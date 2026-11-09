@@ -5,7 +5,7 @@
 anoDB は端末内の SQLite を正とし、変更を **E2EE された Nostr イベント**として既存の公開リレーに流す Local-first DB の SDK です。
 名前の通り、開発者が用意するサーバーは **absolutely none**。API サーバーも DB サーバーもプロジェクト作成も不要で、オフライン読み書き・複数端末同期・他ユーザーの公開プロフィール取得を一つの型付き API で扱えます。
 
-> ステータス: **v0.3 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
+> ステータス: **v0.4 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## 特徴
 
@@ -114,6 +114,45 @@ await db.revokeDevice(lostDevicePubkey)        // 紛失・盗難時
 
 > ⚠ グループ鍵は端末鍵宛てにしか渡しません。**全端末を失うと個人スペースのデータは復元できません**（共有スペースは他のメンバーから戻れます）。端末を2台以上登録しておくことを推奨します。
 
+## 公開データ（Nostr 互換テーブル）
+
+```ts
+import { defineSchema, publicTable } from 'anodb'
+
+const schema = defineSchema({
+  todo: { title: 'text' },                 // 非公開（スペース内で暗号化）
+  posts: publicTable('note'),              // kind 1
+  profiles: publicTable('profile'),        // kind 0
+  follows: publicTable('follows'),         // kind 3
+  reactions: publicTable('reaction'),      // kind 7
+  articles: publicTable('longForm'),       // kind 30023
+})
+
+await db.insertInto('posts').values({ content: 'hello nostr', tags: [['t', 'anodb']] }).execute() // 署名して発行
+await db.syncPublic('posts', { authors: [alice] }, { live: true })                                // 取得・購読
+await db.selectFrom('posts').innerJoin('profiles', 'profiles.author', 'posts.author')
+  .select(['posts.content', 'profiles.name']).execute()                                         // JOIN
+```
+
+## 同期の健全性
+
+```ts
+db.syncHealth()   // { gaps: [{ space, device, missing: [7, 8] }], nip77: { 'wss://…': true } }
+await db.repair() // 全リレーから深く取り直す
+```
+
+NIP-77 対応リレーでは差分照合で取りこぼしなく同期し、リレーが失った封筒は自動で再アップロードします。非対応リレーでも端末ごとの通し番号で欠落を**検出**できます。
+
+## React
+
+```tsx
+import { AnoDBProvider, useQuery, useSyncStatus } from 'anodb/react'
+
+<AnoDBProvider db={db}><App /></AnoDBProvider>
+const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', 0), [])
+const status = useSyncStatus()
+```
+
 ## 列型
 
 | 型 | TS | SQLite |
@@ -132,14 +171,14 @@ await db.revokeDevice(lostDevicePubkey)        // 紛失・盗難時
 - 端末間の整合性は**結果整合**です（在庫・残高・一意制約は不可）。
 - SQL は**手元にあるデータ**にしか効きません。
 - 削除は論理削除（tombstone）で、リレー上の過去イベントは残ります。
-- 同一秒にリレー上限を超えるイベントがあると、初回同期でその秒の一部を取りこぼすことがあります（NIP-77 対応で解消予定）。
+- NIP-77 非対応のリレーしか無い場合、同一秒にリレー上限を超えるイベントがあると取りこぼすことがあります（欠落は `syncHealth()` で検出されます）。
 
 詳細は [docs/DESIGN.md](docs/DESIGN.md) の「未解決の課題」を参照。
 
 ## 開発
 
 ```sh
-npm test              # unit + ローカル WS リレーでの統合テスト（障害注入あり）
+npm test              # unit + 模擬リレー（NIP-77 対応・障害注入あり）での統合テスト
 npm run typecheck
 npm run smoke:public  # 実際の公開リレーで疎通確認（ネットワーク必須）
 ```

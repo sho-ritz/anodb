@@ -28,6 +28,7 @@ import type { KeyStore } from './keystore/types.js'
 import { type KyselyDatabase, type SqlExecutor, createKysely } from './kysely.js'
 import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLength, parseStreamPayload, splitChanges } from './protocol.js'
 import { PublicData } from './public.js'
+import { presetOf } from './public-tables.js'
 import { RelayPool, type RelayPoolOptions } from './relay-pool.js'
 import { SYS_CREATED, SYS_DELETED, validateSchema } from './schema.js'
 import { type Signer, localSigner } from './signer.js'
@@ -63,6 +64,13 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   minAcks?: number
   retryIntervalMs?: number
   relayOptions?: RelayPoolOptions
+  /**
+   * Ask relays (NIP-09) to delete own envelopes that a snapshot superseded. Off by default: relays
+   * may ignore it, and old envelopes are unreadable without old keys anyway.
+   */
+  pruneOldEvents?: boolean
+  /** How often to run NIP-77 reconciliation with connected relays. Default 10 min. */
+  reconcileIntervalMs?: number
   /** Wall clock in ms. For tests. */
   now?: () => number
 }
@@ -395,9 +403,14 @@ export class AnoDBCore<S extends SchemaDefinition> {
     const touched = new Set<string>()
     const nowMs = this.now()
     const writable = new Set<string>()
+    const publicCells: CapturedCell[] = []
     for (const c of cells) {
       const def = this.schema[c.table]
       if (!def) continue
+      if (presetOf(def)) {
+        publicCells.push(c)
+        continue
+      }
       if (!ID_RE.test(c.rowId)) throw new Error(`anoDB: invalid row id "${c.rowId}" (1–128 chars of A-Z a-z 0-9 _ -)`)
       if (!writable.has(c.space)) {
         this.assertCanWrite(c.space)
@@ -422,7 +435,13 @@ export class AnoDBCore<S extends SchemaDefinition> {
     })
     this.notify(touched, 'local')
     this.afterLocalWrite([...bySpace.keys()])
+    if (publicCells.length > 0) await this.commitPublic(publicCells)
     void this.sync?.flush()
+  }
+
+  /** Writes to public tables become signed standard Nostr events (implemented by AnoDB). */
+  protected async commitPublic(_cells: CapturedCell[]): Promise<void> {
+    throw new Error('anoDB: public tables are not supported by this build')
   }
 
   /** Hook (v0.3: automatic snapshots / key rotation). */
@@ -515,13 +534,18 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Seal an inner message into an envelope with the given routing tag and conversation key. */
   protected wrap(innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): NostrEvent {
     if (byteLength(innerJson) > 65_000) throw new Error('anoDB: message too large')
-    const sk = signerSk ?? (this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey())
+    const sk = signerSk ?? this.envelopeKey(tag)
     return signWith(sk, {
       kind: WRAP_KIND,
       created_at: Math.floor(this.now() / 1000),
       tags: [[TAG, tag]],
       content: encrypt(innerJson, convKey),
     })
+  }
+
+  /** Key that signs a space-stream envelope (throwaway by default). */
+  protected envelopeKey(_tag: string): Uint8Array {
+    return this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
   }
 
   /** Envelope to another device's inbox (pairwise NIP-44 with a throwaway key). */
@@ -558,10 +582,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     return {
       tags: () => this.subscriptionTags(),
       ingest: (relay, e) => this.ingestGated(relay, e),
-      resign: (e) => {
-        const sk = this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
-        return signWith(sk, { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
-      },
+      resign: (e) => this.resignEnvelope(e),
       statusChanged: () => this.emitStatus(),
       publishRejected: (id) => this.error('publish-rejected', `every relay rejected event ${id}; call db.flush() to retry`, id),
       now: () => this.now(),
@@ -570,6 +591,12 @@ export class AnoDBCore<S extends SchemaDefinition> {
   }
 
   protected async afterCatchUp(_relay: string): Promise<void> {}
+
+  /** Same content, fresh created_at, new envelope key. */
+  protected resignEnvelope(e: NostrEvent): NostrEvent {
+    const tag = e.tags.find((t) => t[0] === TAG)?.[1] ?? ''
+    return signWith(this.envelopeKey(tag), { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
+  }
 
   protected subscriptionTags(): string[] {
     const active = new Set(this.store.spaces().filter((s) => s.status === 'active').map((s) => s.id))

@@ -1,5 +1,6 @@
 import { decodeHlc } from './hlc.js'
 import type { Change } from './protocol.js'
+import { PUBLIC_SPACE, presetOf } from './public-tables.js'
 import { SYS_CREATED, SYS_DELETED, createTableSql, quoteIdent, tableFingerprint, toSql } from './schema.js'
 import type { NostrEvent, SchemaDefinition, SqlValue, SqliteDriver } from './types.js'
 
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS anodb_messages (
   PRIMARY KEY (space, device, seq)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS anodb_messages_type ON anodb_messages (space, type);
+CREATE TABLE IF NOT EXISTS anodb_prune (event_id TEXT PRIMARY KEY, salt TEXT NOT NULL, tag TEXT NOT NULL, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS anodb_devices (
   device TEXT PRIMARY KEY, identity TEXT NOT NULL, delegation TEXT NOT NULL, name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
 );
@@ -125,11 +127,13 @@ export class Store {
     this.#schema = schema
     this.transaction(() => {
       for (const [table, def] of Object.entries(schema)) {
-        const fp = `${tableFingerprint(def)}|${defaultSpace}`
+        const preset = presetOf(def)
+        const space = preset ? PUBLIC_SPACE : defaultSpace
+        const fp = `${tableFingerprint(def)}|${space}|${preset ? preset.kind : ''}`
         const key = `schema:${table}`
         if (this.getMeta(key) === fp) continue
         this.#db.exec(`DROP TABLE IF EXISTS ${quoteIdent(table)}`)
-        this.#db.exec(createTableSql(table, def, defaultSpace))
+        this.#db.exec(createTableSql(table, def, space))
         const rows = this.#db.all<{ space: string; row_id: string }>('SELECT DISTINCT space, row_id FROM anodb_cells WHERE tbl = ?', [table])
         for (const r of rows) this.#project(r.space, table, r.row_id)
         this.setMeta(key, fp)
@@ -290,6 +294,42 @@ export class Store {
 
   countMessages(space: string, type: string, sinceReceived = 0): number {
     return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_messages WHERE space = ? AND type = ? AND received_at > ?', [space, type, sinceReceived])[0]!.n
+  }
+
+  // ---- prunable envelopes (pruneOldEvents) ----------------------------------------
+
+  putPrunable(eventId: string, salt: string, tag: string, createdAt: number): void {
+    this.#db.run('INSERT OR IGNORE INTO anodb_prune (event_id, salt, tag, created_at) VALUES (?, ?, ?, ?)', [eventId, salt, tag, createdAt])
+  }
+
+  prunable(tags: readonly string[], before: number): Array<{ eventId: string; salt: string }> {
+    if (tags.length === 0) return []
+    return this.#db.all<{ eventId: string; salt: string }>(
+      `SELECT event_id AS eventId, salt FROM anodb_prune WHERE created_at < ? AND tag IN (${tags.map(() => '?').join(',')})`,
+      [before, ...tags],
+    )
+  }
+
+  forgetPrunable(eventId: string): void {
+    this.#db.run('DELETE FROM anodb_prune WHERE event_id = ?', [eventId])
+  }
+
+  // ---- public table rows ---------------------------------------------------------
+
+  publicRows(table: string, where: string, params: readonly SqlValue[]): Array<Record<string, SqlValue>> {
+    return this.#db.all(`SELECT * FROM ${quoteIdent(table)} WHERE space = '${PUBLIC_SPACE}' AND ${where}`, params)
+  }
+
+  putPublicRow(table: string, row: Record<string, SqlValue>): void {
+    const cols = Object.keys(row)
+    this.#db.run(
+      `INSERT OR REPLACE INTO ${quoteIdent(table)} (space, ${cols.map(quoteIdent).join(', ')}) VALUES ('${PUBLIC_SPACE}', ${cols.map(() => '?').join(', ')})`,
+      cols.map((c) => row[c] ?? null),
+    )
+  }
+
+  deletePublicRows(table: string, where: string, params: readonly SqlValue[]): void {
+    this.#db.run(`DELETE FROM ${quoteIdent(table)} WHERE space = '${PUBLIC_SPACE}' AND ${where}`, params)
   }
 
   // ---- devices -------------------------------------------------------------------

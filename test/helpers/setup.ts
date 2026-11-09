@@ -41,3 +41,41 @@ export async function open<const S extends SchemaDefinition>(
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * A second device of `a`'s identity via real QR pairing, backed by a file so it can be reopened
+ * after pairing (as apps do). Returns `{ db, reopen }`.
+ */
+export async function pairedDevice<const S extends SchemaDefinition>(
+  a: { parsePairing(uri: string): { approve(name?: string): Promise<void> } },
+  schema: S,
+  relays: MockRelay[],
+  extra: Partial<AnoDBOptions<S>> = {},
+) {
+  const { mkdtempSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const file = join(mkdtempSync(join(tmpdir(), 'anodb-dev-')), 'db.sqlite')
+  const keyStore = memoryKeyStore()
+  const mk = async () => {
+    const d = await createAnoDB({
+      appId: 'test',
+      schema,
+      driver: nodeSqlite(file),
+      keyStore,
+      relays: relays.map((r) => r.url),
+      discoveryRelays: [],
+      relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },
+      retryIntervalMs: 100,
+      ...extra,
+    })
+    cleanup.push(() => d.close())
+    return d
+  }
+  const fresh = await mk()
+  const offer = await fresh.startPairing()
+  await a.parsePairing(offer.uri).approve('paired')
+  await offer.done
+  await fresh.close()
+  return { db: await mk(), reopen: mk }
+}

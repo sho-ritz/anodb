@@ -152,15 +152,11 @@ export class SyncEngine {
       } else break
     }
     if (this.#state.get(relay) !== st) return
-    try {
-      await this.#host.afterCatchUp?.(relay)
-    } catch {
-      /* best effort */
-    }
-    if (this.#state.get(relay) !== st) return
     for (const [tag, newest] of st.newestByTag) this.#store.advanceCursor(relay, tag, newest)
     st.caughtUp = true
     this.#host.statusChanged()
+    // Extra layers (NIP-77, gap repair) run in the background; they only add data.
+    this.#host.afterCatchUp?.(relay).catch(() => {})
   }
 
   get status(): SyncStatus {

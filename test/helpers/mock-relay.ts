@@ -12,6 +12,8 @@ export interface MockRelayOptions {
   blackhole?: boolean
   /** Do not answer EVENT with OK. */
   silent?: boolean
+  /** Support NIP-77 (Negentropy). */
+  negentropy?: boolean
 }
 
 /** In-process NIP-01 relay with fault injection. */
@@ -22,6 +24,8 @@ export class MockRelay {
   #wss: WebSocketServer | null = null
   #port = 0
   readonly #subs = new Map<WebSocket, Map<string, Filter[]>>()
+  readonly #negs = new Map<string, { reconcile(m: string): string | null }>()
+  negOpens = 0
 
   constructor(opts: MockRelayOptions = {}) {
     this.opts = opts
@@ -108,6 +112,24 @@ export class MockRelay {
       const limit = Math.min(max, ...filters.map((f) => f.limit ?? max))
       for (const e of matched.slice(0, limit)) ws.send(JSON.stringify(['EVENT', id, e]))
       ws.send(JSON.stringify(['EOSE', id]))
+    } else if (type === 'NEG-OPEN' || type === 'NEG-MSG') {
+      const id = rest[0] as string
+      if (!this.opts.negentropy) return void ws.send(JSON.stringify(['NOTICE', 'unknown command']))
+      void import('../../src/sync/negentropy.js').then(({ Negentropy }) => {
+        let neg = this.#negs.get(id)
+        if (type === 'NEG-OPEN') {
+          const filter = rest[1] as Filter
+          const items = [...this.events.values()].filter((e) => matchFilters([filter], e))
+          neg = new Negentropy(items, { initiator: false })
+          this.#negs.set(id, neg)
+          this.negOpens++
+        }
+        if (!neg) return void ws.send(JSON.stringify(['NEG-ERR', id, 'closed: no session']))
+        const out = neg.reconcile(rest[type === 'NEG-OPEN' ? 2 : 1] as string)
+        ws.send(JSON.stringify(['NEG-MSG', id, out ?? '61']))
+      })
+    } else if (type === 'NEG-CLOSE') {
+      this.#negs.delete(rest[0] as string)
     } else if (type === 'CLOSE') {
       this.#subs.get(ws)?.delete(rest[0] as string)
     }

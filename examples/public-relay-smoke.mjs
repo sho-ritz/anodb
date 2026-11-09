@@ -28,5 +28,13 @@ await db.insertInto('ping').values({ at: Date.now() }).execute()
 const t0 = Date.now()
 const s = await db.waitForSync(20_000)
 console.log(`   state=${s.state} pending=${s.pendingEvents} after ${Date.now() - t0} ms`)
+
+console.log('3) NIP-77 reconciliation per relay')
+for (const url of ok) {
+  const t = Date.now()
+  const supported = await db.reconcile(url)
+  console.log(`   ${supported ? '✔ NIP-77' : '– no NIP-77 (time-based fallback)'}  ${url}  (${Date.now() - t} ms)`)
+}
+console.log('   gaps:', JSON.stringify(db.syncHealth().gaps))
 await db.close()
 process.exit(ok.length === relays.length && s.pendingEvents === 0 ? 0 : 1)

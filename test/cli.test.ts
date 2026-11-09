@@ -78,7 +78,8 @@ describe('anodb init', () => {
       { cwd, prompter: s.p, install: async (pm, pkgs) => void installs.push([pm, ...pkgs]) },
     )
     expect(res).toMatchObject({ env: 'browser', framework: 'react', recoveryKey: null })
-    expect(res.files).toEqual(['src/anodb/schema.ts', 'src/anodb/db.ts'])
+    expect(res.files).toEqual(['src/anodb/schema.ts', 'src/anodb/db.ts', 'src/anodb/provider.tsx'])
+    expect(readFileSync(join(cwd, 'src/anodb/provider.tsx'), 'utf8')).toContain("from 'anodb/react'")
     const dbTs = readFileSync(join(cwd, 'src/anodb/db.ts'), 'utf8')
     expect(dbTs).toContain("identity: 'recovery'")
     expect(dbTs).toContain('wss://relay.example')

@@ -185,6 +185,10 @@ class RelayConnection {
       resolve({ outcome: ok ? 'ok' : 'rejected', message })
     } else if (type === 'CLOSED' && typeof a === 'string') {
       this.#pool._dispatchClosed(this.url, a, typeof b === 'string' ? b : '')
+    } else if (type === 'NOTICE') {
+      this.#pool._dispatchNotice(this.url)
+    } else if ((type === 'NEG-MSG' || type === 'NEG-ERR') && typeof a === 'string' && typeof b === 'string') {
+      this.#pool._dispatchNeg(this.url, a, type === 'NEG-MSG' ? { msg: b } : { err: b })
     }
   }
 }
@@ -315,6 +319,62 @@ export class RelayPool {
       }),
     )
     return [...seen.values()]
+  }
+
+  /**
+   * NIP-77 reconciliation of `filter` against one pool relay. Returns ids only we have / only the
+   * relay has, or null if the relay does not support NIP-77 (error, NOTICE or timeout).
+   */
+  async negentropy(
+    relay: string,
+    filter: Filter,
+    local: ReadonlyArray<{ created_at: number; id: string }>,
+    timeoutMs = 8_000,
+  ): Promise<{ have: string[]; need: string[] } | null> {
+    const conn = this.#conns.get(relay)
+    if (!conn?.isOpen) return null
+    const { Negentropy } = await import('./sync/negentropy.js')
+    const neg = new Negentropy(local, { initiator: true })
+    const id = nextSubId('n')
+    const have: string[] = []
+    const need: string[] = []
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout>
+      const done = (r: { have: string[]; need: string[] } | null) => {
+        clearTimeout(timer)
+        this.#neg.delete(`${relay} ${id}`)
+        conn.send(['NEG-CLOSE', id])
+        resolve(r)
+      }
+      const arm = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => done(null), timeoutMs)
+      }
+      this.#neg.set(`${relay} ${id}`, (m) => {
+        if ('err' in m) return done(null)
+        try {
+          const next = neg.reconcile(m.msg, (x) => have.push(x), (x) => need.push(x))
+          if (next === null) return done({ have, need })
+          arm()
+          conn.send(['NEG-MSG', id, next])
+        } catch {
+          done(null)
+        }
+      })
+      arm()
+      if (!conn.send(['NEG-OPEN', id, filter, neg.initiate()])) done(null)
+    })
+  }
+
+  readonly #neg = new Map<string, (m: { msg: string } | { err: string }) => void>()
+
+  /** Relays without NIP-77 typically answer NEG-OPEN with a NOTICE. */
+  _dispatchNotice(relay: string): void {
+    for (const [k, fn] of this.#neg) if (k.startsWith(`${relay} `)) fn({ err: 'notice' })
+  }
+
+  _dispatchNeg(relay: string, subId: string, m: { msg: string } | { err: string }): void {
+    this.#neg.get(`${relay} ${subId}`)?.(m)
   }
 
   close(): void {

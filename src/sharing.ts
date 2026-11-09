@@ -274,15 +274,30 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       size += n
     }
     const sid = randomHex(8)
+    const heads = this.store.deviceMaxSeqs(space)
+    const startedAt = Math.floor(this.now() / 1000)
     this.store.transaction(() => {
-      parts.forEach((body, i) => this.sendToSpace(space, 'snap', { sid, i, n: parts.length, body }, key))
+      parts.forEach((body, i) => this.sendToSpace(space, 'snap', { sid, i, n: parts.length, body: i === 0 ? { ...body, heads } : body }, key))
       this.store.setMeta(`snap:${space}`, String(Date.now()))
     })
+    this.afterSnapshot(space, startedAt)
     void this.sync?.flush()
   }
 
+  /** Hook (v0.4: prune superseded envelopes). */
+  protected afterSnapshot(_space: string, _before: number): void {}
+
+  /** Sequence numbers covered by complete, authorized snapshots: device → seq. */
+  protected snapshotCoverage(space: string): Map<string, number> {
+    const cover = new Map<string, number>()
+    for (const snap of this.#completeSnapshots(space)) {
+      for (const [d, seq] of Object.entries(snap.heads)) if (seq > (cover.get(d) ?? 0)) cover.set(d, seq)
+    }
+    return cover
+  }
+
   /** Snapshots whose parts all arrived and whose author may write. */
-  #completeSnapshots(space: string): Array<{ cells: Change[] }> {
+  #completeSnapshots(space: string): Array<{ cells: Change[]; heads: Record<string, number> }> {
     const groups = new Map<string, Array<{ i: number; n: number; seq: number; identity: string; device: string; body: { ops?: unknown; cells?: unknown } }>>()
     for (const m of this.store.messages(space, 'snap')) {
       const p = JSON.parse(m.payload) as { sid: string; i: number; n: number; body: { ops?: unknown; cells?: unknown } }
@@ -291,14 +306,19 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       list.push({ i: p.i, n: p.n, seq: m.seq, identity: m.identity, device: m.device, body: p.body })
       groups.set(k, list)
     }
-    const out: Array<{ cells: Change[] }> = []
+    const out: Array<{ cells: Change[]; heads: Record<string, number> }> = []
     for (const parts of groups.values()) {
       const n = parts[0]!.n
       if (parts.length !== n || new Set(parts.map((p) => p.i)).size !== n || parts.some((p) => p.n !== n)) continue
       const last = Math.max(...parts.map((p) => p.seq))
       if (!this.isAuthorizedWriter(space, parts[0]!.identity, parts[0]!.device, last)) continue
       const cells = parts.flatMap((p) => (Array.isArray(p.body?.cells) ? (p.body.cells as Change[]) : []))
-      out.push({ cells: cells.filter((c) => Array.isArray(c) && c.length === 5) })
+      const h = parts.find((p) => p.i === 0)?.body as { heads?: unknown } | undefined
+      const heads: Record<string, number> = {}
+      if (h?.heads && typeof h.heads === 'object') {
+        for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
+      }
+      out.push({ cells: cells.filter((c) => Array.isArray(c) && c.length === 5), heads })
     }
     return out
   }

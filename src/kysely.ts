@@ -27,7 +27,7 @@ export type KyselyTable<D extends TableDefinition> = {
   id: ColumnType<string, string | undefined, never>
   createdAt: ColumnType<number | null, never, never>
   updatedAt: ColumnType<number, never, never>
-} & { [K in keyof D]: ColumnType<SelectTs<D[K]> | null, WriteTs<D[K]> | null | undefined, WriteTs<D[K]> | null> }
+} & { [K in Exclude<keyof D, symbol>]: ColumnType<SelectTs<D[K]> | null, WriteTs<D[K]> | null | undefined, WriteTs<D[K]> | null> }
 
 export type KyselyDatabase<S extends SchemaDefinition> = { -readonly [T in keyof S]: KyselyTable<S[T]> }
 

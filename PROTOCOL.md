@@ -141,7 +141,32 @@ others can invite by npub.
 
 ## 6. Sync (informative)
 
-Subscribe per relay to `{"kinds":[7303], "#n":[tags…], "since": cursor − 600}`; after `EOSE`
-page backwards with `until` until nothing new arrives; then advance per-(relay, tag) cursors.
-Envelopes are retried until `minAcks` relays acknowledge them; envelopes older than 300 s are
-re-signed with a fresh `created_at` (and a new throwaway key) before resending.
+1. **NIP-77**: `NEG-OPEN` with `{"kinds":[7303],"#n":[tags…]}` over the local envelope set; fetch
+   `need` ids (repeat until complete — relays cap id lookups too), re-publish `have` envelopes.
+   A relay answering `NEG-ERR`, a `NOTICE`, or nothing is treated as unsupported.
+2. **Time-based**: `{"kinds":[7303],"#n":[tags…],"since":cursor−600}` per relay; after `EOSE`, page
+   with `until` until nothing new; advance per-(relay, tag) cursors.
+3. **Gaps**: per (space, device), every `seq` above the coverage of complete snapshots
+   (`heads` in part 0) must be present; missing ones trigger a deep re-fetch.
+4. **Snapshots**: new members/devices start from them.
+
+Outbox: retry until `minAcks` relays acknowledge; envelopes older than 300 s are re-signed (new
+throwaway key, fresh `created_at`, same content).
+
+Optional pruning: envelope key = `sha256("anodb/v2/prune/" + hex(deviceSk) + "/" + salt)`; after a
+snapshot the author publishes NIP-09 kind 5 `["e", id], ["k", "7303"]` for its older envelopes.
+
+## 7. Public tables
+
+Standard events, unencrypted, signed by the identity key:
+
+| preset | kind | row id | replace rule |
+|---|---|---|---|
+| note | 1 | event id | none (delete = kind 5) |
+| profile | 0 | author | newest per author |
+| follows | 3 | `author:target` | newest list per author |
+| reaction | 7 | event id | none |
+| longForm | 30023 | `author:d` | newest per address |
+
+A client publishing a new version of a replaceable event MUST use a `created_at` greater than the
+version it replaces.

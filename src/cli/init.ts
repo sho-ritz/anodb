@@ -228,6 +228,7 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
   }
   write(`src/anodb/schema.${ext}`, schemaTemplate())
   write(`src/anodb/db.${ext}`, dbTemplate(env, appId, keyMode, relays, ts))
+  if (framework === 'react' && env !== 'node') write(`src/anodb/provider.${ts ? 'tsx' : 'jsx'}`, reactTemplate(ts))
   if (envVars) {
     writeEnv(join(deps.cwd, '.env'), envVars)
     files.push('.env')
@@ -268,6 +269,24 @@ function ensureGitignore(path: string): boolean {
   if (content.split('\n').some((l) => l.trim() === '.env' || l.trim() === '.env*' || l.trim() === '*.env')) return false
   writeFileSync(path, `${content}${content && !content.endsWith('\n') ? '\n' : ''}.env\n`)
   return true
+}
+
+export function reactTemplate(ts: boolean): string {
+  return `import { useEffect, useState${ts ? ', type ReactNode' : ''} } from 'react'
+import { AnoDBProvider } from 'anodb/react'
+import { openDB } from './db${ts ? '' : '.js'}'
+
+// <DBProvider><App /></DBProvider>, then in components:
+//   const todos = useQuery((db) => db.selectFrom('todo').selectAll(), [])
+export function DBProvider({ children }${ts ? ': { children: ReactNode }' : ''}) {
+  const [db, setDb] = useState${ts ? '<Awaited<ReturnType<typeof openDB>> | null>' : ''}(null)
+  useEffect(() => {
+    void openDB().then(setDb)
+  }, [])
+  if (!db) return null
+  return <AnoDBProvider db={db}>{children}</AnoDBProvider>
+}
+`
 }
 
 export function schemaTemplate(): string {

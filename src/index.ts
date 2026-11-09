@@ -1,4 +1,7 @@
 export { AnoDB, createAnoDB } from './anodb.js'
+export type { PublicSyncFilter, SyncGap } from './anodb.js'
+export { publicTable, presets } from './public-tables.js'
+export type { PresetName } from './public-tables.js'
 export { AnoDBCore, AnoDBError } from './db.js'
 export type { Device, Invitation, JoinRequest, Member, PairingOffer } from './sharing.js'
 export type { Role } from './membership.js'
