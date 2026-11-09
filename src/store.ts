@@ -68,9 +68,26 @@ export class Store {
   #schema: SchemaDefinition = {}
   #depth = 0
 
+  #closed = false
+
   constructor(db: SqliteDriver) {
-    this.#db = db
-    db.exec(INTERNAL_SCHEMA)
+    // Background work (sync, reconciliation, timers) may still finish after close(): turn every
+    // later call into a no-op instead of an error from a closed SQLite handle.
+    this.#db = {
+      exec: (sql) => {
+        if (!this.#closed) db.exec(sql)
+      },
+      run: (sql, params) => {
+        if (!this.#closed) db.run(sql, params)
+      },
+      all: <T>(sql: string, params?: readonly SqlValue[]) => (this.#closed ? [] : db.all<T>(sql, params)),
+      close: () => {
+        if (this.#closed) return
+        this.#closed = true
+        db.close()
+      },
+    }
+    this.#db.exec(INTERNAL_SCHEMA)
   }
 
   get driver(): SqliteDriver {
@@ -293,7 +310,7 @@ export class Store {
   }
 
   countMessages(space: string, type: string, sinceReceived = 0): number {
-    return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_messages WHERE space = ? AND type = ? AND received_at > ?', [space, type, sinceReceived])[0]!.n
+    return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_messages WHERE space = ? AND type = ? AND received_at > ?', [space, type, sinceReceived])[0]?.n ?? 0
   }
 
   // ---- prunable envelopes (pruneOldEvents) ----------------------------------------
@@ -507,7 +524,7 @@ export class Store {
   }
 
   outboxSize(): number {
-    return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_outbox')[0]!.n
+    return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_outbox')[0]?.n ?? 0
   }
 
   recordAck(eventId: string, relay: string, status: AckStatus, message: string): void {
