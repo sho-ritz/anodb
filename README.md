@@ -1,31 +1,36 @@
-# anoDB — Absolutely None DB
+<p align="center">
+  <img src="assets/anodb-logo.svg" alt="anoDB — Absolutely None DB" width="720" />
+</p>
 
-**Local-first SQLite database that syncs over Nostr relays — no backend to provision.**
+<h1 align="center">anoDB — Absolutely None DB</h1>
 
-anoDB は端末内の SQLite を正とし、変更を **E2EE された Nostr イベント**として既存の公開リレーに流す Local-first DB の SDK です。
-名前の通り、開発者が用意するサーバーは **absolutely none**。API サーバーも DB サーバーもプロジェクト作成も不要で、オフライン読み書き・複数端末同期・他ユーザーの公開プロフィール取得を一つの型付き API で扱えます。
+<p align="center"><strong>A local-first SQLite database that syncs over Nostr relays — no backend to provision.</strong></p>
 
-> ステータス: **v0.1 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
+anoDB is a local-first database SDK that treats on-device SQLite as the source of truth and distributes changes as **end-to-end encrypted Nostr events** through existing public relays.
 
-## 特徴
+True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device synchronization, and fetching other users' public Nostr profiles are available through a single typed API.
 
-- 📴 **オフラインファースト** — 書き込みは常にローカル SQLite へ即時コミット。ネットワークは後から追いつく
-- 🔐 **E2EE** — 値・テーブル名・列名・appId はリレーから見えない（NIP-44 v2 で所有者自身宛てに暗号化）
-- 🔀 **決定論的マージ** — セル（行×列）単位の Last-Writer-Wins + Hybrid Logical Clock。順不同・重複・再送に強い
-- 📮 **Outbox** — `minAcks` 個のリレーが保存を確認するまで再送。オフラインで書いたものも確実に届ける
-- 🧬 **使い捨ての射影テーブル** — スキーマを変えてもセルから再構築。古い端末が知らない列も失わない
-- 🌐 **Nostr 互換** — kind 0（プロフィール）/ 1（投稿）/ 10002（NIP-65 リレーリスト）を読み書き。取得結果は SQLite にキャッシュ
-- 🪶 依存は `nostr-tools` と `@noble/hashes` のみ
+> **Status: v0.1 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md)) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations.
 
-## インストール
+## Features
+
+- 📴 **Offline-first** — Writes commit immediately to local SQLite. The network catches up later.
+- 🔐 **End-to-end encryption** — Values, table names, column names, and the app ID are hidden from relays (encrypted to the owner's own key using NIP-44 v2).
+- 🔀 **Deterministic merging** — Cell-level (row × column) Last-Writer-Wins with Hybrid Logical Clocks, designed to tolerate out-of-order delivery, duplicates, and retries.
+- 📮 **Outbox** — Retries until `minAcks` relays acknowledge storage, including changes made offline.
+- 🧬 **Rebuildable projection tables** — Reconstruct tables from stored cells after schema changes without discarding columns unknown to older devices.
+- 🌐 **Nostr compatibility** — Read and publish kind 0 (profiles), kind 1 (notes), and kind 10002 (NIP-65 relay lists). Retrieved data is cached in SQLite.
+- 🪶 **Minimal dependencies** — Only `nostr-tools` and `@noble/hashes`.
+
+## Installation
 
 ```sh
 npm install anodb
 ```
 
-Node.js 22.13+（`node:sqlite`）またはブラウザ（`sql.js` などの同期 SQLite）で動きます。
+Runs on Node.js 22.13+ (using `node:sqlite`) or in browsers with a synchronous SQLite implementation such as `sql.js`.
 
-## 使い方
+## Usage
 
 ```ts
 import { createAnoDB, defineSchema } from 'anodb'
@@ -39,37 +44,37 @@ const db = createAnoDB({
   appId: 'com.example.todo',
   schema,
   driver: nodeSqlite('todo.sqlite'),
-  // secretKey: 'nsec1…',   // 省略時は生成して DB に保存
-  // relays: [...],          // 省略時は DEFAULT_RELAYS。[] でローカル専用
+  // secretKey: 'nsec1…',   // Generated and saved in the DB if omitted
+  // relays: [...],          // Defaults to DEFAULT_RELAYS; [] enables local-only mode
 })
 
 const todos = db.table('todo')
-const id = todos.insert({ title: '買い物', done: false })
+const id = todos.insert({ title: 'Buy groceries', done: false })
 todos.update(id, { done: true })
 
 todos.findMany({ where: { done: false }, orderBy: { createdAt: 'desc' }, limit: 20 })
-db.sql('SELECT title FROM todo WHERE priority > ?', [1]) // 読み取り専用 SQL
+db.sql('SELECT title FROM todo WHERE priority > ?', [1]) // Read-only SQL
 
-// 変更（ローカル/他端末から）を購読
+// Subscribe to changes from this device or other devices
 const stop = todos.subscribe({ where: { done: false } }, (rows) => render(rows))
 
-// 複数の書き込みをまとめて 1 トランザクション（= 1 イベント）に
+// Group multiple writes into one transaction (= one event)
 db.transaction((tx) => {
   const a = tx.insert('todo', { title: 'A' })
   tx.update('todo', a, { priority: 1 })
 })
 ```
 
-### 別の端末で同期する
+### Sync across devices
 
-同じ所有者鍵を渡すだけです。
+Simply provide the same owner key on another device.
 
 ```ts
-const key = db.exportSecretKey() // nsec1…  安全な方法で別端末へ
+const key = db.exportSecretKey() // nsec1… Transfer securely to the other device
 const other = createAnoDB({ appId: 'com.example.todo', schema, driver: nodeSqlite('b.sqlite'), secretKey: key })
 ```
 
-### 同期状態
+### Sync status
 
 ```ts
 db.status // { state: 'offline' | 'syncing' | 'synced', connectedRelays, pendingEvents }
@@ -78,19 +83,21 @@ db.onError((e) => console.warn(e.code, e.message))
 await db.waitForSync()
 ```
 
-### 公開データ（他の Nostr クライアントと互換）
+### Public Nostr data
+
+Compatible with other Nostr clients.
 
 ```ts
 const { value: profile, status } = await db.nostr.getProfile(pubkey)
-// status: 'synced' | 'stale'（取得できずキャッシュを返した） | 'unavailable'
-db.nostr.cachedProfile(pubkey)           // ネットワークに触れない
+// status: 'synced' | 'stale' (cached data returned after a fetch failure) | 'unavailable'
+db.nostr.cachedProfile(pubkey)           // No network access
 
 db.nostr.publishProfile({ name: 'alice', about: 'hello' })
-db.nostr.publishNote('anoDB から投稿', [['t', 'anodb']])
+db.nostr.publishNote('Posting from anoDB', [['t', 'anodb']])
 await db.nostr.getNotes(pubkey, { limit: 20 })
 ```
 
-### ブラウザ（sql.js）
+### Browser (sql.js)
 
 ```ts
 import initSqlJs from 'sql.js'
@@ -100,39 +107,39 @@ const SQL = await initSqlJs()
 const db = createAnoDB({ appId, schema, driver: sqlJsDriver(new SQL.Database()) })
 ```
 
-sql.js はメモリ DB です。永続化が必要なら Worker 上で同期 VFS（sqlite-wasm の OPFS SAH Pool など）を `SqliteDriver` として実装してください（OPFS ドライバ同梱は v0.3 予定）。
+`sql.js` uses an in-memory database. For persistence, implement a synchronous VFS (such as the sqlite-wasm OPFS SAH Pool) in a Worker and expose it as a `SqliteDriver`. A bundled OPFS driver is planned for v0.3.
 
-## 列型
+## Column types
 
-| 型 | TS | SQLite |
+| Type | TypeScript | SQLite |
 |---|---|---|
 | `text` | `string` | TEXT |
-| `integer` | `number`（safe integer） | INTEGER |
+| `integer` | `number` (safe integer) | INTEGER |
 | `real` | `number` | REAL |
 | `boolean` | `boolean` | INTEGER 0/1 |
 | `json` | `unknown` | TEXT |
 
-全列 nullable。各行には `id`, `createdAt`, `updatedAt` が自動で付きます。
+All columns are nullable. Every row automatically includes `id`, `createdAt`, and `updatedAt`.
 
-## 何ができないか
+## Limitations
 
-- 公開リレーは**保存を保証しません**。複数リレー + `minAcks` で確率を上げるだけです。
-- 端末間の整合性は**結果整合**です（在庫・残高・一意制約は不可）。
-- SQL は**手元にあるデータ**にしか効きません。
-- 削除は論理削除（tombstone）で、リレー上の過去イベントは残ります。
-- v0.1 は**所有者1人（複数端末）**のみ。他人との共有は v0.2 予定。
-- 同一秒にリレー上限を超えるイベントがあると、初回同期でその秒の一部を取りこぼすことがあります（NIP-77 対応で解消予定）。
+- **Public relays do not guarantee retention.** Using multiple relays and `minAcks` improves durability but cannot guarantee it.
+- **Consistency across devices is eventual.** This is not suitable for enforcing global inventory counts, balances, or uniqueness constraints.
+- **SQL queries only cover locally available data.**
+- **Deletion uses tombstones.** Historical events may remain on relays.
+- **v0.1 supports one owner across multiple devices.** Sharing with other users is planned for v0.2.
+- **Initial synchronization can miss events** when the number of events in a single second exceeds a relay's result limit. NIP-77 support is planned to address this.
 
-詳細は [docs/DESIGN.md](docs/DESIGN.md) の「未解決の課題」を参照。
+For more, see the unresolved issues in [docs/DESIGN.md](docs/DESIGN.md).
 
-## 開発
+## Development
 
 ```sh
-npm test              # unit + ローカル WS リレーでの統合テスト（障害注入あり）
+npm test              # Unit and local WebSocket relay integration tests (with fault injection)
 npm run typecheck
-npm run smoke:public  # 実際の公開リレーで疎通確認（ネットワーク必須）
+npm run smoke:public  # Connectivity smoke test against public relays (requires network)
 ```
 
-## ライセンス
+## License
 
 MIT
