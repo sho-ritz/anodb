@@ -79,17 +79,30 @@ class RelayConnection {
       this.#pool._onOpen(this)
     }
     ws.onmessage = (msg: MessageEvent) => this.#onMessage(msg.data)
-    ws.onerror = () => {}
-    ws.onclose = () => {
-      const wasOpen = this.#open
-      this.#open = false
-      this.#ws = null
-      for (const w of this.#openWaiters.splice(0)) w(false)
-      for (const [, resolve] of this.#pendingOk) resolve({ outcome: 'disconnected', message: 'connection closed' })
-      this.#pendingOk.clear()
-      if (wasOpen) this.#pool._onClose(this)
-      this.#scheduleReconnect()
+    // Some implementations (Node 22's undici) fire only `error`, never `close`, when the connection fails.
+    ws.onerror = () => {
+      if (!this.#open) this.#teardown(ws)
     }
+    ws.onclose = () => this.#teardown(ws)
+  }
+
+  /** Idempotent per socket: handles whichever of error/close arrives first. */
+  #teardown(ws: WebSocket): void {
+    if (this.#ws !== ws) return
+    const wasOpen = this.#open
+    this.#open = false
+    this.#ws = null
+    ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null
+    try {
+      ws.close()
+    } catch {
+      /* ignore */
+    }
+    for (const w of this.#openWaiters.splice(0)) w(false)
+    for (const [, resolve] of this.#pendingOk) resolve({ outcome: 'disconnected', message: 'connection closed' })
+    this.#pendingOk.clear()
+    if (wasOpen) this.#pool._onClose(this)
+    this.#scheduleReconnect()
   }
 
   waitOpen(timeoutMs: number): Promise<boolean> {
