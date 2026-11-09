@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+<title id="title">anoDB neon retro logo</title>
+<desc id="desc">A dreamy retro-futurist neon logo, with glowing database cylinders linked by orbital lines on a midnight-purple background.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#100c29"/><stop offset=".55" stop-color="#211239"/><stop offset="1" stop-color="#090d22"/></linearGradient>
+ <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffba90"/><stop offset=".55" stop-color="#f477bc"/><stop offset="1" stop-color="#7846ae"/></linearGradient>
+ <linearGradient id="type" x1="0" y1="0" x2="1" y2=".2"><stop stop-color="#73f8e9"/><stop offset=".5" stop-color="#adadff"/><stop offset="1" stop-color="#ff8fca"/></linearGradient>
+ <linearGradient id="node" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#75f7e3"/><stop offset="1" stop-color="#d29aff"/></linearGradient>
+ <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <pattern id="grid" width="35" height="35" patternUnits="userSpaceOnUse"><path d="M35 0H0V35" fill="none" stroke="#a66bd2" stroke-opacity=".12" stroke-width="1"/></pattern>
+ <clipPath id="sunclip"><circle cx="215" cy="187" r="103"/></clipPath>
+</defs>
+<rect width="1200" height="420" rx="30" fill="url(#bg)"/>
+<rect width="1200" height="420" rx="30" fill="url(#grid)" opacity=".35"/>
+<g opacity=".65" fill="#e6d8ff"><circle cx="75" cy="65" r="2"/><circle cx="410" cy="68" r="2"/><circle cx="1106" cy="66" r="2.5"/><circle cx="1030" cy="330" r="1.5"/><circle cx="95" cy="334" r="1.5"/><circle cx="1080" cy="185" r="1"/></g>
+<circle cx="215" cy="187" r="103" fill="url(#sun)" opacity=".85"/>
+<g clip-path="url(#sunclip)" fill="#231439" opacity=".64"><rect x="105" y="219" width="220" height="8"/><rect x="105" y="236" width="220" height="10"/><rect x="105" y="257" width="220" height="13"/><rect x="105" y="282" width="220" height="17"/></g>
+<g fill="none" stroke="#79f4e9" stroke-width="3" opacity=".85" filter="url(#glow)"><path d="M121 162C139 105 289 105 310 163"/><path d="M121 210C145 263 288 262 310 209"/></g>
+<g transform="translate(166 133)" stroke="url(#node)" stroke-width="4" fill="#161c3c" fill-opacity=".84" filter="url(#glow)"><path d="M0 26V97C0 115 99 115 99 97V26"/><ellipse cx="49.5" cy="26" rx="49.5" ry="18"/><path d="M0 61C0 80 99 80 99 61M0 94C0 112 99 112 99 94" fill="none"/></g>
+<g stroke="#87fcea" stroke-width="3" fill="#98fff2" filter="url(#glow)"><circle cx="127" cy="164" r="5"/><circle cx="308" cy="211" r="5"/><circle cx="212" cy="113" r="4"/></g>
+<path d="M348 327H1120" stroke="#ff8fca" stroke-opacity=".25" stroke-width="2"/>
+<text x="377" y="238" font-size="150" font-weight="750" font-family="Trebuchet MS, Arial, sans-serif" letter-spacing="-9" fill="url(#type)" filter="url(#glow)">anoDB</text>
+<text x="384" y="290" font-size="23" font-family="Arial, sans-serif" font-weight="500" letter-spacing="8" fill="#e1b9e9">LOCAL FIRST · OPEN BY DESIGN</text>
+<text x="1120" y="371" text-anchor="end" font-size="15" letter-spacing="4" fill="#927dac" font-family="Arial, sans-serif">STAY IN SYNC, STAY CHILL</text>
+<rect x="1" y="1" width="1198" height="418" rx="29" fill="none" stroke="#b990e7" stroke-opacity=".28" stroke-width="2"/>
+</svg>
