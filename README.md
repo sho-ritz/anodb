@@ -1,35 +1,43 @@
-# anoDB — Absolutely None DB
+<p align="center">
+  <img src="assets/anodb-logo.svg" alt="anoDB — Absolutely None DB" width="720" />
+</p>
 
-**Local-first SQLite database that syncs over Nostr relays — no backend to provision.**
+<h1 align="center">anoDB — Absolutely None DB</h1>
 
-anoDB は端末内の SQLite を正とし、変更を **E2EE された Nostr イベント**として既存の公開リレーに流す Local-first DB の SDK です。
-名前の通り、開発者が用意するサーバーは **absolutely none**。API サーバーも DB サーバーもプロジェクト作成も不要で、オフライン読み書き・複数端末同期・他ユーザーの公開プロフィール取得を一つの型付き API で扱えます。
+<p align="center"><strong>A local-first SQLite database that syncs over Nostr relays — no backend to provision.</strong></p>
 
-> ステータス: **v0.4 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
+anoDB is a local-first database SDK that treats on-device SQLite as the source of truth and distributes changes as **end-to-end encrypted Nostr events** through existing public relays.
 
-## 特徴
+True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-- 📴 **オフラインファースト** — 書き込みは常にローカル SQLite へ即時コミット。ネットワークは後から追いつく
-- 🔐 **E2EE** — 値・テーブル名・列名・appId はリレーから見えない（NIP-44 v2 で所有者自身宛てに暗号化）
-- 🔀 **決定論的マージ** — セル（行×列）単位の Last-Writer-Wins + Hybrid Logical Clock。順不同・重複・再送に強い
-- 📮 **Outbox** — `minAcks` 個のリレーが保存を確認するまで再送。オフラインで書いたものも確実に届ける
-- 🧬 **使い捨ての射影テーブル** — スキーマを変えてもセルから再構築。古い端末が知らない列も失わない
-- 🌐 **Nostr 互換** — kind 0（プロフィール）/ 1（投稿）/ 10002（NIP-65 リレーリスト）を読み書き。取得結果は SQLite にキャッシュ
-- 🪶 依存は `nostr-tools` と `@noble/hashes` のみ
+> **Status: v0.4 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
-## インストール
+## Features
+
+- 📴 **Offline-first** — Writes commit immediately to local SQLite. The network catches up later.
+- 🧾 **Type-safe SQL** — A [Kysely](https://kysely.dev) query builder with JOINs, plus raw SQL writes (`UPDATE … LIKE`, `INSERT … SELECT`, upserts) that are captured and synced.
+- 👥 **Sharing** — Spaces with owner / admin / writer / reader roles, invitations by npub or one-time links, removal with cut-offs, key rotation.
+- 🔐 **Secure by default** — Writes are signed by per-device keys, keys are stored encrypted, relays see only throwaway pubkeys and rotating tags, and new members never see deleted history.
+- 🔀 **Deterministic merging** — Cell-level Last-Writer-Wins with Hybrid Logical Clocks; tolerant of out-of-order delivery, duplicates and retries.
+- 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
+- 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
+- ⚛️ **React hooks** — `useQuery`, `useSyncStatus`.
+
+## Get started
+
+```sh
+npx anodb init   # interactive: language → environment → framework → keys → relays (with check) → files
+```
+
+Or install manually:
 
 ```sh
 npm install anodb
 ```
 
-Node.js 22.13+（`node:sqlite`）またはブラウザ（`sql.js` などの同期 SQLite）で動きます。
+Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 22.13+ (`node:sqlite`), and React Native / Expo (`expo-sqlite`).
 
-## 使い方
-
-```sh
-npx anodb init        # 対話式セットアップ（言語 → 環境 → フレームワーク → 鍵 → リレー → ファイル生成）
-```
+## Usage
 
 ```ts
 import { createAnoDB, defineSchema } from 'anodb'
@@ -41,86 +49,87 @@ const schema = defineSchema({
 
 const db = await createAnoDB({ appId: 'com.example.todo', schema, driver })
 
-// SQL ライクで型安全（Kysely）。JOIN も型が付く
-await db.insertInto('todo').values({ title: '買い物', done: false }).execute()
-await db.updateTable('todo').set({ done: true }).where('title', 'like', '%買%').execute()
+// SQL-like and type-safe, JOINs included
+await db.insertInto('todo').values({ title: 'Buy groceries', done: false }).execute()
+await db.updateTable('todo').set({ done: true }).where('title', 'like', '%groceries%').execute()
 const rows = await db
   .selectFrom('todo')
   .leftJoin('tag', 'tag.todoId', 'todo.id')
   .select(['todo.title', 'tag.name'])
   .execute()
 
-// 生 SQL でも書ける（書き込みはトリガーで捕捉され、暗号化・同期される）
-await db.execute(`UPDATE todo SET done = 1 WHERE priority > ?`, [2])
+// Raw SQL works too; writes are captured by triggers, encrypted and synced
+await db.execute('UPDATE todo SET done = 1 WHERE priority > ?', [2])
 
-// トランザクション（1回の同期単位）
+// Transactions (atomic locally, one sync unit)
 await db.transaction().execute(async (tx) => {
   await tx.insertInto('todo').values({ title: 'A' }).execute()
 })
 
-// 変更を購読（ローカル / 他端末どちらの変更でも再実行）
+// Live queries: re-run on local or remote changes
 const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(rows))
 ```
 
-- 各テーブルには `id`, `space`, `createdAt`, `updatedAt` が自動で付きます（`space` の既定は個人スペース）
-- SQLite の流儀どおり、`boolean` は `0 | 1`、`json` は JSON テキストとして読めます
+- Every table gets `id`, `space`, `createdAt` and `updatedAt` (`space` defaults to your personal space).
+- Following SQLite semantics, `boolean` reads as `0 | 1` and `json` reads as JSON text.
 
-### 鍵（既定で最も安全な設定）
+### Keys (most secure defaults)
 
-| 環境 | 既定の保存先 |
+| Environment | Default key store |
 |---|---|
-| ブラウザ / Tauri | IndexedDB ＋取り出し不可の WebCrypto 鍵で暗号化 |
-| Node | 環境変数（`npx anodb init` が `.env` に端末鍵と委任だけを書く。本人の鍵は書かない） |
+| Browser / Tauri | IndexedDB, sealed with a non-extractable WebCrypto key |
+| Node | Environment variables (`npx anodb init` writes only the device key and delegation to `.env`, never the identity key) |
 | Electron / Expo | `electronKeyStore(safeStorage)` / `secureStorageKeyStore(expo-secure-store)` |
 
-- 書き込みはすべて**端末鍵**で署名され、本人の鍵（identity）は端末の登録時に一度だけ使います
-- `identity: 'recovery'` にすると、本人の鍵は `onRecoveryKey` で一度だけ渡され、端末には残りません
-- `signer: nip07Signer() / nip46Signer(uri) / nip55Signer(bridge)` で外部署名者を使えます
-- リレーに見えるのは「使い捨ての公開鍵・世代ごとに変わるタグ・時刻・サイズ」だけです（`metadataProtection: 'none'` で無効化）
+- Every write is signed by a **device key**; the identity key is used once to register the device.
+- With `identity: 'recovery'`, the identity key is handed to `onRecoveryKey` once and never stored on the device.
+- External signers: `signer: nip07Signer() | nip46Signer(uri) | nip55Signer(bridge)`.
+- Relays see only throwaway pubkeys, per-epoch tags, times and sizes (`metadataProtection: 'none'` turns this off for allow-listed relays).
 
-## 共有（スペース）
+## Sharing (spaces)
 
 ```ts
-const family = await db.createSpace('家族')
-await db.insertInto('todo').values({ title: '牛乳', space: family }).execute()
+const family = await db.createSpace('Family')
+await db.insertInto('todo').values({ title: 'Milk', space: family }).execute()
 
-// npub で招待（相手は事前に db.publishKeyPackage()）
+// Invite by npub (the invitee publishes a key package first: db.publishKeyPackage())
 await db.invite(family, 'npub1alice…', 'writer')        // owner / admin / writer / reader
-// 相手側: 承諾するまで何も同期されない
+// Invitee: nothing syncs until they accept
 alice.onInvitation((i) => …); await alice.acceptInvitation(i.space)
 
-// 招待リンク（使い捨て・期限付き・admin の承認必須）
+// One-time, expiring invite link; an admin must approve each request
 const link = await db.createInviteLink(family, { role: 'reader', expiresInMs: 86_400_000 })
 db.onJoinRequest((req) => db.approveJoinRequest(req.id))
 
-await db.setRole(family, who, 'reader'); await db.removeMember(family, who)
+await db.setRole(family, who, 'reader')
+await db.removeMember(family, who)
 ```
 
-- 新メンバーには**現在の状態のスナップショットだけ**が渡ります（削除済みの内容・編集履歴は渡りません）
-- グループ鍵はメンバー削除・端末失効・追加・30日ごとに入れ替わります
-- 外したメンバーの書き込みは、端末ごとの通し番号のカットオフ以降すべて拒否されます（日付の偽装も無効）
+- New members receive **only a snapshot of the current state** — no edit history and no deleted content.
+- Group keys rotate on member removal, device revocation, member addition and every 30 days.
+- After removal, writes beyond each device's sequence-number cut-off are rejected (backdating does not help).
 
-### 端末の追加と失効
+### Adding and revoking devices
 
 ```ts
-// 新しい端末: QR を表示
-const offer = await newDevice.startPairing()   // offer.uri を QR に、offer.code を表示
-await offer.done; await newDevice.close()      // その後、開き直すと同じ ID になっている
-// 既存の端末: QR を読んでコードを照合してから承認（本人の鍵はコピーされない）
-const req = db.parsePairing(uri); /* req.code を確認 */ await req.approve('ノートPC')
+// New device: show a QR code
+const offer = await newDevice.startPairing()   // render offer.uri as QR, show offer.code
+await offer.done; await newDevice.close()      // reopen: it now has the same identity
+// Existing device: scan, compare the code, approve (the identity key is never copied)
+const req = db.parsePairing(uri); /* check req.code */ await req.approve('Laptop')
 
-await db.revokeDevice(lostDevicePubkey)        // 紛失・盗難時
+await db.revokeDevice(lostDevicePubkey)        // lost or stolen device
 ```
 
-> ⚠ グループ鍵は端末鍵宛てにしか渡しません。**全端末を失うと個人スペースのデータは復元できません**（共有スペースは他のメンバーから戻れます）。端末を2台以上登録しておくことを推奨します。
+> ⚠ Group keys are delivered to device keys only. **If you lose every device, your personal space cannot be recovered** (shared spaces can be restored by other members). Register at least two devices.
 
-## 公開データ（Nostr 互換テーブル）
+## Public Nostr data (tables)
 
 ```ts
 import { defineSchema, publicTable } from 'anodb'
 
 const schema = defineSchema({
-  todo: { title: 'text' },                 // 非公開（スペース内で暗号化）
+  todo: { title: 'text' },                 // private (encrypted in a space)
   posts: publicTable('note'),              // kind 1
   profiles: publicTable('profile'),        // kind 0
   follows: publicTable('follows'),         // kind 3
@@ -128,20 +137,23 @@ const schema = defineSchema({
   articles: publicTable('longForm'),       // kind 30023
 })
 
-await db.insertInto('posts').values({ content: 'hello nostr', tags: [['t', 'anodb']] }).execute() // 署名して発行
-await db.syncPublic('posts', { authors: [alice] }, { live: true })                                // 取得・購読
+await db.insertInto('posts').values({ content: 'hello nostr', tags: [['t', 'anodb']] }).execute() // signed & published
+await db.syncPublic('posts', { authors: [alice] }, { live: true })                                // fetch & follow
 await db.selectFrom('posts').innerJoin('profiles', 'profiles.author', 'posts.author')
   .select(['posts.content', 'profiles.name']).execute()                                         // JOIN
 ```
 
-## 同期の健全性
+Public tables are **not encrypted**. Notes and reactions cannot be edited (deleting publishes a NIP-09 request); profiles, follow lists and articles are replaceable.
+
+## Sync health
 
 ```ts
-db.syncHealth()   // { gaps: [{ space, device, missing: [7, 8] }], nip77: { 'wss://…': true } }
-await db.repair() // 全リレーから深く取り直す
+db.status        // { state: 'offline' | 'syncing' | 'synced', connectedRelays, pendingEvents }
+db.syncHealth()  // { gaps: [{ space, device, missing: [7, 8] }], nip77: { 'wss://…': true } }
+await db.repair() // deep re-fetch from every relay
 ```
 
-NIP-77 対応リレーでは差分照合で取りこぼしなく同期し、リレーが失った封筒は自動で再アップロードします。非対応リレーでも端末ごとの通し番号で欠落を**検出**できます。
+On NIP-77 relays, reconciliation is exact and lost envelopes are re-uploaded automatically. On other relays, per-device sequence numbers still **detect** anything missing.
 
 ## React
 
@@ -153,36 +165,38 @@ const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '
 const status = useSyncStatus()
 ```
 
-## 列型
+## Column types
 
-| 型 | TS | SQLite |
-|---|---|---|
-| `text` | `string` | TEXT |
-| `integer` | `number`（safe integer） | INTEGER |
-| `real` | `number` | REAL |
-| `boolean` | `boolean` | INTEGER 0/1 |
-| `json` | `unknown` | TEXT |
+| Type | Write (TS) | Read (TS) | SQLite |
+|---|---|---|---|
+| `text` | `string` | `string` | TEXT |
+| `integer` | `number` (safe integer) | `number` | INTEGER |
+| `real` | `number` | `number` | REAL |
+| `boolean` | `boolean \| 0 \| 1` | `0 \| 1` | INTEGER |
+| `json` | any JSON value | `string` (JSON text) | TEXT |
 
-全列 nullable。各行には `id`, `createdAt`, `updatedAt` が自動で付きます。
+All columns are nullable.
 
-## 何ができないか
+## Limitations
 
-- 公開リレーは**保存を保証しません**。複数リレー + `minAcks` で確率を上げるだけです。
-- 端末間の整合性は**結果整合**です（在庫・残高・一意制約は不可）。
-- SQL は**手元にあるデータ**にしか効きません。
-- 削除は論理削除（tombstone）で、リレー上の過去イベントは残ります。
-- NIP-77 非対応のリレーしか無い場合、同一秒にリレー上限を超えるイベントがあると取りこぼすことがあります（欠落は `syncHealth()` で検出されます）。
+- **Public relays do not guarantee retention.** Multiple relays, `minAcks` and repair improve durability but cannot guarantee it.
+- **Consistency across devices is eventual.** Not suitable for global inventory counts, balances or uniqueness constraints.
+- **SQL queries only cover locally available data.**
+- **Deletion uses tombstones.** Copies held by relays or other people are not erased; removed members keep what they already read.
+- **Losing every device loses your personal space** (by design, for security).
+- With only non-NIP-77 relays, more events in a single second than a relay's result limit can be missed; `syncHealth()` reports the gap.
+- The local SQLite file itself is not encrypted; rely on disk encryption.
 
-詳細は [docs/DESIGN.md](docs/DESIGN.md) の「未解決の課題」を参照。
+See [docs/DESIGN.md](docs/DESIGN.md) for the threat model and open issues.
 
-## 開発
+## Development
 
 ```sh
-npm test              # unit + 模擬リレー（NIP-77 対応・障害注入あり）での統合テスト
+npm test              # unit + integration tests against a mock relay (NIP-77, fault injection)
 npm run typecheck
-npm run smoke:public  # 実際の公開リレーで疎通確認（ネットワーク必須）
+npm run smoke:public  # checks against real public relays (network required)
 ```
 
-## ライセンス
+## License
 
 MIT
