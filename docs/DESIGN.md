@@ -20,8 +20,8 @@
 
 ### 名前について
 
-旧称「NoDB（No Database Provisioning）」は既存プロジェクトと衝突するため **anoDB** に改名した（npm の `anodb` は 2026-11-09 時点で未使用）。
-意味は「**a** **no**-provisioning **DB**」。「DB が無い」のではなく「**DB を用意する作業が無い**」。
+**anoDB = Absolutely None DB** の略。旧称「NoDB（No Database Provisioning）」は既存プロジェクトと衝突するため改名した（npm の `anodb` は 2026-11-09 時点で未使用）。
+「Absolutely None」なのは、開発者が用意・運用する DB サーバー／API サーバー／BaaS プロジェクトが**まったく無い**こと。端末内の SQLite や公開 Nostr リレーは使うが、それらは開発者がプロビジョニングするものではない。
 
 ### 何ではないか（非ゴール）
 

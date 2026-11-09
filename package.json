@@ -1,7 +1,7 @@
 {
   "name": "anodb",
   "version": "0.0.0",
-  "description": "Local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
+  "description": "Absolutely None DB — local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
