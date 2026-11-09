@@ -21,6 +21,7 @@ import {
 import { DEFAULT_RELAYS } from './defaults.js'
 import { Clock } from './hlc.js'
 import { createDelegation, isEvent, verifyDelegation } from './identity.js'
+import { spaceIdFor } from './membership.js'
 import { browserKeyStore } from './keystore/browser.js'
 import { envKeyStore } from './keystore/env.js'
 import type { KeyStore } from './keystore/types.js'
@@ -122,13 +123,6 @@ class Gate {
 
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 
-export async function createAnoDB<const S extends SchemaDefinition>(opts: AnoDBOptions<S>): Promise<AnoDB<S>> {
-  const i = await prepare(opts)
-  const db = new AnoDB<S>(i)
-  await db._init()
-  return db
-}
-
 /** Resolve keys (device, delegation, identity) and open the store. Shared with subclasses. */
 export async function prepare<S extends SchemaDefinition>(opts: AnoDBOptions<S>): Promise<Internals<S>> {
   if (!opts.appId) throw new Error('anoDB: appId is required')
@@ -198,7 +192,7 @@ export interface Internals<S extends SchemaDefinition> {
   now: () => number
 }
 
-export class AnoDB<S extends SchemaDefinition> {
+export class AnoDBCore<S extends SchemaDefinition> {
   readonly appId: string
   readonly schema: S
   /** Identity public key (hex). */
@@ -273,8 +267,7 @@ export class AnoDB<S extends SchemaDefinition> {
     await this.loadKeys()
     let personal = this.store.spaces().find((s) => s.personal && s.status === 'active')
     if (!personal) {
-      const id = randomHex(16)
-      await this.createSpaceInternal(id, 'personal', true)
+      const id = await this.createSpaceInternal('personal', true)
       personal = { id, name: 'personal', personal: true, status: 'active' }
     }
     this.setPersonal(personal.id)
@@ -489,14 +482,18 @@ export class AnoDB<S extends SchemaDefinition> {
     return k
   }
 
-  protected async createSpaceInternal(id: string, name: string, personal: boolean): Promise<void> {
+  /** Create a space whose id commits to this identity (so nobody else can claim to own it). */
+  protected async createSpaceInternal(name: string, personal: boolean): Promise<string> {
+    const nonce = randomHex(16)
+    const id = spaceIdFor(this.pubkey, nonce)
     await this.storeKey(id, randomBytes(32), 1)
     await this.gate.idle()
     this.store.transaction(() => {
       this.store.upsertSpace(id, name, personal)
-      this.sendToSpace(id, 'op', { op: { type: 'create', owner: this.pubkey, name, personal }, par: [] })
+      this.sendToSpace(id, 'op', { op: { type: 'create', owner: this.pubkey, nonce, name, personal }, par: [] })
     })
     this.sync?.refresh()
+    return id
   }
 
   // ---- outgoing messages --------------------------------------------------------
@@ -507,8 +504,9 @@ export class AnoDB<S extends SchemaDefinition> {
     const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, dlg: this.delegation, ...body }
     const content = JSON.stringify(payload)
     const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
-    this.store.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id)
-    const outer = this.wrap(JSON.stringify(inner), key.tag, key.key)
+    const innerJson = JSON.stringify(inner)
+    this.store.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id, innerJson)
+    const outer = this.wrap(innerJson, key.tag, key.key)
     this.store.putRaw(outer, key.tag)
     this.sync?.enqueue(outer, true)
     return { seq, msgId: inner.id }
@@ -626,17 +624,17 @@ export class AnoDB<S extends SchemaDefinition> {
     const changed = this.store.transaction(() => {
       this.store.putRaw(outer, tag)
       if (this.store.hasMessage(ek.space, device, payload.seq)) return new Set<string>()
-      this.store.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId)
+      this.store.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId, JSON.stringify(inner))
       result = 'new'
       return this.onMessage(ek.space, identity, device, payload)
     })
     this.notify(changed, 'remote')
-    if (result === 'new') this.afterRemoteMessage(ek.space, payload)
+    if (result === 'new') this.afterRemoteMessage(ek.space, identity, device, payload)
     return result
   }
 
   /** Hook after a new remote message was stored (v0.3: membership handling). */
-  protected afterRemoteMessage(_space: string, _p: StreamPayload): void {}
+  protected afterRemoteMessage(_space: string, _identity: string, _device: string, _p: StreamPayload): void {}
 
   /** Envelope for a tag that is not a space key (inbox, invite secrets). Implemented in v0.3. */
   protected ingestOther(_tag: string, _outer: NostrEvent): IngestResult {

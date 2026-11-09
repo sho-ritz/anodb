@@ -15,9 +15,18 @@ CREATE TABLE IF NOT EXISTS anodb_keys (
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS anodb_messages (
   space TEXT NOT NULL, device TEXT NOT NULL, seq INTEGER NOT NULL, identity TEXT NOT NULL, type TEXT NOT NULL,
-  payload TEXT NOT NULL, msg_id TEXT NOT NULL, received_at INTEGER NOT NULL,
+  payload TEXT NOT NULL, msg_id TEXT NOT NULL, inner TEXT NOT NULL DEFAULT '', received_at INTEGER NOT NULL,
   PRIMARY KEY (space, device, seq)
 ) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS anodb_messages_type ON anodb_messages (space, type);
+CREATE TABLE IF NOT EXISTS anodb_devices (
+  device TEXT PRIMARY KEY, identity TEXT NOT NULL, delegation TEXT NOT NULL, name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS anodb_invites_out (secret TEXT PRIMARY KEY, space TEXT NOT NULL, role TEXT NOT NULL, expires INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS anodb_invites_in (space TEXT PRIMARY KEY, sender TEXT NOT NULL, role TEXT NOT NULL, name TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, received_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS anodb_join_requests (
+  id TEXT PRIMARY KEY, secret TEXT NOT NULL, identity TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, received_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS anodb_cells (
   space TEXT NOT NULL, tbl TEXT NOT NULL, row_id TEXT NOT NULL, col TEXT NOT NULL, value TEXT NOT NULL, hlc TEXT NOT NULL,
   PRIMARY KEY (space, tbl, row_id, col)
@@ -244,11 +253,140 @@ export class Store {
     return this.#db.all('SELECT 1 FROM anodb_messages WHERE space = ? AND device = ? AND seq = ?', [space, device, seq]).length > 0
   }
 
-  putMessage(m: StoredMessage, msgId: string): void {
+  putMessage(m: StoredMessage, msgId: string, inner: string): void {
     this.#db.run(
-      'INSERT OR IGNORE INTO anodb_messages (space, device, seq, identity, type, payload, msg_id, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [m.space, m.device, m.seq, m.identity, m.type, m.payload, msgId, Date.now()],
+      'INSERT OR IGNORE INTO anodb_messages (space, device, seq, identity, type, payload, msg_id, inner, received_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [m.space, m.device, m.seq, m.identity, m.type, m.payload, msgId, inner, Date.now()],
     )
+  }
+
+  /** Signed inner events of a message type (portable: verifiable by anyone). */
+  inners(space: string, type: string): string[] {
+    return this.#db.all<{ inner: string }>('SELECT inner FROM anodb_messages WHERE space = ? AND type = ? ORDER BY received_at, msg_id', [space, type]).map((r) => r.inner)
+  }
+
+  opRecords(space: string): Array<{ msgId: string; identity: string; payload: string }> {
+    return this.#db.all<{ msgId: string; identity: string; payload: string }>(
+      "SELECT msg_id AS msgId, identity, payload FROM anodb_messages WHERE space = ? AND type = 'op'",
+      [space],
+    )
+  }
+
+  /** Highest seq per device of one identity in a space (cut-offs for removal). */
+  deviceMaxSeqs(space: string, identity?: string, device?: string): Record<string, number> {
+    const where = ['space = ?']
+    const params: SqlValue[] = [space]
+    if (identity) {
+      where.push('identity = ?')
+      params.push(identity)
+    }
+    if (device) {
+      where.push('device = ?')
+      params.push(device)
+    }
+    const rows = this.#db.all<{ device: string; m: number }>(`SELECT device, MAX(seq) AS m FROM anodb_messages WHERE ${where.join(' AND ')} GROUP BY device`, params)
+    return Object.fromEntries(rows.map((r) => [r.device, r.m]))
+  }
+
+  countMessages(space: string, type: string, sinceReceived = 0): number {
+    return this.#db.all<{ n: number }>('SELECT COUNT(*) AS n FROM anodb_messages WHERE space = ? AND type = ? AND received_at > ?', [space, type, sinceReceived])[0]!.n
+  }
+
+  // ---- devices -------------------------------------------------------------------
+
+  putDevice(device: string, identity: string, delegation: string, name: string): void {
+    this.#db.run('INSERT OR IGNORE INTO anodb_devices (device, identity, delegation, name) VALUES (?, ?, ?, ?)', [device, identity, delegation, name])
+  }
+
+  revokeDevice(device: string): void {
+    this.#db.run('UPDATE anodb_devices SET revoked = 1 WHERE device = ?', [device])
+  }
+
+  devices(identity?: string): Array<{ device: string; identity: string; delegation: string; name: string; revoked: boolean }> {
+    return this.#db
+      .all<{ device: string; identity: string; delegation: string; name: string; revoked: number }>(
+        `SELECT device, identity, delegation, name, revoked FROM anodb_devices${identity ? ' WHERE identity = ?' : ''} ORDER BY device`,
+        identity ? [identity] : [],
+      )
+      .map((r) => ({ ...r, revoked: r.revoked === 1 }))
+  }
+
+  // ---- invitations ---------------------------------------------------------------
+
+  putInviteOut(secret: string, space: string, role: string, expires: number): void {
+    this.#db.run('INSERT INTO anodb_invites_out (secret, space, role, expires) VALUES (?, ?, ?, ?)', [secret, space, role, expires])
+  }
+
+  invitesOut(): Array<{ secret: string; space: string; role: string; expires: number; used: boolean }> {
+    return this.#db
+      .all<{ secret: string; space: string; role: string; expires: number; used: number }>('SELECT secret, space, role, expires, used FROM anodb_invites_out')
+      .map((r) => ({ ...r, used: r.used === 1 }))
+  }
+
+  markInviteUsed(secret: string): void {
+    this.#db.run('UPDATE anodb_invites_out SET used = 1 WHERE secret = ?', [secret])
+  }
+
+  putInviteIn(space: string, sender: string, role: string, name: string, payload: string): void {
+    this.#db.run(
+      `INSERT INTO anodb_invites_in (space, sender, role, name, payload, status, received_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)
+       ON CONFLICT(space) DO UPDATE SET sender = excluded.sender, role = excluded.role, name = excluded.name, payload = excluded.payload,
+         status = CASE WHEN anodb_invites_in.status = 'accepted' THEN 'accepted' ELSE 'pending' END`,
+      [space, sender, role, name, payload, Date.now()],
+    )
+  }
+
+  invitesIn(status?: string): Array<{ space: string; sender: string; role: string; name: string; payload: string; status: string }> {
+    return this.#db.all(
+      `SELECT space, sender, role, name, payload, status FROM anodb_invites_in${status ? ' WHERE status = ?' : ''} ORDER BY received_at`,
+      status ? [status] : [],
+    )
+  }
+
+  setInviteInStatus(space: string, status: string): void {
+    this.#db.run('UPDATE anodb_invites_in SET status = ? WHERE space = ?', [status, space])
+  }
+
+  putJoinRequest(id: string, secret: string, identity: string, payload: string): void {
+    this.#db.run("INSERT OR IGNORE INTO anodb_join_requests (id, secret, identity, payload, status, received_at) VALUES (?, ?, ?, ?, 'pending', ?)", [
+      id,
+      secret,
+      identity,
+      payload,
+      Date.now(),
+    ])
+  }
+
+  joinRequests(status = 'pending'): Array<{ id: string; secret: string; identity: string; payload: string }> {
+    return this.#db.all('SELECT id, secret, identity, payload FROM anodb_join_requests WHERE status = ? ORDER BY received_at', [status])
+  }
+
+  setJoinRequestStatus(id: string, status: string): void {
+    this.#db.run('UPDATE anodb_join_requests SET status = ? WHERE id = ?', [status, id])
+  }
+
+  /** Forget all spaces and data (device pairing adopts another identity). Keeps node id and clock. */
+  wipe(): void {
+    this.transaction(() => {
+      for (const t of [
+        'anodb_spaces',
+        'anodb_keys',
+        'anodb_messages',
+        'anodb_cells',
+        'anodb_raw',
+        'anodb_outbox',
+        'anodb_acks',
+        'anodb_cursors',
+        'anodb_devices',
+        'anodb_invites_out',
+        'anodb_invites_in',
+        'anodb_join_requests',
+      ]) {
+        this.#db.run(`DELETE FROM ${t}`)
+      }
+      this.#db.run("DELETE FROM anodb_meta WHERE key LIKE 'seq:%' OR key LIKE 'schema:%' OR key LIKE 'snap:%'")
+      for (const t of Object.keys(this.#schema)) this.#db.run(`DELETE FROM ${quoteIdent(t)}`)
+    })
   }
 
   messages(space: string, type?: string): StoredMessage[] {

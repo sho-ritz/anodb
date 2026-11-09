@@ -5,7 +5,7 @@
 anoDB は端末内の SQLite を正とし、変更を **E2EE された Nostr イベント**として既存の公開リレーに流す Local-first DB の SDK です。
 名前の通り、開発者が用意するサーバーは **absolutely none**。API サーバーも DB サーバーもプロジェクト作成も不要で、オフライン読み書き・複数端末同期・他ユーザーの公開プロフィール取得を一つの型付き API で扱えます。
 
-> ステータス: **v0.2 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
+> ステータス: **v0.3 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## 特徴
 
@@ -78,6 +78,42 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 - `signer: nip07Signer() / nip46Signer(uri) / nip55Signer(bridge)` で外部署名者を使えます
 - リレーに見えるのは「使い捨ての公開鍵・世代ごとに変わるタグ・時刻・サイズ」だけです（`metadataProtection: 'none'` で無効化）
 
+## 共有（スペース）
+
+```ts
+const family = await db.createSpace('家族')
+await db.insertInto('todo').values({ title: '牛乳', space: family }).execute()
+
+// npub で招待（相手は事前に db.publishKeyPackage()）
+await db.invite(family, 'npub1alice…', 'writer')        // owner / admin / writer / reader
+// 相手側: 承諾するまで何も同期されない
+alice.onInvitation((i) => …); await alice.acceptInvitation(i.space)
+
+// 招待リンク（使い捨て・期限付き・admin の承認必須）
+const link = await db.createInviteLink(family, { role: 'reader', expiresInMs: 86_400_000 })
+db.onJoinRequest((req) => db.approveJoinRequest(req.id))
+
+await db.setRole(family, who, 'reader'); await db.removeMember(family, who)
+```
+
+- 新メンバーには**現在の状態のスナップショットだけ**が渡ります（削除済みの内容・編集履歴は渡りません）
+- グループ鍵はメンバー削除・端末失効・追加・30日ごとに入れ替わります
+- 外したメンバーの書き込みは、端末ごとの通し番号のカットオフ以降すべて拒否されます（日付の偽装も無効）
+
+### 端末の追加と失効
+
+```ts
+// 新しい端末: QR を表示
+const offer = await newDevice.startPairing()   // offer.uri を QR に、offer.code を表示
+await offer.done; await newDevice.close()      // その後、開き直すと同じ ID になっている
+// 既存の端末: QR を読んでコードを照合してから承認（本人の鍵はコピーされない）
+const req = db.parsePairing(uri); /* req.code を確認 */ await req.approve('ノートPC')
+
+await db.revokeDevice(lostDevicePubkey)        // 紛失・盗難時
+```
+
+> ⚠ グループ鍵は端末鍵宛てにしか渡しません。**全端末を失うと個人スペースのデータは復元できません**（共有スペースは他のメンバーから戻れます）。端末を2台以上登録しておくことを推奨します。
+
 ## 列型
 
 | 型 | TS | SQLite |
@@ -96,7 +132,6 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 - 端末間の整合性は**結果整合**です（在庫・残高・一意制約は不可）。
 - SQL は**手元にあるデータ**にしか効きません。
 - 削除は論理削除（tombstone）で、リレー上の過去イベントは残ります。
-- v0.1 は**所有者1人（複数端末）**のみ。他人との共有は v0.2 予定。
 - 同一秒にリレー上限を超えるイベントがあると、初回同期でその秒の一部を取りこぼすことがあります（NIP-77 対応で解消予定）。
 
 詳細は [docs/DESIGN.md](docs/DESIGN.md) の「未解決の課題」を参照。

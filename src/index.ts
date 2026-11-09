@@ -1,4 +1,7 @@
-export { AnoDB, AnoDBError, createAnoDB } from './db.js'
+export { AnoDB, createAnoDB } from './anodb.js'
+export { AnoDBCore, AnoDBError } from './db.js'
+export type { Device, Invitation, JoinRequest, Member, PairingOffer } from './sharing.js'
+export type { Role } from './membership.js'
 export type { AnoDBErrorCode, AnoDBOptions, ChangeListener, ErrorListener, SpaceInfo, StatusListener } from './db.js'
 export { defineSchema } from './schema.js'
 export type { KyselyDatabase, KyselyTable } from './kysely.js'

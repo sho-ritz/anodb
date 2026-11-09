@@ -71,11 +71,73 @@ kept and re-evaluated whenever membership changes.
 
 ## 5. Spaces and membership
 
-Every row belongs to a space. A user's personal data is a space whose only member is the user.
-The first message of a space is an `op` with `{ "type": "create", "owner": <identity>, "name": … }`
-signed by a device of that owner.
+Every row belongs to a space; a user's personal data is a space whose only member is the user.
+`spaceId = hex(sha256("anodb/v2/space-id/" + owner + "/" + nonce))[0:32]`, so only the owner can
+produce the valid `create` op.
 
-(Roles, invitations, removal cut-offs and key rotation: added in protocol revisions for anoDB 0.3.)
+### 5.1 Ops (`t: "op"`)
+
+`par` lists the ids of the ops the author had seen (DAG heads). An op is evaluated only once all its
+ancestors are known; it is **valid iff its author was permitted to perform it in the state formed
+by its valid ancestors**.
+
+| op | fields | who may |
+|---|---|---|
+| `create` | `owner, nonce, name` | the owner (no parents; id must match) |
+| `add` | `identity, role` | owner: any role; admin: writer/reader |
+| `role` | `identity, role, cut?` | owner: any non-owner; admin: writer/reader of non-admins |
+| `remove` | `identity, cut` | owner: anyone but itself; admin: writers/readers |
+| `leave` | `cut` | any non-owner member, for itself |
+| `transfer` | `identity` | the owner, to a member (old owner becomes admin) |
+| `revoke` | `revocation` (kind 7304 event), `cut` | any member, relaying a valid revocation |
+
+Roles: `owner` (exactly one) > `admin` > `writer` > `reader`.
+
+Conflict rules:
+
+- a `remove` of X overrides every `add`/`role` for X that is not its descendant;
+- `cut` maps device → highest accepted `seq`. Concurrent cut-offs for one device combine to the
+  **minimum**. A message from a device with a cut-off is applied only if `seq ≤ cut`;
+- a later (descendant) `add` lifts the identity's cut-offs.
+
+A `ch` or `snap` message is applied iff its author may write under the final membership state
+(including cut-offs). Unauthorized messages are stored and re-evaluated on every membership change.
+
+### 5.2 Keys and rotation
+
+The current epoch key is the one with the highest `num` (ties: lowest key id). Owners/admins
+rotate on removal, device revocation, member addition and every 30 days, by sending the new key to
+every active device of every member through their inboxes, then posting a snapshot in the new
+epoch.
+
+### 5.3 Inbox messages (inner kind 7305, payload `{ v: 2, t, dlg, … }`)
+
+| `t` | fields | accepted when |
+|---|---|---|
+| `key` | `sp, name, personal, num, key, ops[]` | sender is admin+ of `sp` (or the same identity) under the carried + known ops, and the receiver is a member |
+| `invite` | as `key` + `role`, optional `req` | as above; stored until the user accepts (`req = sha256(link secret)` → auto-accept for own join requests) |
+
+`ops` are complete signed inner op events, verifiable without the old epoch keys.
+
+### 5.4 Snapshots (`t: "snap"`)
+
+Parts `i/n` with `body: { ops?: [inner…], cells?: [change…] }`. Rows that are deleted carry only their
+`$deleted` cell. A complete snapshot from an authorized writer is merged like ordinary changes.
+New members and newly paired devices receive keys for the **new** epoch only and catch up from
+snapshots.
+
+### 5.5 Invite links and pairing (secret routing)
+
+- Invite link: `anodb://join?app=<appId>&s=<secret>`. The requester sends `{ t: "joinreq", devices: [delegations], name }`
+  to the secret tag. An admin must approve; the link is single-use and expires.
+- Pairing: `anodb://pair?app=<appId>&d=<new device pubkey>&s=<secret>`; both devices display
+  `sha256("anodb/v2/pair-code/" + d + "/" + s)` as a 6-digit code. The approving device sends
+  `{ t: "pair", delegation, spaces: [grant…] }` to the secret tag. The identity key is never sent.
+
+### 5.6 Key package (kind 10304, public, replaceable)
+
+`content = {"v":2,"delegations":[…]}` signed by the identity, listing current device delegations so
+others can invite by npub.
 
 ## 6. Sync (informative)
 
