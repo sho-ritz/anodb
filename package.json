@@ -1,0 +1,63 @@
+{
+  "name": "anodb",
+  "version": "0.0.0",
+  "description": "Local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
+  "type": "module",
+  "license": "MIT",
+  "author": "show-ritz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sho-ritz/anodb.git"
+  },
+  "keywords": [
+    "nostr",
+    "local-first",
+    "sqlite",
+    "crdt",
+    "sync",
+    "offline",
+    "e2ee"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "PROTOCOL.md",
+    "docs"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:public": "npm run build && node examples/public-relay-smoke.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "nostr-tools": "^2.26.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/sql.js": "^1.4.11",
+    "@types/ws": "^8.18.2",
+    "sql.js": "^1.15.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "ws": "^8.22.2"
+  }
+}
