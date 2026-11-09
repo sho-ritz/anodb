@@ -1,39 +1,65 @@
-import { BACKFILL_PAGE, CURSOR_SKEW_SEC, DEFAULT_RELAYS, RESIGN_AFTER_SEC } from './defaults.js'
-import { OwnerKey, type SecretKeyInput, namespaceTag, newRowId, parseSecretKey, randomHex, verifySignedEvent } from './crypto.js'
+import { CompiledQuery, type Compilable, type Kysely } from 'kysely'
+import { type CapturedCell, beginCapture, endCapture, fromCaptured, installCapture } from './capture.js'
+import {
+  bytesToHex,
+  conversationKey,
+  decrypt,
+  encrypt,
+  generateSecretKey,
+  getPublicKey,
+  inboxTag,
+  keyId,
+  npubEncode,
+  nsecEncode,
+  parseSecretKey,
+  randomBytes,
+  randomHex,
+  signWith,
+  spaceTag,
+  verifySignedEvent,
+} from './crypto.js'
+import { DEFAULT_RELAYS } from './defaults.js'
 import { Clock } from './hlc.js'
-import { CHANGE_KIND, type Change, NAMESPACE_TAG, decodePayload, encodePayload, splitChanges } from './protocol.js'
+import { createDelegation, isEvent, verifyDelegation } from './identity.js'
+import { browserKeyStore } from './keystore/browser.js'
+import { envKeyStore } from './keystore/env.js'
+import type { KeyStore } from './keystore/types.js'
+import { type KyselyDatabase, type SqlExecutor, createKysely } from './kysely.js'
+import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLength, parseStreamPayload, splitChanges } from './protocol.js'
 import { PublicData } from './public.js'
-import { type Filter, RelayPool, type RelayPoolOptions } from './relay-pool.js'
-import { SYS_CREATED, SYS_DELETED, checkValue, fromSql, quoteIdent, validateSchema } from './schema.js'
+import { RelayPool, type RelayPoolOptions } from './relay-pool.js'
+import { SYS_CREATED, SYS_DELETED, validateSchema } from './schema.js'
+import { type Signer, localSigner } from './signer.js'
 import { Store } from './store.js'
-import type {
-  FindOptions,
-  NostrEvent,
-  Row,
-  SchemaDefinition,
-  SqlValue,
-  SqliteDriver,
-  SyncStatus,
-  Writable,
-} from './types.js'
+import { type IngestResult, SyncEngine, type SyncHost } from './sync.js'
+import type { NostrEvent, SchemaDefinition, SqlValue, SqliteDriver, SyncStatus } from './types.js'
 
 export interface AnoDBOptions<S extends SchemaDefinition> {
-  /** Application namespace. Different appIds never see each other's data, even with the same key. */
+  /** Application namespace. Different appIds never share spaces. */
   appId: string
   schema: S
   driver: SqliteDriver
-  /** Relays to sync through. `[]` = local only. Defaults to `DEFAULT_RELAYS`. */
-  relays?: readonly string[]
-  /** Relays used to discover other users' NIP-65 relay lists and profiles. */
-  discoveryRelays?: readonly string[]
   /**
-   * Owner key (bytes, hex or nsec). If omitted, a key stored in the database is used, or a new one
-   * is generated and stored. Use the same key on every device of the same owner.
+   * Where keys live. Default: browserKeyStore() when IndexedDB exists (browsers, Tauri), otherwise
+   * envKeyStore() (Node: ANODB_DEVICE_KEY / ANODB_DELEGATION from `npx anodb init`).
    */
-  secretKey?: SecretKeyInput
+  keyStore?: KeyStore
+  /**
+   * `'stored'` (default): the identity key is kept in the key store (encrypted).
+   * `'recovery'`: the identity key is handed to `onRecoveryKey` once and never stored on the device.
+   */
+  identity?: 'stored' | 'recovery'
+  onRecoveryKey?: (nsec: string) => void
+  /** External identity signer (NIP-07 / NIP-46 / NIP-55). Only needed for identity operations. */
+  signer?: Signer
+  /** Human-readable name of this device, shown to the owner. */
+  deviceName?: string
+  /** `'wrap'` (default): envelopes are signed by throwaway keys. `'none'`: signed by the device key. */
+  metadataProtection?: 'wrap' | 'none'
+  relays?: readonly string[]
+  discoveryRelays?: readonly string[]
   /** A write leaves the outbox after this many relays accepted it. Default: min(2, relays.length). */
   minAcks?: number
-  /** How often to retry the outbox while events are pending. Default 30s. */
   retryIntervalMs?: number
   relayOptions?: RelayPoolOptions
   /** Wall clock in ms. For tests. */
@@ -44,10 +70,12 @@ export type ChangeListener = (tables: ReadonlySet<string>, origin: 'local' | 're
 export type ErrorListener = (error: AnoDBError) => void
 export type StatusListener = (status: SyncStatus) => void
 
+export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol'
+
 export class AnoDBError extends Error {
-  readonly code: 'publish-rejected' | 'invalid-event' | 'unsupported-protocol' | 'decrypt-failed'
+  readonly code: AnoDBErrorCode
   readonly eventId: string | undefined
-  constructor(code: AnoDBError['code'], message: string, eventId?: string) {
+  constructor(code: AnoDBErrorCode, message: string, eventId?: string) {
     super(message)
     this.name = 'AnoDBError'
     this.code = code
@@ -55,303 +83,612 @@ export class AnoDBError extends Error {
   }
 }
 
-type TableName<S> = Extract<keyof S, string>
-
-/** Write handle passed to `db.transaction`. All writes in one transaction are committed atomically locally. */
-export interface Transaction<S extends SchemaDefinition> {
-  insert<T extends TableName<S>>(table: T, values: Writable<S[T]>, opts?: { id?: string }): string
-  update<T extends TableName<S>>(table: T, id: string, values: Writable<S[T]>): void
-  delete<T extends TableName<S>>(table: T, id: string): void
+export interface EpochKey {
+  space: string
+  keyId: string
+  num: number
+  key: Uint8Array
+  tag: string
+  createdAt: number
 }
 
-/** Convenience handle bound to one table. */
-export interface TableHandle<S extends SchemaDefinition, T extends TableName<S>> {
-  insert(values: Writable<S[T]>, opts?: { id?: string }): string
-  update(id: string, values: Writable<S[T]>): void
-  delete(id: string): void
-  findMany(opts?: FindOptions<S[T]>): Row<S[T]>[]
-  findById(id: string): Row<S[T]> | undefined
-  count(opts?: Pick<FindOptions<S[T]>, 'where'>): number
-  subscribe(opts: FindOptions<S[T]>, cb: (rows: Row<S[T]>[]) => void): () => void
+export interface SpaceInfo {
+  id: string
+  name: string
+  personal: boolean
+  status: string
 }
 
-interface RelaySyncState {
-  /** `since` used in the current REQ. */
-  reqSince: number
-  /** Oldest / newest created_at received in the initial batch of the current REQ. */
-  oldest: number | null
-  newest: number | null
-  caughtUp: boolean
+type Query = Compilable | { sql: string; parameters?: readonly unknown[] } | string
+
+/** Defers work while a capture transaction is open across awaits (Kysely transactions). */
+class Gate {
+  #busy = false
+  #waiters: Array<() => void> = []
+  get busy(): boolean {
+    return this.#busy
+  }
+  close(): void {
+    this.#busy = true
+  }
+  open(): void {
+    this.#busy = false
+    for (const w of this.#waiters.splice(0)) w()
+  }
+  idle(): Promise<void> {
+    return this.#busy ? new Promise((r) => this.#waiters.push(r)) : Promise.resolve()
+  }
 }
 
-export function createAnoDB<const S extends SchemaDefinition>(opts: AnoDBOptions<S>): AnoDB<S> {
-  return new AnoDB(opts)
+const ID_RE = /^[A-Za-z0-9_-]{1,128}$/
+
+export async function createAnoDB<const S extends SchemaDefinition>(opts: AnoDBOptions<S>): Promise<AnoDB<S>> {
+  const i = await prepare(opts)
+  const db = new AnoDB<S>(i)
+  await db._init()
+  return db
+}
+
+/** Resolve keys (device, delegation, identity) and open the store. Shared with subclasses. */
+export async function prepare<S extends SchemaDefinition>(opts: AnoDBOptions<S>): Promise<Internals<S>> {
+  if (!opts.appId) throw new Error('anoDB: appId is required')
+  validateSchema(opts.schema)
+  const now = opts.now ?? Date.now
+  const store = new Store(opts.driver)
+  const keyStore = opts.keyStore ?? defaultKeyStore(opts.appId)
+  const mode = opts.identity ?? 'stored'
+
+  let deviceHex = await keyStore.get('device')
+  let delegationJson = await keyStore.get('delegation')
+  const storedIdentity = await keyStore.get('identity')
+  let identitySigner: Signer | null = opts.signer ?? (storedIdentity ? localSigner(storedIdentity) : null)
+
+  if (!deviceHex || !delegationJson) {
+    let newIdentity: Uint8Array | null = null
+    if (!identitySigner) {
+      if (mode === 'recovery' && !opts.onRecoveryKey) {
+        throw new Error("anoDB: identity: 'recovery' requires onRecoveryKey to hand the key to the user")
+      }
+      newIdentity = generateSecretKey()
+      identitySigner = localSigner(newIdentity)
+    }
+    const deviceSk = generateSecretKey()
+    const delegation = await createDelegation(identitySigner, getPublicKey(deviceSk), opts.deviceName ?? 'device', now())
+    deviceHex = bytesToHex(deviceSk)
+    delegationJson = JSON.stringify(delegation)
+    await keyStore.set('device', deviceHex)
+    await keyStore.set('delegation', delegationJson)
+    if (newIdentity) {
+      if (mode === 'recovery') {
+        opts.onRecoveryKey!(nsecEncode(newIdentity))
+        identitySigner = null // never kept on this device
+      } else {
+        await keyStore.set('identity', bytesToHex(newIdentity))
+      }
+    }
+  }
+  const deviceSk = parseSecretKey(deviceHex)
+  const devicePk = getPublicKey(deviceSk)
+  const delegation = JSON.parse(delegationJson) as unknown
+  const identity = verifyDelegation(delegation, devicePk)
+  if (!identity || !isEvent(delegation)) throw new Error('anoDB: stored delegation does not match the device key')
+  if (identitySigner && (await identitySigner.getPublicKey()) !== identity) {
+    throw new Error('anoDB: signer / identity key does not belong to this device’s identity')
+  }
+  const owner = store.getMeta('identity')
+  if (owner && owner !== identity) throw new Error('anoDB: this database belongs to a different identity')
+  store.setMeta('identity', identity)
+  return { opts, store, keyStore, deviceSk, devicePk, identity, delegation, identitySigner, now }
+}
+
+function defaultKeyStore(appId: string): KeyStore {
+  if (typeof indexedDB !== 'undefined') return browserKeyStore(`anodb-${appId}`)
+  return envKeyStore()
+}
+
+export interface Internals<S extends SchemaDefinition> {
+  opts: AnoDBOptions<S>
+  store: Store
+  keyStore: KeyStore
+  deviceSk: Uint8Array
+  devicePk: string
+  identity: string
+  delegation: NostrEvent
+  identitySigner: Signer | null
+  now: () => number
 }
 
 export class AnoDB<S extends SchemaDefinition> {
   readonly appId: string
   readonly schema: S
+  /** Identity public key (hex). */
   readonly pubkey: string
   readonly npub: string
-  /** Public Nostr data: profiles, notes, relay lists (interoperable with other Nostr clients). */
+  readonly devicePubkey: string
+  /** Public Nostr data (profiles, notes, relay lists). */
   readonly nostr: PublicData
 
-  readonly #store: Store
-  readonly #key: OwnerKey
-  readonly #clock: Clock
-  readonly #ns: string
-  readonly #pool: RelayPool | null
-  readonly #minAcks: number
-  readonly #now: () => number
-  readonly #relayState = new Map<string, RelaySyncState>()
+  protected readonly store: Store
+  protected readonly keyStore: KeyStore
+  protected readonly deviceSk: Uint8Array
+  protected readonly delegation: NostrEvent
+  protected identitySigner: Signer | null
+  protected readonly now: () => number
+  protected readonly clock: Clock
+  protected readonly sync: SyncEngine | null
+  protected readonly gate = new Gate()
+  protected readonly keysByTag = new Map<string, EpochKey>()
+  protected readonly keysBySpace = new Map<string, EpochKey[]>()
+  protected readonly opts: AnoDBOptions<S>
+  protected readonly kysely: Kysely<KyselyDatabase<S>>
+  protected personal = ''
   readonly #changeListeners = new Set<ChangeListener>()
   readonly #errorListeners = new Set<ErrorListener>()
   readonly #statusListeners = new Set<StatusListener>()
-  #flushing: Promise<void> | null = null
-  #flushAgain = false
-  #retryTimer: ReturnType<typeof setInterval> | null = null
-  #unsubscribe: (() => void) | null = null
+  readonly #deferred: Array<() => void> = []
+  readonly #pendingNotify = new Set<string>()
   #closed = false
   #lastStatus = ''
 
-  constructor(opts: AnoDBOptions<S>) {
-    if (!opts.appId) throw new Error('anoDB: appId is required')
-    validateSchema(opts.schema)
-    this.appId = opts.appId
-    this.schema = opts.schema
-    this.#now = opts.now ?? Date.now
-    this.#store = new Store(opts.driver)
-
-    let secret: Uint8Array
-    if (opts.secretKey !== undefined) {
-      secret = parseSecretKey(opts.secretKey)
-      const stored = this.#store.getMeta('owner_pubkey')
-      const key = new OwnerKey(secret)
-      if (stored && stored !== key.pubkey) {
-        throw new Error('anoDB: this database belongs to a different owner key')
-      }
-    } else {
-      const stored = this.#store.getMeta('owner_secret')
-      secret = stored ? parseSecretKey(stored) : OwnerKey.generate().secret
+  constructor(i: Internals<S>) {
+    this.opts = i.opts
+    this.appId = i.opts.appId
+    this.schema = i.opts.schema
+    this.store = i.store
+    this.keyStore = i.keyStore
+    this.deviceSk = i.deviceSk
+    this.devicePubkey = i.devicePk
+    this.pubkey = i.identity
+    this.npub = npubEncode(i.identity)
+    this.delegation = i.delegation
+    this.identitySigner = i.identitySigner
+    this.now = i.now
+    let nodeId = this.store.getMeta('node_id')
+    if (!nodeId) {
+      nodeId = randomHex(8)
+      this.store.setMeta('node_id', nodeId)
     }
-    this.#key = new OwnerKey(secret)
-    this.pubkey = this.#key.pubkey
-    this.npub = this.#key.npub
-    this.#ns = namespaceTag(this.appId, this.pubkey)
-
-    let nodeId = this.#store.getMeta('node_id')
-    if (!nodeId) nodeId = randomHex(8)
-    this.#clock = new Clock(nodeId, this.#store.getMeta('hlc'), this.#now)
-    this.#store.transaction(() => {
-      this.#store.setMeta('node_id', nodeId)
-      this.#store.setMeta('owner_pubkey', this.pubkey)
-      if (opts.secretKey === undefined) this.#store.setMeta('owner_secret', this.#key.hex)
-    })
-    this.#store.applySchema(this.schema)
-
-    const relays = opts.relays ?? DEFAULT_RELAYS
-    this.#minAcks = Math.max(1, Math.min(opts.minAcks ?? 2, relays.length))
-    this.#pool = relays.length > 0 ? new RelayPool(relays, opts.relayOptions) : null
+    this.clock = new Clock(nodeId, this.store.getMeta('hlc'), this.now)
+    const relays = i.opts.relays ?? DEFAULT_RELAYS
+    const pool = relays.length > 0 ? new RelayPool(relays, i.opts.relayOptions) : null
+    this.sync = pool
+      ? new SyncEngine(this.store, pool, this.syncHost(), {
+          minAcks: Math.max(1, Math.min(i.opts.minAcks ?? 2, relays.length)),
+          retryIntervalMs: i.opts.retryIntervalMs ?? 30_000,
+        })
+      : null
+    this.kysely = createKysely<S>(this.executor())
     this.nostr = new PublicData({
-      store: this.#store,
-      key: this.#key,
-      pool: this.#pool,
-      discoveryRelays: opts.discoveryRelays,
-      now: this.#now,
-      enqueue: (event) => this.#enqueuePublic(event),
-    })
-
-    if (this.#pool) {
-      const pool = this.#pool
-      pool.onOpen(() => {
-        this.#emitStatus()
-        void this.#flush()
-      })
-      pool.onClose((relay) => {
-        this.#relayState.delete(relay)
-        this.#emitStatus()
-      })
-      this.#startSubscription()
-      pool.connect()
-      const interval = opts.retryIntervalMs ?? 30_000
-      this.#retryTimer = setInterval(() => {
-        if (this.#store.outboxSize() > 0) void this.#flush()
-      }, interval)
-      ;(this.#retryTimer as { unref?: () => void }).unref?.()
-    }
-  }
-
-  // ---- identity ------------------------------------------------------------
-
-  /** The owner secret as `nsec1…`. Import it on another device to sync the same data. */
-  exportSecretKey(): string {
-    return this.#key.nsec
-  }
-
-  // ---- writes --------------------------------------------------------------
-
-  transaction(fn: (tx: Transaction<S>) => void): void {
-    this.#assertOpen()
-    const changes: Change[] = []
-    const tx: Transaction<S> = {
-      insert: (table, values, o) => {
-        const id = o?.id ?? newRowId()
-        this.#collect(changes, table, id, values)
-        changes.push([table, id, SYS_CREATED, this.#now(), this.#clock.tick()])
-        return id
-      },
-      update: (table, id, values) => this.#collect(changes, table, id, values),
-      delete: (table, id) => {
-        this.#tableDef(table)
-        changes.push([table, id, SYS_DELETED, true, this.#clock.tick()])
-      },
-    }
-    fn(tx)
-    if (changes.length === 0) return
-    this.#commit(changes)
-  }
-
-  table<T extends TableName<S>>(table: T): TableHandle<S, T> {
-    this.#tableDef(table)
-    return {
-      insert: (values, o) => {
-        let id = ''
-        this.transaction((tx) => {
-          id = tx.insert(table, values, o)
-        })
-        return id
-      },
-      update: (id, values) => this.transaction((tx) => tx.update(table, id, values)),
-      delete: (id) => this.transaction((tx) => tx.delete(table, id)),
-      findMany: (o) => this.findMany(table, o),
-      findById: (id) => this.findMany(table, { where: { id } as NonNullable<FindOptions<S[T]>['where']>, limit: 1 })[0],
-      count: (o) => this.count(table, o),
-      subscribe: (o, cb) => this.subscribe(table, o, cb),
-    }
-  }
-
-  #tableDef(table: string) {
-    const def = this.schema[table]
-    if (!def) throw new Error(`anoDB: unknown table "${table}"`)
-    return def
-  }
-
-  #collect(changes: Change[], table: string, id: string, values: Record<string, unknown>): void {
-    const def = this.#tableDef(table)
-    if (typeof id !== 'string' || id.length === 0 || id.length > 128) throw new Error('anoDB: invalid row id')
-    for (const [column, value] of Object.entries(values)) {
-      if (value === undefined) continue
-      const type = def[column]
-      if (!type) throw new Error(`anoDB: unknown column "${table}.${column}"`)
-      changes.push([table, id, column, checkValue(table, column, type, value), this.#clock.tick()])
-    }
-  }
-
-  #commit(changes: Change[]): void {
-    const batches = splitChanges(changes)
-    const createdAt = Math.floor(this.#now() / 1000)
-    const events = batches.map((batch) =>
-      this.#key.sign({
-        kind: CHANGE_KIND,
-        created_at: createdAt,
-        tags: [[NAMESPACE_TAG, this.#ns]],
-        content: this.#key.encryptToSelf(encodePayload(batch)),
-      }),
-    )
-    const tables = this.#store.transaction(() => {
-      const touched = this.#store.applyChanges(changes)
-      this.#store.setMeta('hlc', this.#clock.current())
-      for (const e of events) {
-        this.#store.markEvent(e.id, e.created_at)
-        if (this.#pool) this.#store.enqueue(e)
-      }
-      return touched
-    })
-    this.#notify(tables, 'local')
-    if (this.#pool) {
-      this.#emitStatus()
-      void this.#flush()
-    }
-  }
-
-  // ---- reads ---------------------------------------------------------------
-
-  findMany<T extends TableName<S>>(table: T, opts: FindOptions<S[T]> = {}): Row<S[T]>[] {
-    this.#assertOpen()
-    const def = this.#tableDef(table)
-    const { clause, params } = this.#where(table, opts.where)
-    let sql = `SELECT * FROM ${quoteIdent(table)}${clause}`
-    const order = Object.entries(opts.orderBy ?? {})
-    if (order.length > 0) {
-      sql += ` ORDER BY ${order
-        .map(([col, dir]) => {
-          this.#assertColumn(table, col)
-          return `${quoteIdent(col)} ${dir === 'desc' ? 'DESC' : 'ASC'}`
-        })
-        .join(', ')}`
-    }
-    if (opts.limit !== undefined || opts.offset !== undefined) {
-      sql += ' LIMIT ? OFFSET ?'
-      params.push(opts.limit ?? -1, opts.offset ?? 0)
-    }
-    const rows = this.#store.driver.all<Record<string, SqlValue>>(sql, params)
-    return rows.map((r) => {
-      const out: Record<string, unknown> = { id: r.id, createdAt: r.createdAt, updatedAt: r.updatedAt }
-      for (const [col, type] of Object.entries(def)) out[col] = fromSql(type, r[col] ?? null)
-      return out as Row<S[T]>
+      store: this.store,
+      signer: () => this.requireIdentitySigner(),
+      pool,
+      discoveryRelays: i.opts.discoveryRelays,
+      now: this.now,
+      enqueue: (event) => this.enqueuePlain(event),
     })
   }
 
-  count<T extends TableName<S>>(table: T, opts: Pick<FindOptions<S[T]>, 'where'> = {}): number {
-    this.#assertOpen()
-    const { clause, params } = this.#where(table, opts.where)
-    return this.#store.driver.all<{ n: number }>(`SELECT COUNT(*) AS n FROM ${quoteIdent(table)}${clause}`, params)[0]!.n
+  /** @internal */
+  async _init(): Promise<void> {
+    await this.loadKeys()
+    let personal = this.store.spaces().find((s) => s.personal && s.status === 'active')
+    if (!personal) {
+      const id = randomHex(16)
+      await this.createSpaceInternal(id, 'personal', true)
+      personal = { id, name: 'personal', personal: true, status: 'active' }
+    }
+    this.setPersonal(personal.id)
+    await this.afterInit()
+    this.sync?.start()
   }
 
-  /** Read-only SQL over the local projection (`SELECT` / `WITH` only). Tables are named after the schema. */
-  sql<R = Record<string, SqlValue>>(query: string, params: readonly SqlValue[] = []): R[] {
-    this.#assertOpen()
-    if (!/^\s*(select|with)\b/i.test(query)) throw new Error('anoDB: db.sql() is read-only; use table writes')
-    return this.#store.driver.all<R>(query, params)
+  /** Extension point for subclasses. */
+  protected async afterInit(): Promise<void> {}
+
+  /** Switch the default (personal) space; rebuilds projections and their capture triggers. */
+  protected setPersonal(space: string): void {
+    this.personal = space
+    this.store.applySchema(this.schema, space)
+    installCapture(this.store.driver, this.schema)
   }
 
-  /** Calls `cb` now and whenever `table` changes (locally or from sync). */
-  subscribe<T extends TableName<S>>(table: T, opts: FindOptions<S[T]>, cb: (rows: Row<S[T]>[]) => void): () => void {
-    const run = () => cb(this.findMany(table, opts))
-    const listener: ChangeListener = (tables) => {
-      if (tables.has(table)) run()
+  // ---- SQL-like API (Kysely) ------------------------------------------------
+
+  get selectFrom(): Kysely<KyselyDatabase<S>>['selectFrom'] {
+    return this.kysely.selectFrom.bind(this.kysely)
+  }
+  get insertInto(): Kysely<KyselyDatabase<S>>['insertInto'] {
+    return this.kysely.insertInto.bind(this.kysely)
+  }
+  get updateTable(): Kysely<KyselyDatabase<S>>['updateTable'] {
+    return this.kysely.updateTable.bind(this.kysely)
+  }
+  get deleteFrom(): Kysely<KyselyDatabase<S>>['deleteFrom'] {
+    return this.kysely.deleteFrom.bind(this.kysely)
+  }
+  get with(): Kysely<KyselyDatabase<S>>['with'] {
+    return this.kysely.with.bind(this.kysely)
+  }
+  get transaction(): Kysely<KyselyDatabase<S>>['transaction'] {
+    return this.kysely.transaction.bind(this.kysely)
+  }
+  /** The underlying Kysely instance (for `sql` template tags, `fn`, …). */
+  get db(): Kysely<KyselyDatabase<S>> {
+    return this.kysely
+  }
+
+  /** Raw SQL (read or write). Writes are captured, permission-checked and synced. */
+  async execute<R = Record<string, SqlValue>>(sql: string, params: readonly unknown[] = []): Promise<R[]> {
+    const r = await this.kysely.executeQuery<R>(CompiledQuery.raw(sql, [...params]))
+    return r.rows
+  }
+
+  /** Re-runs `query` whenever a table it mentions changes (locally or from sync). */
+  subscribe<R>(
+    query: Compilable<R> | { sql: string; parameters?: readonly unknown[] } | string,
+    cb: (rows: R[]) => void,
+    onError?: (e: unknown) => void,
+  ): () => void {
+    const compiled = compileQuery(query)
+    const tables = new Set(Object.keys(this.schema).filter((t) => compiled.sql.includes(`"${t}"`) || new RegExp(`\\b${t}\\b`).test(compiled.sql)))
+    let alive = true
+    const run = () => {
+      this.kysely
+        .executeQuery<R>(CompiledQuery.raw(compiled.sql, [...compiled.parameters]))
+        .then((r) => alive && cb(r.rows))
+        .catch((e) => onError?.(e))
+    }
+    const listener: ChangeListener = (changed) => {
+      for (const t of changed) if (tables.has(t)) return run()
     }
     this.#changeListeners.add(listener)
     run()
-    return () => this.#changeListeners.delete(listener)
-  }
-
-  #assertColumn(table: string, col: string): void {
-    if (col === 'id' || col === 'createdAt' || col === 'updatedAt') return
-    if (!(col in this.#tableDef(table))) throw new Error(`anoDB: unknown column "${table}.${col}"`)
-  }
-
-  #where(table: string, where: Record<string, unknown> | undefined): { clause: string; params: SqlValue[] } {
-    const def = this.#tableDef(table)
-    const parts: string[] = []
-    const params: SqlValue[] = []
-    for (const [col, value] of Object.entries(where ?? {})) {
-      if (value === undefined) continue
-      this.#assertColumn(table, col)
-      if (value === null) {
-        parts.push(`${quoteIdent(col)} IS NULL`)
-        continue
-      }
-      const type = def[col]
-      parts.push(`${quoteIdent(col)} = ?`)
-      if (type === 'boolean') params.push(value ? 1 : 0)
-      else if (type === 'json') params.push(JSON.stringify(value))
-      else params.push(value as SqlValue)
+    return () => {
+      alive = false
+      this.#changeListeners.delete(listener)
     }
-    return { clause: parts.length ? ` WHERE ${parts.join(' AND ')}` : '', params }
   }
 
-  // ---- events & status -------------------------------------------------------
+  protected executor(): SqlExecutor {
+    const drv = () => this.store.driver
+    return {
+      execute: async (sql, params) => {
+        this.assertOpen()
+        await this.gate.idle()
+        beginCapture(drv())
+        let rows: Record<string, SqlValue>[]
+        let cells: CapturedCell[]
+        try {
+          rows = drv().all<Record<string, SqlValue>>(sql, params)
+        } finally {
+          cells = endCapture(drv())
+        }
+        if (cells.length > 0) await this.commitCaptured(cells)
+        return { rows, changedRows: countRows(cells) }
+      },
+      begin: async () => {
+        this.assertOpen()
+        await this.gate.idle()
+        this.gate.close()
+        beginCapture(drv())
+      },
+      executeInTransaction: (sql, params) => {
+        const count = () => drv().all<{ n: number }>('SELECT COUNT(*) AS n FROM temp.anodb_cap')[0]!.n
+        const before = count()
+        const rows = drv().all<Record<string, SqlValue>>(sql, params)
+        return { rows, changedRows: count() > before ? 1 : 0 }
+      },
+      commit: async () => {
+        const cells = endCapture(drv())
+        this.reopenGate()
+        if (cells.length > 0) await this.commitCaptured(cells)
+      },
+      rollback: async () => {
+        endCapture(drv())
+        this.reopenGate()
+      },
+    }
+  }
+
+  protected reopenGate(): void {
+    this.gate.open()
+    for (const fn of this.#deferred.splice(0)) fn()
+    if (this.#pendingNotify.size > 0) this.notify(new Set(), 'remote')
+  }
+
+  /** Validate captured cells and commit them as signed, encrypted messages. */
+  protected async commitCaptured(cells: CapturedCell[]): Promise<void> {
+    const bySpace = new Map<string, Change[]>()
+    const touched = new Set<string>()
+    const nowMs = this.now()
+    const writable = new Set<string>()
+    for (const c of cells) {
+      const def = this.schema[c.table]
+      if (!def) continue
+      if (!ID_RE.test(c.rowId)) throw new Error(`anoDB: invalid row id "${c.rowId}" (1–128 chars of A-Z a-z 0-9 _ -)`)
+      if (!writable.has(c.space)) {
+        this.assertCanWrite(c.space)
+        writable.add(c.space)
+      }
+      let value: unknown
+      if (c.column === SYS_DELETED) value = true
+      else if (c.column === SYS_CREATED) value = nowMs
+      else value = fromCaptured(c.table, c.column, def[c.column]!, c.value)
+      let list = bySpace.get(c.space)
+      if (!list) bySpace.set(c.space, (list = []))
+      list.push([c.table, c.rowId, c.column, value, this.clock.tick()])
+      touched.add(c.table)
+    }
+    await this.gate.idle()
+    this.store.transaction(() => {
+      for (const [space, changes] of bySpace) {
+        this.store.applyChanges(space, changes)
+        for (const batch of splitChanges(changes)) this.sendToSpace(space, 'ch', { c: batch })
+      }
+      this.store.setMeta('hlc', this.clock.current())
+    })
+    this.notify(touched, 'local')
+    this.afterLocalWrite([...bySpace.keys()])
+    void this.sync?.flush()
+  }
+
+  /** Hook (v0.3: automatic snapshots / key rotation). */
+  protected afterLocalWrite(_spaces: string[]): void {}
+
+  /** Throws unless this device may write to `space`. */
+  protected assertCanWrite(space: string): void {
+    const s = this.store.spaces().find((x) => x.id === space)
+    if (!s || s.status !== 'active') throw new Error(`anoDB: unknown or inactive space "${space}"`)
+    if (!this.isAuthorizedWriter(space, this.pubkey, this.devicePubkey, Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`anoDB: no write permission in space ${space}`)
+    }
+  }
+
+  // ---- spaces & keys ----------------------------------------------------------
+
+  /** Id of this identity's personal space (default for inserts). */
+  get personalSpace(): string {
+    return this.personal
+  }
+
+  spaces(): SpaceInfo[] {
+    return this.store.spaces()
+  }
+
+  protected async loadKeys(): Promise<void> {
+    for (const k of this.store.keys()) {
+      const key = await this.keyStore.open(k.sealed)
+      this.addKey({ space: k.space, keyId: k.keyId, num: k.num, key, tag: spaceTag(key), createdAt: k.createdAt })
+    }
+  }
+
+  protected addKey(k: EpochKey): boolean {
+    if (this.keysByTag.has(k.tag)) return false
+    this.keysByTag.set(k.tag, k)
+    const list = this.keysBySpace.get(k.space) ?? []
+    list.push(k)
+    list.sort((a, b) => b.num - a.num || (a.keyId < b.keyId ? -1 : 1))
+    this.keysBySpace.set(k.space, list)
+    return true
+  }
+
+  protected async storeKey(space: string, key: Uint8Array, num: number): Promise<EpochKey> {
+    const k: EpochKey = { space, keyId: keyId(key), num, key, tag: spaceTag(key), createdAt: Date.now() }
+    if (this.keysByTag.has(k.tag)) return this.keysByTag.get(k.tag)!
+    const sealed = await this.keyStore.seal(key)
+    await this.gate.idle()
+    this.store.putKey(space, k.keyId, num, sealed)
+    this.addKey(k)
+    return k
+  }
+
+  /** Current epoch key of a space: highest number, ties by lowest key id. */
+  protected currentKey(space: string): EpochKey {
+    const k = this.keysBySpace.get(space)?.[0]
+    if (!k) throw new Error(`anoDB: no key for space ${space}`)
+    return k
+  }
+
+  protected async createSpaceInternal(id: string, name: string, personal: boolean): Promise<void> {
+    await this.storeKey(id, randomBytes(32), 1)
+    await this.gate.idle()
+    this.store.transaction(() => {
+      this.store.upsertSpace(id, name, personal)
+      this.sendToSpace(id, 'op', { op: { type: 'create', owner: this.pubkey, name, personal }, par: [] })
+    })
+    this.sync?.refresh()
+  }
+
+  // ---- outgoing messages --------------------------------------------------------
+
+  /** Sign, store, wrap and enqueue a stream message. Must run inside `store.transaction`. */
+  protected sendToSpace(space: string, type: StreamPayload['t'], body: Record<string, unknown>, key = this.currentKey(space)): { seq: number; msgId: string } {
+    const seq = this.store.nextSeq(space)
+    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, dlg: this.delegation, ...body }
+    const content = JSON.stringify(payload)
+    const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
+    this.store.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id)
+    const outer = this.wrap(JSON.stringify(inner), key.tag, key.key)
+    this.store.putRaw(outer, key.tag)
+    this.sync?.enqueue(outer, true)
+    return { seq, msgId: inner.id }
+  }
+
+  /** Seal an inner message into an envelope with the given routing tag and conversation key. */
+  protected wrap(innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): NostrEvent {
+    if (byteLength(innerJson) > 65_000) throw new Error('anoDB: message too large')
+    const sk = signerSk ?? (this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey())
+    return signWith(sk, {
+      kind: WRAP_KIND,
+      created_at: Math.floor(this.now() / 1000),
+      tags: [[TAG, tag]],
+      content: encrypt(innerJson, convKey),
+    })
+  }
+
+  /** Envelope to another device's inbox (pairwise NIP-44 with a throwaway key). */
+  protected wrapToDevice(innerJson: string, devicePk: string): NostrEvent {
+    const eph = this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
+    return this.wrap(innerJson, inboxTag(devicePk), conversationKey(eph, devicePk), eph)
+  }
+
+  protected enqueuePlain(event: NostrEvent): void {
+    this.assertOpen()
+    if (!this.sync) throw new Error('anoDB: no relays configured')
+    this.store.enqueue(event, false)
+    this.emitStatus()
+    void this.sync.flush()
+  }
+
+  protected requireIdentitySigner(): Signer {
+    if (!this.identitySigner) {
+      throw new Error('anoDB: the identity key is not on this device; pass `signer` (NIP-07/46/55) or the recovery key')
+    }
+    return this.identitySigner
+  }
+
+  /** The identity secret as nsec, when stored on this device (identity: 'stored'). */
+  exportIdentityKey(): string {
+    const s = this.identitySigner as (Signer & { secretKey?: Uint8Array }) | null
+    if (!s?.secretKey) throw new Error('anoDB: the identity key is not stored on this device')
+    return nsecEncode(s.secretKey)
+  }
+
+  // ---- incoming -------------------------------------------------------------------
+
+  protected syncHost(): SyncHost {
+    return {
+      tags: () => this.subscriptionTags(),
+      ingest: (relay, e) => this.ingestGated(relay, e),
+      resign: (e) => {
+        const sk = this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
+        return signWith(sk, { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
+      },
+      statusChanged: () => this.emitStatus(),
+      publishRejected: (id) => this.error('publish-rejected', `every relay rejected event ${id}; call db.flush() to retry`, id),
+      now: () => this.now(),
+      afterCatchUp: (relay) => this.afterCatchUp(relay),
+    }
+  }
+
+  protected async afterCatchUp(_relay: string): Promise<void> {}
+
+  protected subscriptionTags(): string[] {
+    const active = new Set(this.store.spaces().filter((s) => s.status === 'active').map((s) => s.id))
+    return [...this.keysByTag.values()].filter((k) => active.has(k.space)).map((k) => k.tag)
+  }
+
+  protected ingestGated(relay: string, e: NostrEvent): IngestResult {
+    if (this.gate.busy) {
+      this.#deferred.push(() => void this.ingest(relay, e))
+      return 'seen'
+    }
+    return this.ingest(relay, e)
+  }
+
+  /** Verify and apply one envelope. */
+  protected ingest(_relay: string, outer: NostrEvent): IngestResult {
+    if (this.#closed || outer.kind !== WRAP_KIND) return 'invalid'
+    const tag = outer.tags.find((t) => t[0] === TAG)?.[1]
+    if (!tag) return 'invalid'
+    if (this.store.hasRaw(outer.id)) return 'seen'
+    const ek = this.keysByTag.get(tag)
+    if (!ek) return this.ingestOther(tag, outer)
+    if (outer.content.length > 120_000 || !verifySignedEvent(outer)) return 'invalid'
+    let inner: unknown
+    try {
+      inner = JSON.parse(decrypt(outer.content, ek.key))
+    } catch {
+      this.error('decrypt-failed', 'could not decrypt envelope', outer.id)
+      return 'invalid'
+    }
+    if (!isEvent(inner) || inner.kind !== MESSAGE_KIND || !verifySignedEvent(inner)) {
+      this.error('invalid-event', 'inner message is malformed or badly signed', outer.id)
+      return 'invalid'
+    }
+    const payload = parseStreamPayload(inner.content)
+    if (!payload) {
+      this.error('unsupported-protocol', 'unknown message format or newer protocol version', outer.id)
+      return 'invalid'
+    }
+    if (payload.sp !== ek.space || payload.ep !== ek.keyId) {
+      this.error('invalid-event', 'message header does not match its envelope', outer.id)
+      return 'invalid'
+    }
+    const identity = verifyDelegation(payload.dlg, inner.pubkey)
+    if (!identity) {
+      this.error('invalid-event', 'message has no valid delegation', outer.id)
+      return 'invalid'
+    }
+    let result = 'seen' as IngestResult
+    const msgId = inner.id
+    const device = inner.pubkey
+    const changed = this.store.transaction(() => {
+      this.store.putRaw(outer, tag)
+      if (this.store.hasMessage(ek.space, device, payload.seq)) return new Set<string>()
+      this.store.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId)
+      result = 'new'
+      return this.onMessage(ek.space, identity, device, payload)
+    })
+    this.notify(changed, 'remote')
+    if (result === 'new') this.afterRemoteMessage(ek.space, payload)
+    return result
+  }
+
+  /** Hook after a new remote message was stored (v0.3: membership handling). */
+  protected afterRemoteMessage(_space: string, _p: StreamPayload): void {}
+
+  /** Envelope for a tag that is not a space key (inbox, invite secrets). Implemented in v0.3. */
+  protected ingestOther(_tag: string, _outer: NostrEvent): IngestResult {
+    return 'invalid'
+  }
+
+  /** Apply a newly stored, signature-valid message. Returns changed tables. Runs inside a transaction. */
+  protected onMessage(space: string, identity: string, device: string, p: StreamPayload): Set<string> {
+    if (p.t === 'op') {
+      this.invalidateMembership(space)
+      return this.rebuildSpace(space)
+    }
+    if (p.t !== 'ch') return new Set()
+    if (!this.isAuthorizedWriter(space, identity, device, p.seq)) return new Set() // kept; re-evaluated on membership change
+    let maxHlc = ''
+    for (const c of p.c) if (c[4] > maxHlc) maxHlc = c[4]
+    if (maxHlc) this.clock.receive(maxHlc)
+    this.store.setMeta('hlc', this.clock.current())
+    return this.store.applyChanges(space, p.c)
+  }
+
+  readonly #ownerCache = new Map<string, string | null>()
+
+  protected invalidateMembership(space: string): void {
+    this.#ownerCache.delete(space)
+  }
+
+  /** v0.2: only the space creator (owner) may write. Generalised to roles in v0.3. */
+  protected isAuthorizedWriter(space: string, identity: string, _device: string, _seq: number): boolean {
+    if (!this.#ownerCache.has(space)) {
+      let owner: string | null = null
+      for (const m of this.store.messages(space, 'op')) {
+        const p = JSON.parse(m.payload) as { op: { type?: string; owner?: string } }
+        if (p.op.type === 'create' && p.op.owner === m.identity) owner = m.identity
+      }
+      this.#ownerCache.set(space, owner)
+    }
+    return this.#ownerCache.get(space) === identity
+  }
+
+  /** Recompute a space's cells from the message log under the current authorization rules. */
+  protected rebuildSpace(space: string): Set<string> {
+    const touched = this.store.clearSpace(space)
+    for (const m of this.store.messages(space, 'ch')) {
+      if (!this.isAuthorizedWriter(space, m.identity, m.device, m.seq)) continue
+      const p = JSON.parse(m.payload) as { c: Change[] }
+      for (const t of this.store.applyChanges(space, p.c)) touched.add(t)
+    }
+    return touched
+  }
+
+  // ---- events & status -------------------------------------------------------------
 
   onChange(fn: ChangeListener): () => void {
     this.#changeListeners.add(fn)
@@ -370,18 +707,11 @@ export class AnoDB<S extends SchemaDefinition> {
   }
 
   get status(): SyncStatus {
-    const connectedRelays = this.#pool?.connected() ?? []
-    const pendingEvents = this.#store.outboxSize()
-    let state: SyncStatus['state']
-    if (connectedRelays.length === 0) state = 'offline'
-    else if (pendingEvents > 0 || connectedRelays.some((r) => !this.#relayState.get(r)?.caughtUp)) state = 'syncing'
-    else state = 'synced'
-    return { state, connectedRelays, pendingEvents }
+    return this.sync?.status ?? { state: 'offline', connectedRelays: [], pendingEvents: 0 }
   }
 
-  /** Resolves once every connected relay has been caught up and the outbox is flushed (or `timeoutMs`). */
   async waitForSync(timeoutMs = 10_000): Promise<SyncStatus> {
-    const deadline = this.#now() + timeoutMs
+    const deadline = Date.now() + timeoutMs
     for (;;) {
       const s = this.status
       if (s.state === 'synced' || Date.now() >= deadline) return s
@@ -390,211 +720,34 @@ export class AnoDB<S extends SchemaDefinition> {
   }
 
   /** Retry relays that rejected pending events and flush the outbox now. */
-  async sync(): Promise<void> {
-    this.#store.clearRejections()
-    await this.#flush()
+  async flush(): Promise<void> {
+    await this.gate.idle()
+    this.store.clearRejections()
+    await this.sync?.flush()
   }
 
-  // ---- receive path ------------------------------------------------------------
-
-  #filtersFor(relay: string): Filter[] {
-    const cursor = this.#store.getCursor(relay)
-    const since = cursor === undefined ? 0 : Math.max(0, cursor - CURSOR_SKEW_SEC)
-    this.#relayState.set(relay, { reqSince: since, oldest: null, newest: null, caughtUp: false })
-    const filter: Filter = { kinds: [CHANGE_KIND], authors: [this.pubkey], [`#${NAMESPACE_TAG}`]: [this.#ns] }
-    if (since > 0) filter.since = since
-    return [filter]
-  }
-
-  #onRelayEvent(relay: string, event: NostrEvent): void {
-    if (this.#closed) return
-    const state = this.#relayState.get(relay)
-    if (this.#ingest(event) === 'invalid') return
-    if (state && !state.caughtUp) {
-      state.oldest = state.oldest === null ? event.created_at : Math.min(state.oldest, event.created_at)
-      state.newest = state.newest === null ? event.created_at : Math.max(state.newest, event.created_at)
-    } else {
-      this.#store.advanceCursor(relay, event.created_at)
-    }
-  }
-
-  /** Validate, decrypt and merge one change event. */
-  #ingest(event: NostrEvent): 'new' | 'seen' | 'invalid' {
-    if (
-      event.kind !== CHANGE_KIND ||
-      event.pubkey !== this.pubkey ||
-      !event.tags.some((t) => t[0] === NAMESPACE_TAG && t[1] === this.#ns)
-    ) {
-      return 'invalid'
-    }
-    if (this.#store.hasEvent(event.id)) return 'seen'
-    if (event.content.length > 200_000 || !verifySignedEvent(event)) {
-      this.#error('invalid-event', 'event failed signature or size check', event.id)
-      return 'invalid'
-    }
-    let plaintext: string
-    try {
-      plaintext = this.#key.decryptFromSelf(event.content)
-    } catch {
-      this.#error('decrypt-failed', 'could not decrypt change event', event.id)
-      return 'invalid'
-    }
-    const payload = decodePayload(plaintext)
-    if (!payload) {
-      // Not marked as seen: a future version of anoDB may understand it after `resync`.
-      this.#error('unsupported-protocol', 'change event has an unknown format or newer protocol version', event.id)
-      return 'invalid'
-    }
-    let maxHlc = ''
-    for (const c of payload.changes) if (c[4] > maxHlc) maxHlc = c[4]
-    if (maxHlc) this.#clock.receive(maxHlc)
-    const tables = this.#store.transaction(() => {
-      const touched = this.#store.applyChanges(payload.changes)
-      this.#store.markEvent(event.id, event.created_at)
-      this.#store.setMeta('hlc', this.#clock.current())
-      return touched
-    })
-    this.#notify(tables, 'remote')
-    return 'new'
-  }
-
-  /**
-   * Initial batch of a REQ finished. Relays cap how many stored events they return, so page
-   * backwards with `until` until a page brings nothing new, then advance the cursor.
-   */
-  async #onEose(relay: string): Promise<void> {
-    const state = this.#relayState.get(relay)
-    if (!state || state.caughtUp || !this.#pool) return
-    let until = state.oldest
-    let newest = state.newest
-    while (until !== null && !this.#closed) {
-      const filter: Filter = {
-        kinds: [CHANGE_KIND],
-        authors: [this.pubkey],
-        [`#${NAMESPACE_TAG}`]: [this.#ns],
-        until,
-        limit: BACKFILL_PAGE,
-      }
-      if (state.reqSince > 0) filter.since = state.reqSince
-      const page = await this.#pool.query([filter], { relays: [relay] })
-      let fresh = 0
-      let oldest: number | null = null
-      for (const e of page) {
-        if (this.#ingest(e) === 'new') fresh++
-        oldest = oldest === null ? e.created_at : Math.min(oldest, e.created_at)
-        newest = newest === null ? e.created_at : Math.max(newest, e.created_at)
-      }
-      if (oldest === null) break
-      if (fresh > 0) until = oldest
-      else if (oldest === until) {
-        // The whole page is one already-seen second: the relay's limit is saturated by that second.
-        // NIP-01 cannot page inside a second, so skip it and continue with older events.
-        until -= 1
-        if (until < state.reqSince) break
-      } else break
-    }
-    if (this.#relayState.get(relay) !== state) return // reconnected meanwhile
-    if (newest !== null) this.#store.advanceCursor(relay, newest)
-    state.caughtUp = true
-    this.#emitStatus()
-  }
-
-  /** Forget sync cursors and re-download everything from relays (idempotent merge). */
+  /** Forget cursors and re-download everything from relays. */
   resync(): void {
-    this.#store.resetCursors()
-    this.#store.driver.run('DELETE FROM anodb_events')
-    this.#unsubscribe?.()
-    this.#startSubscription()
-    this.#emitStatus()
+    this.sync?.resync()
   }
 
-  #startSubscription(): void {
-    if (!this.#pool) return
-    this.#unsubscribe = this.#pool.subscribe((relay) => this.#filtersFor(relay), {
-      onEvent: (relay, event) => this.#onRelayEvent(relay, event),
-      onEose: (relay) => void this.#onEose(relay),
-    })
-  }
-
-  // ---- outbox ------------------------------------------------------------------
-
-  #enqueuePublic(event: NostrEvent): void {
-    this.#assertOpen()
-    if (!this.#pool) throw new Error('anoDB: no relays configured')
-    this.#store.enqueue(event)
-    this.#emitStatus()
-    void this.#flush()
-  }
-
-  #flush(): Promise<void> {
-    if (this.#flushing) {
-      this.#flushAgain = true
-      return this.#flushing
+  protected notify(tables: ReadonlySet<string>, origin: 'local' | 'remote'): void {
+    if (this.gate.busy) {
+      for (const t of tables) this.#pendingNotify.add(t)
+      return
     }
-    this.#flushing = (async () => {
-      try {
-        do {
-          this.#flushAgain = false
-          await this.#flushOnce()
-        } while (this.#flushAgain && !this.#closed)
-      } finally {
-        this.#flushing = null
-        this.#emitStatus()
-      }
-    })()
-    return this.#flushing
+    const all = new Set([...this.#pendingNotify, ...tables])
+    this.#pendingNotify.clear()
+    if (all.size === 0) return
+    for (const fn of [...this.#changeListeners]) fn(all, origin)
   }
 
-  async #flushOnce(): Promise<void> {
-    const pool = this.#pool
-    if (!pool || this.#closed) return
-    const connected = new Set(pool.connected())
-    if (connected.size === 0) return
-    await Promise.all(
-      this.#store.outbox().map(async ({ entryId, event, acks }) => {
-        const targets = pool.relays.filter((r) => connected.has(r) && !acks.has(r))
-        if (targets.length === 0) return
-        let toSend = event
-        const nowSec = Math.floor(this.#now() / 1000)
-        if (event.kind === CHANGE_KIND && nowSec - event.created_at > RESIGN_AFTER_SEC) {
-          // Offline writes: give the event a fresh created_at so `since` cursors on other devices see it.
-          toSend = this.#key.sign({ kind: event.kind, tags: event.tags, content: event.content, created_at: nowSec })
-          this.#store.transaction(() => {
-            this.#store.replaceOutboxEvent(entryId, toSend)
-            this.#store.markEvent(toSend.id, toSend.created_at)
-          })
-        }
-        const results = await pool.publish(toSend, targets)
-        if (this.#closed) return
-        for (const [relay, r] of results) {
-          if (r.outcome === 'ok' || r.outcome === 'rejected') {
-            acks.set(relay, r.outcome)
-            this.#store.recordAck(entryId, relay, r.outcome, r.message)
-          }
-        }
-        const ok = [...acks.values()].filter((s) => s === 'ok').length
-        if (ok >= this.#minAcks || (ok > 0 && acks.size === pool.relays.length)) {
-          this.#store.dequeue(entryId)
-        } else if (acks.size === pool.relays.length) {
-          this.#error('publish-rejected', `every relay rejected event ${entryId}; call db.sync() to retry`, entryId)
-        }
-      }),
-    )
-  }
-
-  // ---- misc ------------------------------------------------------------------
-
-  #notify(tables: ReadonlySet<string>, origin: 'local' | 'remote'): void {
-    if (tables.size === 0) return
-    for (const fn of [...this.#changeListeners]) fn(tables, origin)
-  }
-
-  #error(code: AnoDBError['code'], message: string, eventId?: string): void {
+  protected error(code: AnoDBErrorCode, message: string, eventId?: string): void {
     const err = new AnoDBError(code, message, eventId)
     for (const fn of this.#errorListeners) fn(err)
   }
 
-  #emitStatus(): void {
+  protected emitStatus(): void {
     if (this.#closed) return
     const s = this.status
     const key = JSON.stringify(s)
@@ -603,17 +756,32 @@ export class AnoDB<S extends SchemaDefinition> {
     for (const fn of this.#statusListeners) fn(s)
   }
 
-  #assertOpen(): void {
+  protected assertOpen(): void {
     if (this.#closed) throw new Error('anoDB: database is closed')
   }
 
-  close(): void {
+  get closed(): boolean {
+    return this.#closed
+  }
+
+  async close(): Promise<void> {
     if (this.#closed) return
+    await this.gate.idle()
     this.#closed = true
-    if (this.#retryTimer) clearInterval(this.#retryTimer)
-    this.#pool?.close()
+    this.sync?.close()
     this.#changeListeners.clear()
     this.#statusListeners.clear()
-    this.#store.driver.close()
+    this.store.driver.close()
   }
+}
+
+function compileQuery(q: Query): { sql: string; parameters: readonly unknown[] } {
+  if (typeof q === 'string') return { sql: q, parameters: [] }
+  if ('compile' in q && typeof q.compile === 'function') return q.compile()
+  const raw = q as { sql: string; parameters?: readonly unknown[] }
+  return { sql: raw.sql, parameters: raw.parameters ?? [] }
+}
+
+function countRows(cells: CapturedCell[]): number {
+  return new Set(cells.map((c) => `${c.space}\u0000${c.table}\u0000${c.rowId}`)).size
 }

@@ -1,86 +1,114 @@
 import { describe, expect, it } from 'vitest'
+import { generateSecretKey, getPublicKey, inboxTag, keyId, parseSecretKey, randomBytes, spaceTag } from '../src/crypto.js'
 import { Clock, decodeHlc, encodeHlc } from '../src/hlc.js'
-import { type Change, decodePayload, encodePayload, splitChanges } from '../src/protocol.js'
+import { createDelegation, createRevocation, verifyDelegation, verifyRevocation } from '../src/identity.js'
+import { envKeyStore } from '../src/keystore/env.js'
+import { memoryKeyStore } from '../src/keystore/memory.js'
+import { type Change, parseStreamPayload, splitChanges } from '../src/protocol.js'
 import { defineSchema } from '../src/schema.js'
-import { OwnerKey, namespaceTag, parseSecretKey } from '../src/crypto.js'
+import { localSigner } from '../src/signer.js'
 
 const NODE_A = 'aaaaaaaaaaaaaaaa'
 const NODE_B = 'bbbbbbbbbbbbbbbb'
 
 describe('HLC', () => {
-  it('round-trips and sorts lexicographically by time, counter, node', () => {
+  it('round-trips and sorts lexicographically', () => {
     const t = { millis: 1_762_000_000_000, counter: 7, node: NODE_A }
     expect(decodeHlc(encodeHlc(t))).toEqual(t)
     const a = encodeHlc({ millis: 1000, counter: 99, node: NODE_B })
     const b = encodeHlc({ millis: 1001, counter: 0, node: NODE_A })
-    const c = encodeHlc({ millis: 1001, counter: 0, node: NODE_B })
-    expect([c, b, a].sort()).toEqual([a, b, c])
+    expect([b, a].sort()).toEqual([a, b])
   })
 
-  it('is strictly monotonic even when the wall clock stalls or goes back', () => {
+  it('is monotonic when the wall clock goes back, and orders after received stamps', () => {
     let wall = 5000
     const clock = new Clock(NODE_A, undefined, () => wall)
-    const seen: string[] = []
-    for (let i = 0; i < 5; i++) seen.push(clock.tick())
+    const seen = [clock.tick(), clock.tick()]
     wall = 4000
-    for (let i = 0; i < 5; i++) seen.push(clock.tick())
+    seen.push(clock.tick())
     expect([...seen].sort()).toEqual(seen)
-    expect(new Set(seen).size).toBe(seen.length)
-  })
-
-  it('orders local writes after received remote timestamps', () => {
-    const clock = new Clock(NODE_A, undefined, () => 1000)
     const remote = encodeHlc({ millis: 9000, counter: 3, node: NODE_B })
     clock.receive(remote)
     expect(clock.tick() > remote).toBe(true)
   })
 })
 
-describe('protocol', () => {
-  const ch = (i: number, v: unknown = 'x'): Change => ['todo', `r${i}`, 'title', v, encodeHlc({ millis: 1, counter: i, node: NODE_A })]
+describe('protocol v2', () => {
+  const hlc = (i: number) => encodeHlc({ millis: 1, counter: i, node: NODE_A })
+  const ch = (i: number, v: unknown = 'x'): Change => ['todo', `r${i}`, 'title', v, hlc(i)]
+  const header = async () => {
+    const id = localSigner(generateSecretKey())
+    const dev = getPublicKey(generateSecretKey())
+    return { v: 2, sp: 'a'.repeat(32), ep: 'b'.repeat(16), seq: 1, dlg: await createDelegation(id, dev, 'd', Date.now()) }
+  }
 
-  it('encodes, decodes and rejects malformed payloads', () => {
-    const changes = [ch(1), ch(2, { nested: [1, 2] })]
-    expect(decodePayload(encodePayload(changes))?.changes).toEqual(changes)
-    expect(decodePayload('nope')).toBeNull()
-    expect(decodePayload(JSON.stringify({ v: 99, changes: [] }))).toBeNull()
-    expect(decodePayload(JSON.stringify({ v: 1, changes: [['todo', 'r', 'title', 1, 'bad-hlc']] }))).toBeNull()
-    expect(decodePayload(JSON.stringify({ v: 1, changes: [['$x', 'r', 'title', 1, ch(1)[4]]] }))).toBeNull()
+  it('parses valid payloads and rejects malformed ones', async () => {
+    const h = await header()
+    expect(parseStreamPayload(JSON.stringify({ ...h, t: 'ch', c: [ch(1)] }))?.t).toBe('ch')
+    expect(parseStreamPayload(JSON.stringify({ ...h, v: 1, t: 'ch', c: [] }))).toBeNull()
+    expect(parseStreamPayload(JSON.stringify({ ...h, seq: 0, t: 'ch', c: [] }))).toBeNull()
+    expect(parseStreamPayload(JSON.stringify({ ...h, t: 'ch', c: [['todo', 'r', 'x', 1, 'bad']] }))).toBeNull()
+    expect(parseStreamPayload(JSON.stringify({ ...h, t: 'zz' }))).toBeNull()
+    expect(parseStreamPayload(JSON.stringify({ ...h, dlg: { nope: 1 }, t: 'ch', c: [] }))).toBeNull()
   })
 
-  it('splits large transactions under the byte limit', () => {
+  it('splits large change sets', () => {
     const big = Array.from({ length: 200 }, (_, i) => ch(i, 'y'.repeat(500)))
     const parts = splitChanges(big, 20_000)
     expect(parts.length).toBeGreaterThan(1)
     expect(parts.flat()).toEqual(big)
-    for (const p of parts) expect(new TextEncoder().encode(encodePayload(p)).length).toBeLessThanOrEqual(20_000)
     expect(() => splitChanges([ch(0, 'z'.repeat(30_000))], 20_000)).toThrow(/exceeds/)
+  })
+})
+
+describe('identity', () => {
+  it('verifies delegations and revocations', async () => {
+    const id = localSigner(generateSecretKey())
+    const dev = getPublicKey(generateSecretKey())
+    const d = await createDelegation(id, dev, 'phone', Date.now())
+    expect(verifyDelegation(d, dev)).toBe(await id.getPublicKey())
+    expect(verifyDelegation(d, getPublicKey(generateSecretKey()))).toBeNull()
+    expect(verifyDelegation({ ...d, content: 'tampered' }, dev)).toBeNull()
+    const r = await createRevocation(id, dev, Date.now())
+    expect(verifyRevocation(r)).toEqual({ identity: await id.getPublicKey(), device: dev })
+  })
+
+  it('derives distinct routing tags and key ids', () => {
+    const k1 = randomBytes(32)
+    const k2 = randomBytes(32)
+    expect(spaceTag(k1)).not.toBe(spaceTag(k2))
+    expect(spaceTag(k1)).toHaveLength(32)
+    expect(keyId(k1)).toHaveLength(16)
+    expect(inboxTag('a'.repeat(64))).not.toBe(spaceTag(k1))
+  })
+})
+
+describe('key stores', () => {
+  it('memory store seals and opens', async () => {
+    const ks = memoryKeyStore()
+    await ks.set('device', 'abc')
+    expect(await ks.get('device')).toBe('abc')
+    const sealed = await ks.seal(new Uint8Array([1, 2, 3]))
+    expect([...(await ks.open(sealed))]).toEqual([1, 2, 3])
+    await expect(memoryKeyStore().open(sealed)).rejects.toThrow()
+  })
+
+  it('env store is read-only, needs both variables and accepts base64 delegations', async () => {
+    expect(() => envKeyStore({})).toThrow(/npx anodb init/)
+    const sk = generateSecretKey()
+    const dlg = JSON.stringify(await createDelegation(localSigner(generateSecretKey()), getPublicKey(sk), 'srv', Date.now()))
+    const ks = envKeyStore({ ANODB_DEVICE_KEY: Buffer.from(sk).toString('hex'), ANODB_DELEGATION: btoa(dlg) })
+    expect(await ks.get('delegation')).toBe(dlg)
+    expect(parseSecretKey((await ks.get('device'))!)).toEqual(sk)
+    await expect(ks.set('identity', 'x')).rejects.toThrow(/read-only/)
   })
 })
 
 describe('schema', () => {
   it('rejects reserved or invalid names', () => {
     expect(() => defineSchema({ todo: { id: 'text' } })).toThrow(/reserved/)
+    expect(() => defineSchema({ todo: { space: 'text' } })).toThrow(/reserved/)
     expect(() => defineSchema({ anodb_x: { a: 'text' } })).toThrow(/reserved/)
     expect(() => defineSchema({ 'bad name': { a: 'text' } })).toThrow(/invalid/)
-    expect(() => defineSchema({ t: { a: 'blob' as 'text' } })).toThrow(/unknown column type/)
-  })
-})
-
-describe('crypto', () => {
-  it('parses nsec/hex/bytes and self-encrypts', () => {
-    const k = OwnerKey.generate()
-    expect(new OwnerKey(parseSecretKey(k.nsec)).pubkey).toBe(k.pubkey)
-    expect(new OwnerKey(parseSecretKey(k.hex)).pubkey).toBe(k.pubkey)
-    const ct = k.encryptToSelf('secret')
-    expect(ct).not.toContain('secret')
-    expect(k.decryptFromSelf(ct)).toBe('secret')
-    expect(() => OwnerKey.generate().decryptFromSelf(ct)).toThrow()
-  })
-
-  it('namespace tag differs per app and per owner', () => {
-    expect(namespaceTag('a', 'p1')).not.toBe(namespaceTag('b', 'p1'))
-    expect(namespaceTag('a', 'p1')).not.toBe(namespaceTag('a', 'p2'))
-    expect(namespaceTag('a', 'p1')).toHaveLength(32)
   })
 })

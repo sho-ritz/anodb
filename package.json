@@ -1,7 +1,7 @@
 {
   "name": "anodb",
-  "version": "0.0.0",
-  "description": "Absolutely None DB — local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
+  "version": "0.2.0",
+  "description": "Absolutely None DB \u2014 local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
@@ -49,6 +49,7 @@
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
+    "kysely": "^0.29.8",
     "nostr-tools": "^2.26.0"
   },
   "devDependencies": {
@@ -59,5 +60,8 @@
     "typescript": "^7.0.2",
     "vitest": "^5.1.0",
     "ws": "^8.22.2"
+  },
+  "bin": {
+    "anodb": "./dist/cli/main.js"
   }
 }

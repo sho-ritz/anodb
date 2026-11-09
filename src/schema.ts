@@ -1,7 +1,7 @@
 import type { ColumnType, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
 
 const IDENT = /^[A-Za-z][A-Za-z0-9_]*$/
-export const RESERVED_COLUMNS = new Set(['id', 'createdAt', 'updatedAt', 'isDeleted'])
+export const RESERVED_COLUMNS = new Set(['id', 'space', 'createdAt', 'updatedAt', 'isDeleted'])
 const COLUMN_TYPES = new Set<ColumnType>(['text', 'integer', 'real', 'boolean', 'json'])
 
 /** System cells. They travel in the change log like user cells. */
@@ -38,9 +38,11 @@ const SQL_TYPE: Record<ColumnType, string> = {
   json: 'TEXT',
 }
 
-export function createTableSql(table: string, def: TableDefinition): string {
+export function createTableSql(table: string, def: TableDefinition, defaultSpace: string): string {
   const cols = Object.entries(def).map(([c, t]) => `${quoteIdent(c)} ${SQL_TYPE[t]}`)
-  return `CREATE TABLE ${quoteIdent(table)} (id TEXT PRIMARY KEY, ${[...cols, '"createdAt" INTEGER', '"updatedAt" INTEGER NOT NULL'].join(', ')})`
+  const space = `space TEXT NOT NULL DEFAULT '${defaultSpace.replaceAll("'", "''")}'`
+  const id = 'id TEXT NOT NULL DEFAULT (lower(hex(randomblob(16))))'
+  return `CREATE TABLE ${quoteIdent(table)} (${[space, id, ...cols, '"createdAt" INTEGER', '"updatedAt" INTEGER NOT NULL DEFAULT 0', 'PRIMARY KEY (space, id)'].join(', ')})`
 }
 
 /** Stable fingerprint of a table definition; projection is rebuilt when it changes. */

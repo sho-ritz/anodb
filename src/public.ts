@@ -1,5 +1,5 @@
-import type { OwnerKey } from './crypto.js'
 import { verifySignedEvent } from './crypto.js'
+import type { Signer } from './signer.js'
 import { DEFAULT_DISCOVERY_RELAYS } from './defaults.js'
 import { type Filter, type RelayPool, normalizeRelayUrl } from './relay-pool.js'
 import type { Store } from './store.js'
@@ -46,7 +46,7 @@ export interface FetchOptions {
 
 interface Deps {
   store: Store
-  key: OwnerKey
+  signer: () => Signer
   pool: RelayPool | null
   discoveryRelays: readonly string[] | undefined
   now: () => number
@@ -140,20 +140,20 @@ export class PublicData {
   // ---- write -----------------------------------------------------------------
   // Signed with the owner key and delivered through the durable outbox.
 
-  publishProfile(profile: Profile): NostrEvent {
-    const event = this.#sign(KIND_PROFILE, JSON.stringify(profile), [])
+  async publishProfile(profile: Profile): Promise<NostrEvent> {
+    const event = await this.#sign(KIND_PROFILE, JSON.stringify(profile), [])
     this.#d.store.putPublic(event, event.pubkey, KIND_PROFILE, this.#d.now())
     this.#d.enqueue(event)
     return event
   }
 
-  publishNote(content: string, tags: string[][] = []): NostrEvent {
-    const event = this.#sign(KIND_NOTE, content, tags)
+  async publishNote(content: string, tags: string[][] = []): Promise<NostrEvent> {
+    const event = await this.#sign(KIND_NOTE, content, tags)
     this.#d.enqueue(event)
     return event
   }
 
-  publishRelayList(list: RelayList): NostrEvent {
+  async publishRelayList(list: RelayList): Promise<NostrEvent> {
     const read = new Set(list.read.map(normalizeRelayUrl))
     const write = new Set(list.write.map(normalizeRelayUrl))
     const tags: string[][] = []
@@ -161,14 +161,14 @@ export class PublicData {
       if (read.has(r) && write.has(r)) tags.push(['r', r])
       else tags.push(['r', r, read.has(r) ? 'read' : 'write'])
     }
-    const event = this.#sign(KIND_RELAY_LIST, '', tags)
+    const event = await this.#sign(KIND_RELAY_LIST, '', tags)
     this.#d.store.putPublic(event, event.pubkey, KIND_RELAY_LIST, this.#d.now())
     this.#d.enqueue(event)
     return event
   }
 
-  #sign(kind: number, content: string, tags: string[][]): NostrEvent {
-    return this.#d.key.sign({ kind, content, tags, created_at: Math.floor(this.#d.now() / 1000) })
+  #sign(kind: number, content: string, tags: string[][]): Promise<NostrEvent> {
+    return this.#d.signer().signEvent({ kind, content, tags, created_at: Math.floor(this.#d.now() / 1000) })
   }
 }
 

@@ -21,32 +21,6 @@ export type ColumnType = 'text' | 'integer' | 'real' | 'boolean' | 'json'
 export type TableDefinition = Readonly<Record<string, ColumnType>>
 export type SchemaDefinition = Readonly<Record<string, TableDefinition>>
 
-type ColumnTs<C extends ColumnType> = C extends 'text'
-  ? string
-  : C extends 'integer' | 'real'
-    ? number
-    : C extends 'boolean'
-      ? boolean
-      : unknown
-
-/** Columns a user may write. Every column is nullable because cells merge independently. */
-export type Writable<T extends TableDefinition> = { [K in keyof T]?: ColumnTs<T[K]> | null }
-
-/** A row as read from the local projection. */
-export type Row<T extends TableDefinition> = { id: string; createdAt: number | null; updatedAt: number } & {
-  [K in keyof T]: ColumnTs<T[K]> | null
-}
-
-export type SortDirection = 'asc' | 'desc'
-
-export interface FindOptions<T extends TableDefinition> {
-  /** Equality match per column. `null` matches SQL NULL. */
-  where?: { [K in keyof Row<T>]?: Row<T>[K] }
-  orderBy?: { [K in keyof Row<T>]?: SortDirection }
-  limit?: number
-  offset?: number
-}
-
 /** Overall sync state reported by `db.status`. */
 export type SyncState = 'offline' | 'syncing' | 'synced'
 

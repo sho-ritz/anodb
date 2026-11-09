@@ -5,7 +5,7 @@
 anoDB は端末内の SQLite を正とし、変更を **E2EE された Nostr イベント**として既存の公開リレーに流す Local-first DB の SDK です。
 名前の通り、開発者が用意するサーバーは **absolutely none**。API サーバーも DB サーバーもプロジェクト作成も不要で、オフライン読み書き・複数端末同期・他ユーザーの公開プロフィール取得を一つの型付き API で扱えます。
 
-> ステータス: **v0.1 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
+> ステータス: **v0.2 / 実験的**。プロトコル（[PROTOCOL.md](PROTOCOL.md)）は破壊的に変わる可能性があります。設計の詳細と限界は [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## 特徴
 
@@ -27,80 +27,56 @@ Node.js 22.13+（`node:sqlite`）またはブラウザ（`sql.js` などの同�
 
 ## 使い方
 
+```sh
+npx anodb init        # 対話式セットアップ（言語 → 環境 → フレームワーク → 鍵 → リレー → ファイル生成）
+```
+
 ```ts
 import { createAnoDB, defineSchema } from 'anodb'
-import { nodeSqlite } from 'anodb/node'
 
 const schema = defineSchema({
   todo: { title: 'text', done: 'boolean', priority: 'integer', meta: 'json' },
+  tag: { name: 'text', todoId: 'text' },
 })
 
-const db = createAnoDB({
-  appId: 'com.example.todo',
-  schema,
-  driver: nodeSqlite('todo.sqlite'),
-  // secretKey: 'nsec1…',   // 省略時は生成して DB に保存
-  // relays: [...],          // 省略時は DEFAULT_RELAYS。[] でローカル専用
+const db = await createAnoDB({ appId: 'com.example.todo', schema, driver })
+
+// SQL ライクで型安全（Kysely）。JOIN も型が付く
+await db.insertInto('todo').values({ title: '買い物', done: false }).execute()
+await db.updateTable('todo').set({ done: true }).where('title', 'like', '%買%').execute()
+const rows = await db
+  .selectFrom('todo')
+  .leftJoin('tag', 'tag.todoId', 'todo.id')
+  .select(['todo.title', 'tag.name'])
+  .execute()
+
+// 生 SQL でも書ける（書き込みはトリガーで捕捉され、暗号化・同期される）
+await db.execute(`UPDATE todo SET done = 1 WHERE priority > ?`, [2])
+
+// トランザクション（1回の同期単位）
+await db.transaction().execute(async (tx) => {
+  await tx.insertInto('todo').values({ title: 'A' }).execute()
 })
 
-const todos = db.table('todo')
-const id = todos.insert({ title: '買い物', done: false })
-todos.update(id, { done: true })
-
-todos.findMany({ where: { done: false }, orderBy: { createdAt: 'desc' }, limit: 20 })
-db.sql('SELECT title FROM todo WHERE priority > ?', [1]) // 読み取り専用 SQL
-
-// 変更（ローカル/他端末から）を購読
-const stop = todos.subscribe({ where: { done: false } }, (rows) => render(rows))
-
-// 複数の書き込みをまとめて 1 トランザクション（= 1 イベント）に
-db.transaction((tx) => {
-  const a = tx.insert('todo', { title: 'A' })
-  tx.update('todo', a, { priority: 1 })
-})
+// 変更を購読（ローカル / 他端末どちらの変更でも再実行）
+const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(rows))
 ```
 
-### 別の端末で同期する
+- 各テーブルには `id`, `space`, `createdAt`, `updatedAt` が自動で付きます（`space` の既定は個人スペース）
+- SQLite の流儀どおり、`boolean` は `0 | 1`、`json` は JSON テキストとして読めます
 
-同じ所有者鍵を渡すだけです。
+### 鍵（既定で最も安全な設定）
 
-```ts
-const key = db.exportSecretKey() // nsec1…  安全な方法で別端末へ
-const other = createAnoDB({ appId: 'com.example.todo', schema, driver: nodeSqlite('b.sqlite'), secretKey: key })
-```
+| 環境 | 既定の保存先 |
+|---|---|
+| ブラウザ / Tauri | IndexedDB ＋取り出し不可の WebCrypto 鍵で暗号化 |
+| Node | 環境変数（`npx anodb init` が `.env` に端末鍵と委任だけを書く。本人の鍵は書かない） |
+| Electron / Expo | `electronKeyStore(safeStorage)` / `secureStorageKeyStore(expo-secure-store)` |
 
-### 同期状態
-
-```ts
-db.status // { state: 'offline' | 'syncing' | 'synced', connectedRelays, pendingEvents }
-db.onStatus((s) => console.log(s.state))
-db.onError((e) => console.warn(e.code, e.message))
-await db.waitForSync()
-```
-
-### 公開データ（他の Nostr クライアントと互換）
-
-```ts
-const { value: profile, status } = await db.nostr.getProfile(pubkey)
-// status: 'synced' | 'stale'（取得できずキャッシュを返した） | 'unavailable'
-db.nostr.cachedProfile(pubkey)           // ネットワークに触れない
-
-db.nostr.publishProfile({ name: 'alice', about: 'hello' })
-db.nostr.publishNote('anoDB から投稿', [['t', 'anodb']])
-await db.nostr.getNotes(pubkey, { limit: 20 })
-```
-
-### ブラウザ（sql.js）
-
-```ts
-import initSqlJs from 'sql.js'
-import { createAnoDB, sqlJsDriver } from 'anodb'
-
-const SQL = await initSqlJs()
-const db = createAnoDB({ appId, schema, driver: sqlJsDriver(new SQL.Database()) })
-```
-
-sql.js はメモリ DB です。永続化が必要なら Worker 上で同期 VFS（sqlite-wasm の OPFS SAH Pool など）を `SqliteDriver` として実装してください（OPFS ドライバ同梱は v0.3 予定）。
+- 書き込みはすべて**端末鍵**で署名され、本人の鍵（identity）は端末の登録時に一度だけ使います
+- `identity: 'recovery'` にすると、本人の鍵は `onRecoveryKey` で一度だけ渡され、端末には残りません
+- `signer: nip07Signer() / nip46Signer(uri) / nip55Signer(bridge)` で外部署名者を使えます
+- リレーに見えるのは「使い捨ての公開鍵・世代ごとに変わるタグ・時刻・サイズ」だけです（`metadataProtection: 'none'` で無効化）
 
 ## 列型
 

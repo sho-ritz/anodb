@@ -114,9 +114,9 @@ export class MockRelay {
   }
 }
 
-export async function until(cond: () => boolean, timeoutMs = 5000, label = 'condition'): Promise<void> {
+export async function until(cond: () => boolean | Promise<boolean>, timeoutMs = 5000, label = 'condition'): Promise<void> {
   const start = Date.now()
-  while (!cond()) {
+  while (!(await cond())) {
     if (Date.now() - start > timeoutMs) throw new Error(`timed out waiting for ${label}`)
     await new Promise((r) => setTimeout(r, 10))
   }

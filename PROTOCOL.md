@@ -1,97 +1,85 @@
-# anoDB wire protocol — version 1 (draft)
+# anoDB wire protocol — version 2 (draft)
 
-Status: **draft / provisional**. Kind number and tag name are placeholders until checked against
-the NIP registry. Implementations MUST ignore events they cannot validate.
+Status: **draft**. Kind numbers and the tag name are provisional until checked against the NIP
+registry. Implementations MUST drop anything they cannot validate. Version 1 (anoDB 0.1) is
+obsolete and not supported.
 
-## 1. Identities
+## 1. Keys
 
-- **Owner**: a secp256k1 key pair (Nostr key). All data of one owner is signed by the owner key.
-- **Node**: one installation of the database. Has a random 8-byte `nodeId` (16 lowercase hex chars).
-- **appId**: application namespace string chosen by the developer.
+| key | holder | used for |
+|---|---|---|
+| **identity** (secp256k1) | the user (key store, recovery key, or a NIP-07/46/55 signer) | delegations, revocations, key packages, public Nostr events |
+| **device** (secp256k1) | one installation | signing every inner message |
+| **epoch key** (32 random bytes) | every active device of every member of a space | encrypting a space stream for one epoch |
 
-## 2. Change event
+### 1.1 Delegation (kind 7304)
 
-A regular (stored, non-replaceable) Nostr event:
+```jsonc
+{ "kind": 7304, "pubkey": "<identity>", "tags": [["device", "<device pubkey>"]], "content": "{\"name\":\"phone\"}" }
+```
+
+A revocation is the same kind with `["revoke", "<device pubkey>"]`. Delegations are not published
+on their own; they travel inside encrypted messages (and in key packages, §6).
+
+## 2. Envelope (kind 7303)
 
 ```jsonc
 {
   "kind": 7303,
-  "pubkey": "<owner pubkey>",
+  "pubkey": "<throwaway key>",        // device key if metadataProtection = 'none'
   "created_at": <unix seconds>,
-  "tags": [["n", "<namespace>"]],
-  "content": "<NIP-44 v2 payload>",
-  // id, sig per NIP-01
+  "tags": [["n", "<routing tag>"]],
+  "content": "<NIP-44 v2 ciphertext of the inner message JSON>"
 }
 ```
 
-- `namespace = lowercase_hex(sha256(utf8("anodb/v1/" + appId + "/" + pubkey)))[0:32]`
-- `content = nip44_v2_encrypt(plaintext, conversation_key(owner_secret, owner_pubkey))`
-  (the owner encrypts to themself; every device holding the owner secret can decrypt).
-- Plaintext MUST be ≤ 48 KiB (implementations split larger transactions into several events).
+| routing | tag | NIP-44 conversation key |
+|---|---|---|
+| space stream | `hex(sha256("anodb/v2/space/" + hex(epochKey)))[0:32]` | the epoch key itself |
+| device inbox | `hex(sha256("anodb/v2/inbox/" + devicePubkey))[0:32]` | ECDH(envelope key, device key) |
+| invite / pairing secret | `hex(sha256("anodb/v2/secret-tag/" + secret))[0:32]` | `sha256("anodb/v2/secret-key/" + secret)` |
 
-### 2.1 Plaintext
+`keyId(epochKey) = hex(sha256("anodb/v2/key-id/" + hex(epochKey)))[0:16]`.
+
+Relays therefore see only: a random pubkey, a tag that changes every epoch, time and size.
+
+## 3. Inner message (kind 7305)
+
+A NIP-01 event signed by the **device** key, never published unencrypted. `content` is the payload:
 
 ```jsonc
-{ "v": 1, "changes": [[table, rowId, column, value, hlc], ...] }
+{ "v": 2, "t": "<type>", "sp": "<space id, 32 hex>", "ep": "<keyId>", "seq": <n>, "dlg": <delegation event>, ...body }
 ```
 
-| field | type | rule |
+- `seq` starts at 1 and increases by one per (space, device). Gaps reveal missing messages.
+- A receiver MUST check: inner signature; `dlg` delegates to the inner pubkey; `sp`/`ep` match
+  the key that decrypted the envelope; payload shape.
+
+| `t` | body | meaning |
 |---|---|---|
-| `table` | string | `^[A-Za-z][A-Za-z0-9_]*$` |
-| `rowId` | string | 1–128 chars |
-| `column` | string | `^\$?[A-Za-z][A-Za-z0-9_]*$`; names starting with `$` are system columns |
-| `value` | any JSON | |
-| `hlc` | string | see §3 |
+| `ch` | `c: [[table, rowId, column, value, hlc], …]` | cell changes |
+| `op` | `op: {…}, par: [msgId…]` | membership operation (§5) |
+| `snap` | `sid, i, n, body` | part `i` of `n` of a snapshot |
 
-System columns:
+## 4. Cells and merge
 
-| column | value | meaning |
-|---|---|---|
-| `$deleted` | `true` | row is deleted (tombstone) |
-| `$createdAt` | number (ms) | creation time, written once on insert |
+State is `(space, table, rowId, column) → (value, hlc)`; a change wins iff its HLC is greater.
+`hlc = base36(ms, 10) + base36(counter, 5) + "-" + nodeId(16 hex)`; string order = causal order.
+System columns: `$deleted` (`true` = tombstone), `$createdAt` (ms). Changes are applied only if the
+signing identity is authorized (§5) for that device and sequence number; unauthorized messages are
+kept and re-evaluated whenever membership changes.
 
-A payload with `v` other than `1` MUST NOT be applied and SHOULD NOT be marked as processed.
+## 5. Spaces and membership
 
-## 3. Hybrid logical clock
+Every row belongs to a space. A user's personal data is a space whose only member is the user.
+The first message of a space is an `op` with `{ "type": "create", "owner": <identity>, "name": … }`
+signed by a device of that owner.
 
-`hlc = base36(millis).padStart(10,"0") + base36(counter).padStart(5,"0") + "-" + nodeId`
+(Roles, invitations, removal cut-offs and key rotation: added in protocol revisions for anoDB 0.3.)
 
-Plain string comparison orders timestamps. Every change produced by a node MUST have a strictly
-greater HLC than any change the node produced or applied before.
+## 6. Sync (informative)
 
-## 4. Merge rule
-
-State is a map `(table, rowId, column) → (value, hlc)`. On receiving a change:
-
-```
-if no entry or change.hlc > entry.hlc: entry = (change.value, change.hlc)
-```
-
-Equal HLCs are duplicates. The rule is commutative, associative and idempotent, so events may be
-received in any order, any number of times, from any relay.
-
-A row is visible iff it has at least one cell and `$deleted` is not `true`.
-
-## 5. Validation on receipt
-
-A client MUST drop an event unless all of the following hold:
-
-1. `kind == 7303`, `pubkey == owner`, a tag `["n", namespace]` is present;
-2. the NIP-01 id and Schnorr signature are valid;
-3. the content decrypts with the owner conversation key;
-4. the plaintext matches §2.1.
-
-## 6. Sync procedure (informative)
-
-- Subscribe: `{"kinds":[7303],"authors":[owner],"#n":[namespace],"since":cursor-600}` per relay.
-- After `EOSE`, page backwards with `until` = oldest received `created_at` until a page returns no
-  new events; then set the relay cursor to the newest `created_at` seen.
-- Publish to all relays, retry until `minAcks` relays answered `OK true` (or `duplicate:`).
-- Events waiting in the outbox longer than 300 s SHOULD be re-signed with a fresh `created_at`
-  (same content) before resending, so that `since` cursors of other devices include them.
-
-## 7. Public data
-
-anoDB reads and writes standard events unchanged: kind 0 (NIP-01 metadata), kind 1 (text note),
-kind 10002 (NIP-65 relay list). They are cached locally with replaceable-event semantics
-(highest `created_at`, ties broken by lowest `id`).
+Subscribe per relay to `{"kinds":[7303], "#n":[tags…], "since": cursor − 600}`; after `EOSE`
+page backwards with `until` until nothing new arrives; then advance per-(relay, tag) cursors.
+Envelopes are retried until `minAcks` relays acknowledge them; envelopes older than 300 s are
+re-signed with a fresh `created_at` (and a new throwaway key) before resending.
