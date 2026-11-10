@@ -1,6 +1,6 @@
 {
   "name": "@anodb/cli",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Set up anoDB in your project: npx @anodb/cli init",
   "type": "module",
   "license": "MIT",
@@ -11,16 +11,25 @@
     "directory": "packages/cli"
   },
   "homepage": "https://github.com/sho-ritz/anodb#readme",
-  "keywords": ["anodb", "nostr", "local-first", "sqlite", "cli"],
+  "keywords": [
+    "anodb",
+    "nostr",
+    "local-first",
+    "sqlite",
+    "cli"
+  ],
   "engines": {
     "node": ">=22.13"
   },
   "bin": {
     "anodb": "index.js"
   },
-  "files": ["index.js", "README.md"],
+  "files": [
+    "index.js",
+    "README.md"
+  ],
   "dependencies": {
-    "@anodb/core": "^0.7.0"
+    "@anodb/core": "^0.7.1"
   },
   "publishConfig": {
     "access": "public"
