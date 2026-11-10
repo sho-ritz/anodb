@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { type Prompter, detectEnv, runInit } from '../src/cli/init.js'
+import { type Prompter, copySqlJsAssets, detectEnv, runInit, wireProvider } from '../src/cli/init.js'
 import { createAnoDB, defineSchema } from '../src/index.js'
 import { envKeyStore } from '../src/keystore/env.js'
 import { nodeSqlite } from '../src/node.js'
@@ -75,7 +75,7 @@ describe('anodb init', () => {
     const s = scripted([])
     const res = await runInit(
       { yes: true, lang: 'en', keys: 'recovery', relays: ['wss://relay.example'], install: true },
-      { cwd, prompter: s.p, install: async (pm, pkgs) => void installs.push([pm, ...pkgs]) },
+      { cwd, prompter: s.p, install: async (pm, pkgs) => void installs.push([pm, ...pkgs]), copyAssets: () => 'public/anodb' },
     )
     expect(res).toMatchObject({ env: 'browser', framework: 'react', recoveryKey: null })
     expect(res.files).toEqual(['src/anodb/schema.ts', 'src/anodb/db.ts', 'src/anodb/provider.tsx'])
@@ -83,9 +83,60 @@ describe('anodb init', () => {
     const dbTs = readFileSync(join(cwd, 'src/anodb/db.ts'), 'utf8')
     expect(dbTs).toContain("identity: 'recovery'")
     expect(dbTs).toContain('wss://relay.example')
-    expect(dbTs).toContain('sqlJsIndexedDB')
+    expect(dbTs).toContain('browserDriver({ name: "web" })')
     expect(installs).toEqual([['npm', 'anodb', 'sql.js']])
     expect(() => readFileSync(join(cwd, '.env'))).toThrow()
+    // assets stay in sync on every install, and are not committed
+    expect(JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')).scripts.postinstall).toBe('anodb assets')
+    expect(readFileSync(join(cwd, '.gitignore'), 'utf8')).toContain('public/anodb/')
+    expect(s.log.join('\n')).toContain('public/anodb/')
+  })
+
+  it('wires <DBProvider> into a Next.js layout', async () => {
+    const cwd = tmp()
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'next-app', scripts: { postinstall: 'echo hi' }, dependencies: { next: '16', react: '19', 'react-dom': '19' } }))
+    writeFileSync(join(cwd, 'tsconfig.json'), '{}')
+    mkdirSync(join(cwd, 'src/app'), { recursive: true })
+    writeFileSync(
+      join(cwd, 'src/app/layout.tsx'),
+      `import type { Metadata } from "next";\nimport "./globals.css";\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang="en">\n      <body>{children}</body>\n    </html>\n  );\n}\n`,
+    )
+    const res = await runInit({ yes: true, lang: 'en' }, { cwd, prompter: scripted([]).p, copyAssets: () => 'public/anodb' })
+    expect(res.wired).toBe('src/app/layout.tsx')
+    const layout = readFileSync(join(cwd, 'src/app/layout.tsx'), 'utf8')
+    expect(layout).toContain(`import "./globals.css";\nimport { DBProvider } from '../anodb/provider'`)
+    expect(layout).toContain('<body><DBProvider>{children}</DBProvider></body>')
+    expect(readFileSync(join(cwd, 'src/anodb/provider.tsx'), 'utf8').startsWith("'use client'")).toBe(true)
+    expect(JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')).scripts.postinstall).toBe('echo hi && anodb assets')
+    // idempotent
+    expect(wireProvider(cwd, 'src/anodb/provider.tsx')).toBeNull()
+  })
+
+  it('wires a Vite main and leaves ambiguous files alone', () => {
+    const cwd = tmp()
+    mkdirSync(join(cwd, 'src'))
+    writeFileSync(join(cwd, 'src/main.tsx'), `import { StrictMode } from 'react'\nimport {\n  createRoot,\n} from 'react-dom/client'\nimport App from './App.tsx'\n\ncreateRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)\n`)
+    expect(wireProvider(cwd, 'src/anodb/provider.tsx')).toBe('src/main.tsx')
+    const main = readFileSync(join(cwd, 'src/main.tsx'), 'utf8')
+    expect(main).toContain(`import App from './App.tsx'\nimport { DBProvider } from './anodb/provider'`)
+    expect(main).toContain('<StrictMode><DBProvider><App /></DBProvider></StrictMode>')
+
+    const other = tmp()
+    mkdirSync(join(other, 'src'))
+    writeFileSync(join(other, 'src/main.tsx'), '<App /> <App />')
+    expect(wireProvider(other, 'src/anodb/provider.tsx')).toBeNull()
+  })
+
+  it('copies the sql.js assets into the public folder', () => {
+    const cwd = tmp()
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'kit', devDependencies: { '@sveltejs/kit': '2' } }))
+    expect(copySqlJsAssets(cwd)).toBeNull()
+    mkdirSync(join(cwd, 'node_modules/sql.js/dist'), { recursive: true })
+    writeFileSync(join(cwd, 'node_modules/sql.js/package.json'), JSON.stringify({ name: 'sql.js', main: 'dist/sql-wasm.js', exports: { '.': './dist/sql-wasm.js', './dist/*': './dist/*' } }))
+    writeFileSync(join(cwd, 'node_modules/sql.js/dist/sql-wasm.js'), '// js')
+    writeFileSync(join(cwd, 'node_modules/sql.js/dist/sql-wasm.wasm'), 'wasm')
+    expect(copySqlJsAssets(cwd)).toBe('static/anodb')
+    expect(existsSync(join(cwd, 'static/anodb/sql-wasm.wasm'))).toBe(true)
   })
 
   it('runs the relay check and reports each relay', async () => {

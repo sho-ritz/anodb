@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { type InitFlags, runInit } from './init.js'
+import { type InitFlags, copySqlJsAssets, runInit } from './init.js'
 
 const HELP = `anodb — Absolutely No DB
 
 Usage:
-  npx anodb init [options]
+  npx anodb init [options]     set up anoDB in this project (interactive)
+  npx anodb assets             copy the sql.js files into <public>/anodb (browser apps)
 
 Options:
   --lang ja|en                 language of the prompts
@@ -17,6 +18,7 @@ Options:
   --relays <url,url>
   --check / --no-check         relay connectivity check
   --install / --no-install     install packages
+  --wire / --no-wire           wrap the app in <DBProvider> (React)
   --yes                        accept defaults, no prompts
   --force                      overwrite generated files
 `
@@ -49,6 +51,8 @@ function parse(argv: string[]): { cmd: string | undefined; flags: InitFlags } {
       case '--no-check': flags.check = false; break
       case '--install': flags.install = true; break
       case '--no-install': flags.install = false; break
+      case '--wire': flags.wire = true; break
+      case '--no-wire': flags.wire = false; break
       case '--yes': case '-y': flags.yes = true; break
       case '--force': flags.force = true; break
       default: throw new Error(`unknown option ${a}`)
@@ -59,6 +63,12 @@ function parse(argv: string[]): { cmd: string | undefined; flags: InitFlags } {
 
 try {
   const { cmd, flags } = parse(process.argv.slice(2))
+  if (cmd === 'assets') {
+    const out = copySqlJsAssets(process.cwd())
+    if (!out) throw new Error('sql.js is not installed (npm install sql.js)')
+    console.log(`anodb: copied sql.js to ${out}/`)
+    process.exit(0)
+  }
   if (cmd !== 'init') {
     console.log(HELP)
     process.exit(cmd === undefined || cmd === '--help' || cmd === '-h' ? 0 : 1)

@@ -90,7 +90,7 @@ export type ChangeListener = (tables: ReadonlySet<string>, origin: 'local' | 're
 export type ErrorListener = (error: AnoDBError) => void
 export type StatusListener = (status: SyncStatus) => void
 
-export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol'
+export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol' | 'tab-locked'
 
 export class AnoDBError extends Error {
   readonly code: AnoDBErrorCode

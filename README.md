@@ -10,7 +10,7 @@ anoDB is a decentralized, local-first database SDK that treats on-device SQLite 
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.6 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.7 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -27,14 +27,37 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 
 ## Get started
 
+In an existing app (Next.js, Vite, SvelteKit, Tauri, Electron, Expo or Node):
+
 ```sh
-npx anodb init   # interactive: language → environment → framework → keys → relays (with check) → files
+npx anodb init
 ```
 
-Or install manually:
+One interactive command does the whole setup:
 
-```sh
-npm install anodb
+1. Asks the language (English / 日本語) and detects your environment and framework
+2. Installs `anodb` (plus `sql.js` for web apps)
+3. Generates `anodb/schema`, `anodb/db` and a React `<DBProvider>`
+4. Web apps: copies the SQLite WASM files to `public/anodb/` and adds `"postinstall": "anodb assets"` to keep them in sync
+5. Wraps your app in `<DBProvider>` (Next.js `app/layout` or Vite `src/main`)
+6. Optionally checks that the relays store and serve events
+
+Then use it from any component:
+
+```tsx
+const db = useAnoDB()
+const todos = useQuery((db) => db.selectFrom('todo').selectAll(), [])
+await db.insertInto('todo').values({ title: 'Milk', done: false }).execute()
+```
+
+No bundler configuration, no server, no account. Keys are generated on each user's device on first
+launch. Only one tab per origin opens the database; other tabs get `AnoDBError('tab-locked')`.
+
+Manual setup in a browser:
+
+```ts
+import { browserDriver, createAnoDB } from 'anodb'
+const db = await createAnoDB({ appId, schema, driver: await browserDriver({ name: appId }) }) // sql.js from /anodb
 ```
 
 Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 22.13+ (`node:sqlite`), and React Native / Expo (`expo-sqlite`).

@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, relative, sep } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { bytesToHex, generateSecretKey, getPublicKey, nsecEncode, parseSecretKey, signWith } from '../crypto.js'
 import { DEFAULT_RELAYS } from '../defaults.js'
@@ -14,6 +15,7 @@ import { type Lang, type Messages, detectLang, messages } from './i18n.js'
 export type Env = 'browser' | 'tauri' | 'electron' | 'expo' | 'node'
 export type Framework = 'react' | 'vue' | 'svelte' | 'none'
 export type KeyMode = 'stored' | 'recovery' | 'signer'
+export type WebStack = 'next' | 'vite' | 'sveltekit' | 'nuxt' | 'other'
 
 export interface Choice<T> {
   label: string
@@ -38,6 +40,8 @@ export interface InitFlags {
   relays?: string[]
   check?: boolean
   install?: boolean
+  /** Wrap the app in <DBProvider> automatically (React). */
+  wire?: boolean
   yes?: boolean
   force?: boolean
 }
@@ -47,6 +51,8 @@ export interface InitDeps {
   prompter?: Prompter
   /** Install packages; default spawns the detected package manager. */
   install?: (pm: string, pkgs: string[], cwd: string) => Promise<void>
+  /** Copy sql.js assets; default copies from the project's node_modules. */
+  copyAssets?: (cwd: string) => string | null
   /** Relay check; default publishes and reads back a throwaway envelope. */
   checkRelay?: (url: string) => Promise<boolean>
   env?: Record<string, string | undefined>
@@ -59,6 +65,8 @@ export interface InitResult {
   files: string[]
   recoveryKey: string | null
   packages: string[]
+  /** File the provider was wired into, if any. */
+  wired: string | null
 }
 
 const PACKAGES: Record<Env, string[]> = {
@@ -77,7 +85,14 @@ const DRIVERS: Record<Env, string> = {
   node: 'node:sqlite',
 }
 
-function readPackageJson(cwd: string): { name?: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string> } {
+interface PackageJson {
+  name?: string
+  scripts?: Record<string, string>
+  dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+}
+
+function readPackageJson(cwd: string): PackageJson {
   try {
     return JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'))
   } catch {
@@ -100,6 +115,104 @@ export function detectEnv(cwd: string): { env: Env; framework: Framework } {
           : 'node'
   const framework: Framework = has('react') ? 'react' : has('vue') ? 'vue' : has('svelte') ? 'svelte' : 'none'
   return { env, framework }
+}
+
+export function detectWebStack(cwd: string): WebStack {
+  const pkg = readPackageJson(cwd)
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+  if ('next' in deps) return 'next'
+  if ('@sveltejs/kit' in deps) return 'sveltekit'
+  if ('nuxt' in deps) return 'nuxt'
+  if ('vite' in deps) return 'vite'
+  return 'other'
+}
+
+/** Folder whose files are served at the site root. */
+export function publicDir(cwd: string): string {
+  return detectWebStack(cwd) === 'sveltekit' ? 'static' : 'public'
+}
+
+const ASSET_FILES = ['sql-wasm.js', 'sql-wasm.wasm']
+
+/**
+ * Copy the sql.js WASM build into `<public>/anodb/` so the browser driver can load it without any
+ * bundler configuration. Returns the folder, or null if sql.js is not installed.
+ */
+export function copySqlJsAssets(cwd: string): string | null {
+  let dist: string
+  try {
+    dist = dirname(createRequire(join(cwd, 'package.json')).resolve('sql.js/dist/sql-wasm.wasm'))
+  } catch {
+    return null
+  }
+  const out = join(publicDir(cwd), 'anodb')
+  mkdirSync(join(cwd, out), { recursive: true })
+  for (const f of ASSET_FILES) copyFileSync(join(dist, f), join(cwd, out, f))
+  return out
+}
+
+/** Keep the assets in sync with the installed sql.js: `"postinstall": "anodb assets"`. */
+function addPostinstall(cwd: string): boolean {
+  const path = join(cwd, 'package.json')
+  if (!existsSync(path)) return false
+  const raw = readFileSync(path, 'utf8')
+  const pkg = JSON.parse(raw) as PackageJson
+  const cur = pkg.scripts?.postinstall
+  if (cur?.includes('anodb assets')) return false
+  pkg.scripts = { ...pkg.scripts, postinstall: cur ? `${cur} && anodb assets` : 'anodb assets' }
+  const indent = /^(\s+)"/m.exec(raw)?.[1] ?? '  '
+  writeFileSync(path, `${JSON.stringify(pkg, null, indent)}\n`)
+  return true
+}
+
+function ensureIgnored(path: string, entry: string): boolean {
+  const content = existsSync(path) ? readFileSync(path, 'utf8') : ''
+  if (content.split('\n').some((l) => l.trim() === entry || l.trim() === `/${entry}`)) return false
+  writeFileSync(path, `${content}${content && !content.endsWith('\n') ? '\n' : ''}${entry}\n`)
+  return true
+}
+
+const posix = (p: string) => p.split(sep).join('/')
+
+function importPath(fromFile: string, toFile: string): string {
+  const rel = posix(relative(dirname(fromFile), toFile)).replace(/\.(tsx?|jsx?)$/, '')
+  return rel.startsWith('.') ? rel : `./${rel}`
+}
+
+function findFirst(cwd: string, candidates: string[]): string | null {
+  return candidates.find((c) => existsSync(join(cwd, c))) ?? null
+}
+
+/**
+ * Wrap the app in <DBProvider>: Next.js `app/layout` ({children} inside <body>) or a Vite
+ * `src/main` (<App />). Only edits when the pattern occurs exactly once.
+ */
+export function wireProvider(cwd: string, providerFile: string): string | null {
+  const exts = ['tsx', 'jsx', 'js', 'ts']
+  const layout = findFirst(cwd, ['src/app', 'app'].flatMap((d) => exts.map((e) => `${d}/layout.${e}`)))
+  const main = findFirst(cwd, ['src/main', 'src/index'].flatMap((b) => exts.map((e) => `${b}.${e}`)))
+  for (const [file, pattern, replacement] of [
+    [layout, /(<body[^>]*>\s*)\{\s*children\s*\}/g, '$1<DBProvider>{children}</DBProvider>'],
+    [main, /<App\s*\/>/g, '<DBProvider><App /></DBProvider>'],
+  ] as const) {
+    if (!file) continue
+    const path = join(cwd, file)
+    const src = readFileSync(path, 'utf8')
+    if (src.includes('DBProvider')) return null
+    if ((src.match(pattern) ?? []).length !== 1) continue
+    const imp = `import { DBProvider } from '${importPath(file, providerFile)}'\n`
+    const lines = src.split('\n')
+    let lastImport = -1
+    lines.forEach((l, i) => {
+      if (/^import\s/.test(l) || (lastImport >= 0 && i === lastImport + 1 && /^\s+.*from\s+['"]/.test(l))) lastImport = i
+    })
+    // multi-line imports: advance to the line that closes the statement
+    while (lastImport >= 0 && lastImport < lines.length - 1 && !/['"];?\s*$/.test(lines[lastImport]!)) lastImport++
+    lines.splice(lastImport + 1, 0, imp.trimEnd())
+    writeFileSync(path, lines.join('\n').replace(pattern, replacement))
+    return file
+  }
+  return null
 }
 
 export function detectPackageManager(cwd: string): string {
@@ -214,6 +327,9 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
   // ⑥ files
   const ts = existsSync(join(deps.cwd, 'tsconfig.json'))
   const ext = ts ? 'ts' : 'js'
+  const web = env === 'browser' || env === 'tauri'
+  // Next.js without src/: keep files next to app/
+  const base = !existsSync(join(deps.cwd, 'src')) && existsSync(join(deps.cwd, 'app')) ? 'anodb' : 'src/anodb'
   const files: string[] = []
   const write = (rel: string, content: string) => {
     const path = join(deps.cwd, rel)
@@ -226,9 +342,10 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     files.push(rel)
     p.log(`${m.wrote} ${rel}`)
   }
-  write(`src/anodb/schema.${ext}`, schemaTemplate())
-  write(`src/anodb/db.${ext}`, dbTemplate(env, appId, keyMode, relays, ts))
-  if (framework === 'react' && env !== 'node') write(`src/anodb/provider.${ts ? 'tsx' : 'jsx'}`, reactTemplate(ts))
+  write(`${base}/schema.${ext}`, schemaTemplate())
+  write(`${base}/db.${ext}`, dbTemplate(env, appId, keyMode, relays, ts))
+  const providerFile = `${base}/provider.${ts ? 'tsx' : 'jsx'}`
+  if (framework === 'react' && env !== 'node') write(providerFile, reactTemplate(ts, keyMode))
   if (envVars) {
     writeEnv(join(deps.cwd, '.env'), envVars)
     files.push('.env')
@@ -245,6 +362,25 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     await (deps.install ?? installPackages)(pm, packages, deps.cwd)
   }
 
+  // ⑧ browser assets: sql.js served from <public>/anodb, refreshed on every install
+  if (web) {
+    const out = (deps.copyAssets ?? copySqlJsAssets)(deps.cwd)
+    if (out) p.log(`${m.wrote} ${out}/ (${ASSET_FILES.join(', ')})`)
+    else p.log(m.assetsLater)
+    if (addPostinstall(deps.cwd)) p.log(m.postinstall)
+    if (ensureIgnored(join(deps.cwd, '.gitignore'), `${publicDir(deps.cwd)}/anodb/`)) p.log(m.assetsIgnored)
+  }
+
+  // ⑨ wire <DBProvider> into the app
+  let wired: string | null = null
+  if (framework === 'react' && web && files.includes(providerFile)) {
+    const doWire = await ask(flags.wire, () => p.confirm(m.wire, true), true)
+    if (doWire) {
+      wired = wireProvider(deps.cwd, providerFile)
+      p.log(wired ? `${m.wired} ${wired}` : m.wireManual)
+    }
+  }
+
   if (recoveryKey) {
     p.log('')
     p.log(m.recoveryTitle)
@@ -253,8 +389,12 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
   }
   p.log('')
   p.log(m.done)
-  p.log(env === 'node' ? m.nextNode : m.nextBrowser)
-  return { env, framework, appId, files, recoveryKey, packages }
+  if (env === 'node') p.log(m.nextNode)
+  else if (framework === 'react' && web) {
+    if (!wired) p.log(m.nextWrap)
+    p.log(m.nextReact)
+  } else p.log(m.nextBrowser)
+  return { env, framework, appId, files, recoveryKey, packages, wired }
 }
 
 function writeEnv(path: string, vars: Record<string, string>): void {
@@ -271,19 +411,27 @@ function ensureGitignore(path: string): boolean {
   return true
 }
 
-export function reactTemplate(ts: boolean): string {
-  return `import { useEffect, useState${ts ? ', type ReactNode' : ''} } from 'react'
+export function reactTemplate(ts: boolean, keyMode: KeyMode = 'stored'): string {
+  const recovery = keyMode === 'recovery'
+  return `'use client'
+import { useEffect, useState${ts ? ', type ReactNode' : ''} } from 'react'
 import { AnoDBProvider } from 'anodb/react'
 import { openDB } from './db${ts ? '' : '.js'}'
 
-// <DBProvider><App /></DBProvider>, then in components:
+// Wrap your app: <DBProvider><App /></DBProvider>. Then in any component:
 //   const todos = useQuery((db) => db.selectFrom('todo').selectAll(), [])
-export function DBProvider({ children }${ts ? ': { children: ReactNode }' : ''}) {
+//   await db.insertInto('todo').values({ title: 'Milk', done: false }).execute()   // const db = useAnoDB()
+export function DBProvider({ children, fallback = null }${ts ? ': { children: ReactNode; fallback?: ReactNode }' : ''}) {
   const [db, setDb] = useState${ts ? '<Awaited<ReturnType<typeof openDB>> | null>' : ''}(null)
+  const [error, setError] = useState${ts ? '<Error | null>' : ''}(null)
   useEffect(() => {
-    void openDB().then(setDb)
+    openDB(${recovery ? "{ onRecoveryKey: (key) => alert(`Save this recovery key somewhere safe. It will not be shown again:\\n\\n${key}`) }" : ''}).then(setDb, setError)
   }, [])
-  if (!db) return null
+  if (error) {
+    const code = (error${ts ? ' as { code?: string }' : ''}).code
+    return <p>{code === 'tab-locked' ? 'This app is already open in another tab.' : \`Could not open the database: \${error.message}\`}</p>
+  }
+  if (!db) return fallback
   return <AnoDBProvider db={db}>{children}</AnoDBProvider>
 }
 `
@@ -304,6 +452,8 @@ export function dbTemplate(env: Env, appId: string, keyMode: KeyMode, relays: st
   const relayLine = relays ? `\n    relays: ${JSON.stringify(relays)},` : ''
   const schemaImport = `import { schema } from './schema${ts ? '' : '.js'}'`
   const id = JSON.stringify(appId)
+  const optsType = ts ? ': { onRecoveryKey?: (key: string) => void }' : ''
+  const takesOpts = keyMode === 'recovery'
   if (env === 'node') {
     return `import { createAnoDB } from 'anodb'
 import { nodeSqlite } from 'anodb/node'
@@ -328,7 +478,7 @@ ${schemaImport}
 
 const dir = join(app.getPath('userData'), 'anodb')
 
-export async function openDB(${ts ? 'opts: { onRecoveryKey?: (key: string) => void } = {}' : 'opts = {}'}) {
+export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
   await mkdir(dir, { recursive: true })
   return createAnoDB({
     appId: ${id},
@@ -349,7 +499,7 @@ import * as SecureStore from 'expo-secure-store'
 import { createAnoDB, expoSqliteDriver, secureStorageKeyStore } from 'anodb'
 ${schemaImport}
 
-export async function openDB(${ts ? 'opts: { onRecoveryKey?: (key: string) => void } = {}' : 'opts = {}'}) {
+export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
   return createAnoDB({
     appId: ${id},
     schema,
@@ -363,24 +513,28 @@ export async function openDB(${ts ? 'opts: { onRecoveryKey?: (key: string) => vo
 }
 `
   }
-  return `import initSqlJs from 'sql.js'
-import { createAnoDB, sqlJsIndexedDB${keyMode === 'signer' ? ', nip07Signer' : ''} } from 'anodb'
+  return `import { browserDriver, createAnoDB${keyMode === 'signer' ? ', nip07Signer' : ''} } from 'anodb'
 ${schemaImport}
 
 let opening${ts ? ': ReturnType<typeof open> | null' : ''} = null
 
-// Keys are generated on each user's device on first launch and kept encrypted in IndexedDB.
-export function openDB(${ts ? 'opts: { onRecoveryKey?: (key: string) => void } = {}' : 'opts = {}'}) {
-  return (opening ??= open(opts))
+/**
+ * Opens the database once per page. Keys are generated on each user's device on first launch and
+ * kept encrypted in IndexedDB; sql.js is loaded from /anodb (copied there by \`anodb assets\`).
+ */
+export function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
+  opening ??= open(${takesOpts ? 'opts' : ''}).catch((e) => {
+    opening = null
+    throw e
+  })
+  return opening
 }
 
-async function open(${ts ? 'opts: { onRecoveryKey?: (key: string) => void }' : 'opts'}) {
-  // Serve node_modules/sql.js/dist/sql-wasm.wasm from your app (e.g. copy it to /public).
-  const SQL = await initSqlJs({ locateFile: (file${ts ? ': string' : ''}) => \`/\${file}\` })
+async function open(${takesOpts ? `opts${optsType}` : ''}) {
   return createAnoDB({
     appId: ${id},
     schema,
-    driver: await sqlJsIndexedDB(SQL, ${id}),${keyOptions(keyMode, ts)}${relayLine}
+    driver: await browserDriver({ name: ${id} }),${keyOptions(keyMode, ts)}${relayLine}
   })
 }
 `
