@@ -86,7 +86,7 @@
 | 環境 | キーストア | 備考 |
 |---|---|---|
 | ブラウザ / Tauri | IndexedDB ＋ 取り出し不可の WebCrypto AES 鍵 | ディスク盗難に強い。XSS で「使われる」ことは防げない |
-| Node | 環境変数（`ANODB_DEVICE_KEY` / `ANODB_DELEGATION`） | `npx anodb init` が生成。本人の鍵は `.env` に書かず復元用キーとして表示 |
+| Node | 環境変数（`ANODB_DEVICE_KEY` / `ANODB_DELEGATION`） | `npx @anodb/cli init` が生成。本人の鍵は `.env` に書かず復元用キーとして表示 |
 | Electron | `electronKeyStore(safeStorage)` | OS キーチェーン |
 | React Native / Expo | `secureStorageKeyStore(expo-secure-store)` | |
 | テスト | `memoryKeyStore()` | |

@@ -63,7 +63,7 @@ describe('anodb init', () => {
     onCleanup(() => db.close())
     await db.insertInto('t').values({ a: 'hello' }).execute()
     expect(() => db.exportIdentityKey()).toThrow(/not stored/)
-    expect(readFileSync(join(cwd, 'src/anodb/db.js'), 'utf8')).toContain("from 'anodb/node'")
+    expect(readFileSync(join(cwd, 'src/anodb/db.js'), 'utf8')).toContain("from '@anodb/core/node'")
   })
 
   it('never creates keys for browser apps and honours flags non-interactively', async () => {
@@ -79,12 +79,12 @@ describe('anodb init', () => {
     )
     expect(res).toMatchObject({ env: 'browser', framework: 'react', recoveryKey: null })
     expect(res.files).toEqual(['src/anodb/schema.ts', 'src/anodb/db.ts', 'src/anodb/provider.tsx'])
-    expect(readFileSync(join(cwd, 'src/anodb/provider.tsx'), 'utf8')).toContain("from 'anodb/react'")
+    expect(readFileSync(join(cwd, 'src/anodb/provider.tsx'), 'utf8')).toContain("from '@anodb/core/react'")
     const dbTs = readFileSync(join(cwd, 'src/anodb/db.ts'), 'utf8')
     expect(dbTs).toContain("identity: 'recovery'")
     expect(dbTs).toContain('wss://relay.example')
     expect(dbTs).toContain('browserDriver({ name: "web" })')
-    expect(installs).toEqual([['npm', 'anodb', 'sql.js']])
+    expect(installs).toEqual([['npm', '@anodb/core', 'sql.js']])
     expect(() => readFileSync(join(cwd, '.env'))).toThrow()
     // assets stay in sync on every install, and are not committed
     expect(JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8')).scripts.postinstall).toBe('anodb assets')

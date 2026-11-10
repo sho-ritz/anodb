@@ -9,7 +9,7 @@ const VARS: Record<KeyName, string> = {
 }
 
 /**
- * Node default: reads `ANODB_DEVICE_KEY` and `ANODB_DELEGATION` (written by `npx anodb init`).
+ * Node default: reads `ANODB_DEVICE_KEY` and `ANODB_DELEGATION` (written by `npx @anodb/cli init`).
  * Read-only. Group keys in SQLite are sealed with a key derived from the device key.
  */
 export function envKeyStore(env: Record<string, string | undefined> = globalThis.process?.env ?? {}): KeyStore {
@@ -21,7 +21,7 @@ export function envKeyStore(env: Record<string, string | undefined> = globalThis
   const device = read('device')
   if (!device || !read('delegation')) {
     throw new Error(
-      'anoDB: ANODB_DEVICE_KEY / ANODB_DELEGATION are not set. Run `npx anodb init` to create them, ' +
+      'anoDB: ANODB_DEVICE_KEY / ANODB_DELEGATION are not set. Run `npx @anodb/cli init` to create them, ' +
         'or pass `keyStore` (e.g. memoryKeyStore() for tests).',
     )
   }
@@ -30,7 +30,7 @@ export function envKeyStore(env: Record<string, string | undefined> = globalThis
     kind: 'env',
     get: async (n) => read(n),
     set: async (n) => {
-      throw new Error(`anoDB: envKeyStore is read-only (tried to store ${n}); run \`npx anodb init\``)
+      throw new Error(`anoDB: envKeyStore is read-only (tried to store ${n}); run \`npx @anodb/cli init\``)
     },
     remove: async () => {},
     seal: async (p) => aesSeal(await sealKey, p),

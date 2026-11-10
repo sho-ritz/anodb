@@ -6,7 +6,7 @@ export interface BrowserDriverOptions {
   /** Database name (usually your appId). */
   name: string
   /**
-   * Where `sql-wasm.js` and `sql-wasm.wasm` are served from. `npx anodb init` copies them to
+   * Where `sql-wasm.js` and `sql-wasm.wasm` are served from. `npx @anodb/cli init` copies them to
    * `public/anodb/` (and `npx anodb assets` refreshes them). Default `/anodb`.
    */
   assetsUrl?: string

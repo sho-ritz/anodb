@@ -30,13 +30,13 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 In an existing app (Next.js, Vite, SvelteKit, Tauri, Electron, Expo or Node):
 
 ```sh
-npx anodb init
+npx @anodb/cli init
 ```
 
 One interactive command does the whole setup:
 
 1. Asks the language (English / 日本語) and detects your environment and framework
-2. Installs `anodb` (plus `sql.js` for web apps)
+2. Installs `@anodb/core` (plus `sql.js` for web apps)
 3. Generates `anodb/schema`, `anodb/db` and a React `<DBProvider>`
 4. Web apps: copies the SQLite WASM files to `public/anodb/` and adds `"postinstall": "anodb assets"` to keep them in sync
 5. Wraps your app in `<DBProvider>` (Next.js `app/layout` or Vite `src/main`)
@@ -56,7 +56,7 @@ launch. Only one tab per origin opens the database; other tabs get `AnoDBError('
 Manual setup in a browser:
 
 ```ts
-import { browserDriver, createAnoDB } from 'anodb'
+import { browserDriver, createAnoDB } from '@anodb/core'
 const db = await createAnoDB({ appId, schema, driver: await browserDriver({ name: appId }) }) // sql.js from /anodb
 ```
 
@@ -65,7 +65,7 @@ Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 2
 ## Usage
 
 ```ts
-import { createAnoDB, defineSchema } from 'anodb'
+import { createAnoDB, defineSchema } from '@anodb/core'
 
 const schema = defineSchema({
   todo: { title: 'text', done: 'boolean', priority: 'integer', meta: 'json' },
@@ -103,7 +103,7 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 | Environment | Default key store |
 |---|---|
 | Browser / Tauri | IndexedDB, sealed with a non-extractable WebCrypto key |
-| Node | Environment variables (`npx anodb init` writes only the device key and delegation to `.env`, never the identity key) |
+| Node | Environment variables (`npx @anodb/cli init` writes only the device key and delegation to `.env`, never the identity key) |
 | Electron / Expo | `electronKeyStore(safeStorage)` / `secureStorageKeyStore(expo-secure-store)` |
 
 - Every write is signed by a **device key**; the identity key is used once to register the device.
@@ -151,7 +151,7 @@ await db.revokeDevice(lostDevicePubkey)        // lost or stolen device
 ## Public Nostr data (tables)
 
 ```ts
-import { defineSchema, publicTable } from 'anodb'
+import { defineSchema, publicTable } from '@anodb/core'
 
 const schema = defineSchema({
   todo: { title: 'text' },                 // private (encrypted in a space)
@@ -225,7 +225,7 @@ On NIP-77 relays, reconciliation is exact and lost envelopes are re-uploaded aut
 ## React
 
 ```tsx
-import { AnoDBProvider, useQuery, useSyncStatus } from 'anodb/react'
+import { AnoDBProvider, useQuery, useSyncStatus } from '@anodb/core/react'
 
 <AnoDBProvider db={db}><App /></AnoDBProvider>
 const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', 0), [])

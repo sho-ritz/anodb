@@ -45,7 +45,7 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   driver: SqliteDriver
   /**
    * Where keys live. Default: browserKeyStore() when IndexedDB exists (browsers, Tauri), otherwise
-   * envKeyStore() (Node: ANODB_DEVICE_KEY / ANODB_DELEGATION from `npx anodb init`).
+   * envKeyStore() (Node: ANODB_DEVICE_KEY / ANODB_DELEGATION from `npx @anodb/cli init`).
    */
   keyStore?: KeyStore
   /**

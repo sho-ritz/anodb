@@ -94,7 +94,7 @@ describe('key stores', () => {
   })
 
   it('env store is read-only, needs both variables and accepts base64 delegations', async () => {
-    expect(() => envKeyStore({})).toThrow(/npx anodb init/)
+    expect(() => envKeyStore({})).toThrow(/npx @anodb\/cli init/)
     const sk = generateSecretKey()
     const dlg = JSON.stringify(await createDelegation(localSigner(generateSecretKey()), getPublicKey(sk), 'srv', Date.now()))
     const ks = envKeyStore({ ANODB_DEVICE_KEY: Buffer.from(sk).toString('hex'), ANODB_DELEGATION: btoa(dlg) })

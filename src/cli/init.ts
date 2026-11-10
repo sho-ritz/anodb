@@ -70,11 +70,11 @@ export interface InitResult {
 }
 
 const PACKAGES: Record<Env, string[]> = {
-  browser: ['anodb', 'sql.js'],
-  tauri: ['anodb', 'sql.js'],
-  electron: ['anodb'],
-  expo: ['anodb', 'expo-sqlite', 'expo-secure-store'],
-  node: ['anodb'],
+  browser: ['@anodb/core', 'sql.js'],
+  tauri: ['@anodb/core', 'sql.js'],
+  electron: ['@anodb/core'],
+  expo: ['@anodb/core', 'expo-sqlite', 'expo-secure-store'],
+  node: ['@anodb/core'],
 }
 
 const DRIVERS: Record<Env, string> = {
@@ -415,7 +415,7 @@ export function reactTemplate(ts: boolean, keyMode: KeyMode = 'stored'): string 
   const recovery = keyMode === 'recovery'
   return `'use client'
 import { useEffect, useState${ts ? ', type ReactNode' : ''} } from 'react'
-import { AnoDBProvider } from 'anodb/react'
+import { AnoDBProvider } from '@anodb/core/react'
 import { openDB } from './db${ts ? '' : '.js'}'
 
 // Wrap your app: <DBProvider><App /></DBProvider>. Then in any component:
@@ -438,7 +438,7 @@ export function DBProvider({ children, fallback = null }${ts ? ': { children: Re
 }
 
 export function schemaTemplate(): string {
-  return `import { defineSchema } from 'anodb'
+  return `import { defineSchema } from '@anodb/core'
 
 // Each table automatically gets: id, space, createdAt, updatedAt.
 // Column types: 'text' | 'integer' | 'real' | 'boolean' | 'json'
@@ -455,11 +455,11 @@ export function dbTemplate(env: Env, appId: string, keyMode: KeyMode, relays: st
   const optsType = ts ? ': { onRecoveryKey?: (key: string) => void }' : ''
   const takesOpts = keyMode === 'recovery'
   if (env === 'node') {
-    return `import { createAnoDB } from 'anodb'
-import { nodeSqlite } from 'anodb/node'
+    return `import { createAnoDB } from '@anodb/core'
+import { nodeSqlite } from '@anodb/core/node'
 ${schemaImport}
 
-// Keys come from .env (ANODB_DEVICE_KEY / ANODB_DELEGATION), written by \`npx anodb init\`.
+// Keys come from .env (ANODB_DEVICE_KEY / ANODB_DELEGATION), written by \`npx @anodb/cli init\`.
 export const db = await createAnoDB({
   appId: process.env.ANODB_APP_ID ?? ${id},
   schema,
@@ -472,8 +472,8 @@ export const db = await createAnoDB({
 import { app, safeStorage } from 'electron'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createAnoDB, electronKeyStore } from 'anodb'
-import { nodeSqlite } from 'anodb/node'
+import { createAnoDB, electronKeyStore } from '@anodb/core'
+import { nodeSqlite } from '@anodb/core/node'
 ${schemaImport}
 
 const dir = join(app.getPath('userData'), 'anodb')
@@ -496,7 +496,7 @@ export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
   if (env === 'expo') {
     return `import { openDatabaseSync } from 'expo-sqlite'
 import * as SecureStore from 'expo-secure-store'
-import { createAnoDB, expoSqliteDriver, secureStorageKeyStore } from 'anodb'
+import { createAnoDB, expoSqliteDriver, secureStorageKeyStore } from '@anodb/core'
 ${schemaImport}
 
 export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
@@ -513,7 +513,7 @@ export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
 }
 `
   }
-  return `import { browserDriver, createAnoDB${keyMode === 'signer' ? ', nip07Signer' : ''} } from 'anodb'
+  return `import { browserDriver, createAnoDB${keyMode === 'signer' ? ', nip07Signer' : ''} } from '@anodb/core'
 ${schemaImport}
 
 let opening${ts ? ': ReturnType<typeof open> | null' : ''} = null

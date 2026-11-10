@@ -4,7 +4,7 @@ import { type InitFlags, copySqlJsAssets, runInit } from './init.js'
 const HELP = `anodb — Absolutely No DB
 
 Usage:
-  npx anodb init [options]     set up anoDB in this project (interactive)
+  npx @anodb/cli init [options]     set up anoDB in this project (interactive)
   npx anodb assets             copy the sql.js files into <public>/anodb (browser apps)
 
 Options:
