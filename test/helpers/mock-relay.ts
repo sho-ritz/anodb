@@ -14,6 +14,8 @@ export interface MockRelayOptions {
   silent?: boolean
   /** Support NIP-77 (Negentropy). */
   negentropy?: boolean
+  /** Accept but neither store nor forward these kinds (simulate a relay path that loses them). */
+  dropKinds?: number[]
 }
 
 /** In-process NIP-01 relay with fault injection. */
@@ -68,6 +70,14 @@ export class MockRelay {
   }
 
   #store(e: NostrEvent): void {
+    if (this.opts.dropKinds?.includes(e.kind)) return
+    if (e.kind >= 20000 && e.kind < 30000) {
+      // ephemeral: forward only, never store
+      for (const [ws, subs] of this.#subs) {
+        for (const [id, filters] of subs) if (matchFilters(filters, e)) ws.send(JSON.stringify(['EVENT', id, e]))
+      }
+      return
+    }
     if (this.events.has(e.id)) return
     const replaceable = e.kind === 0 || e.kind === 3 || (e.kind >= 10000 && e.kind < 20000)
     if (replaceable) {

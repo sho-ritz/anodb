@@ -10,7 +10,7 @@ anoDB is a local-first database SDK that treats on-device SQLite as the source o
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.5 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.6 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -19,6 +19,7 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 - 👥 **Sharing** — Spaces with owner / admin / writer / reader roles, invitations by npub or one-time links, removal with cut-offs, key rotation.
 - 🔐 **Secure by default** — Writes are signed by per-device keys, keys are stored encrypted, relays see only throwaway pubkeys and rotating tags, and new members never see deleted history.
 - 🔀 **Deterministic merging** — Cell-level Last-Writer-Wins with Hybrid Logical Clocks; tolerant of out-of-order delivery, duplicates and retries.
+- ⚡ **Direct device-to-device sync** — Your devices connect over WebRTC ([nostr-p2p](https://github.com/sho-ritz/nostr-p2p)) and exchange changes in tens of milliseconds; relays remain the store for offline devices.
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
 - 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
@@ -145,6 +146,25 @@ await db.selectFrom('posts').innerJoin('profiles', 'profiles.author', 'posts.aut
 ```
 
 Public tables are **not encrypted**. Notes and reactions cannot be edited (deleting publishes a NIP-09 request); profiles, follow lists and articles are replaceable.
+
+## Direct sync over WebRTC
+
+Where WebRTC is available (browsers, or Node with `node-datachannel`), **your own devices connect
+directly** and exchange changes peer-to-peer (signaling goes through the same Nostr relays).
+
+```ts
+createAnoDB({ ..., p2p: { mode: 'own-devices' } })       // default where WebRTC exists
+createAnoDB({ ..., p2p: { mode: 'members' } })           // also connect to other members (they see your IP)
+createAnoDB({ ..., p2p: { mode: 'off' } })               // relays only
+// Node: p2p: { rtc: { RTCPeerConnection } } from 'node-datachannel/polyfill'
+
+db.p2pPeers() // [{ space, device, transport: 'direct' }]
+```
+
+- Rooms are derived from each space's epoch key, so only members can join and removed members drop out when keys rotate.
+- Every peer proves which device it is with a signature; envelopes received directly go through the same verification as relay ones.
+- A change **skips relays entirely when every device of the space acknowledged it**; otherwise it is published to relays after 2 s, so offline devices still get it.
+- `members` mode is opt-in because direct connections reveal IP addresses to other members.
 
 ## Files (Blossom)
 

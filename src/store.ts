@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS anodb_cells (
   space TEXT NOT NULL, tbl TEXT NOT NULL, row_id TEXT NOT NULL, col TEXT NOT NULL, value TEXT NOT NULL, hlc TEXT NOT NULL,
   PRIMARY KEY (space, tbl, row_id, col)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS anodb_raw (id TEXT PRIMARY KEY, tag TEXT NOT NULL, created_at INTEGER NOT NULL, event TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS anodb_raw (id TEXT PRIMARY KEY, tag TEXT NOT NULL, created_at INTEGER NOT NULL, event TEXT NOT NULL, relay INTEGER NOT NULL DEFAULT 1);
 CREATE INDEX IF NOT EXISTS anodb_raw_tag ON anodb_raw (tag, created_at);
-CREATE TABLE IF NOT EXISTS anodb_outbox (id TEXT PRIMARY KEY, event TEXT NOT NULL, queued_at INTEGER NOT NULL, resign INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS anodb_outbox (id TEXT PRIMARY KEY, event TEXT NOT NULL, queued_at INTEGER NOT NULL, resign INTEGER NOT NULL, hold_until INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS anodb_acks (
   event_id TEXT NOT NULL, relay TEXT NOT NULL, status TEXT NOT NULL, message TEXT,
   PRIMARY KEY (event_id, relay)
@@ -88,6 +88,15 @@ export class Store {
       },
     }
     this.#db.exec(INTERNAL_SCHEMA)
+    this.#ensureColumn('anodb_raw', 'relay', 'INTEGER NOT NULL DEFAULT 1')
+    this.#ensureColumn('anodb_outbox', 'hold_until', 'INTEGER NOT NULL DEFAULT 0')
+    this.#ensureColumn('anodb_messages', 'inner', "TEXT NOT NULL DEFAULT ''")
+  }
+
+  /** Add a column created by a newer version (CREATE TABLE IF NOT EXISTS does not alter tables). */
+  #ensureColumn(table: string, column: string, ddl: string): void {
+    const cols = this.#db.all<{ name: string }>(`PRAGMA table_info(${table})`)
+    if (!cols.some((c) => c.name === column)) this.#db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`)
   }
 
   get driver(): SqliteDriver {
@@ -465,19 +474,23 @@ export class Store {
     return this.#db.all('SELECT 1 FROM anodb_raw WHERE id = ?', [id]).length > 0
   }
 
-  putRaw(event: NostrEvent, tag: string): void {
-    this.#db.run('INSERT OR IGNORE INTO anodb_raw (id, tag, created_at, event) VALUES (?, ?, ?, ?)', [
-      event.id,
-      tag,
-      event.created_at,
-      JSON.stringify(event),
-    ])
+  /** `viaRelay` = false for envelopes only exchanged peer-to-peer (not to be uploaded to relays). */
+  putRaw(event: NostrEvent, tag: string, viaRelay = true): void {
+    this.#db.run(
+      `INSERT INTO anodb_raw (id, tag, created_at, event, relay) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET relay = MAX(relay, excluded.relay)`,
+      [event.id, tag, event.created_at, JSON.stringify(event), viaRelay ? 1 : 0],
+    )
+  }
+
+  markRawLocal(id: string): void {
+    this.#db.run('UPDATE anodb_raw SET relay = 0 WHERE id = ?', [id])
   }
 
   rawIndex(tags: readonly string[]): Array<{ id: string; created_at: number }> {
     if (tags.length === 0) return []
     return this.#db.all<{ id: string; created_at: number }>(
-      `SELECT id, created_at FROM anodb_raw WHERE tag IN (${tags.map(() => '?').join(',')})`,
+      `SELECT id, created_at FROM anodb_raw WHERE relay = 1 AND tag IN (${tags.map(() => '?').join(',')})`,
       tags,
     )
   }
@@ -489,17 +502,25 @@ export class Store {
 
   // ---- outbox --------------------------------------------------------------------
 
-  enqueue(event: NostrEvent, resign: boolean): void {
-    this.#db.run('INSERT OR IGNORE INTO anodb_outbox (id, event, queued_at, resign) VALUES (?, ?, ?, ?)', [
+  enqueue(event: NostrEvent, resign: boolean, holdUntil = 0): void {
+    this.#db.run('INSERT OR IGNORE INTO anodb_outbox (id, event, queued_at, resign, hold_until) VALUES (?, ?, ?, ?, ?)', [
       event.id,
       JSON.stringify(event),
       Date.now(),
       resign ? 1 : 0,
+      holdUntil,
     ])
   }
 
-  outbox(): Array<{ entryId: string; event: NostrEvent; resign: boolean; acks: Map<string, AckStatus> }> {
-    const rows = this.#db.all<{ id: string; event: string; resign: number }>('SELECT id, event, resign FROM anodb_outbox ORDER BY queued_at, id')
+  /** Release a held outbox entry so the next flush sends it to relays. */
+  releaseOutbox(entryId: string): void {
+    this.#db.run('UPDATE anodb_outbox SET hold_until = 0 WHERE id = ?', [entryId])
+  }
+
+  outbox(): Array<{ entryId: string; event: NostrEvent; resign: boolean; holdUntil: number; acks: Map<string, AckStatus> }> {
+    const rows = this.#db.all<{ id: string; event: string; resign: number; hold_until: number }>(
+      'SELECT id, event, resign, hold_until FROM anodb_outbox ORDER BY queued_at, id',
+    )
     const acks = this.#db.all<{ event_id: string; relay: string; status: AckStatus }>('SELECT event_id, relay, status FROM anodb_acks')
     const byEvent = new Map<string, Map<string, AckStatus>>()
     for (const a of acks) {
@@ -511,6 +532,7 @@ export class Store {
       entryId: r.id,
       event: JSON.parse(r.event) as NostrEvent,
       resign: r.resign === 1,
+      holdUntil: r.hold_until,
       acks: byEvent.get(r.id) ?? new Map(),
     }))
   }

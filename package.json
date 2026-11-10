@@ -1,7 +1,7 @@
 {
   "name": "anodb",
-  "version": "0.5.0",
-  "description": "Absolutely None DB \u2014 local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
+  "version": "0.6.0",
+  "description": "Absolutely None DB — local-first SQLite database that syncs over Nostr relays. No backend provisioning.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
@@ -54,6 +54,7 @@
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "kysely": "^0.29.8",
+    "nostr-p2p": "github:sho-ritz/nostr-p2p#v0.1.1",
     "nostr-tools": "^2.26.0"
   },
   "devDependencies": {
@@ -61,6 +62,7 @@
     "@types/react": "^19.3.0",
     "@types/sql.js": "^1.4.11",
     "@types/ws": "^8.18.2",
+    "node-datachannel": "^0.33.6",
     "react": "^19.3.1",
     "sql.js": "^1.15.2",
     "typescript": "^7.0.2",

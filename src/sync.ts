@@ -202,7 +202,9 @@ export class SyncEngine {
     if (connected.size === 0) return
     const relays = this.#pool.relays
     await Promise.all(
-      this.#store.outbox().map(async ({ entryId, event, resign, acks }) => {
+      this.#store.outbox().map(async ({ entryId, event, resign, holdUntil, acks }) => {
+        // Held while peers acknowledge it over WebRTC; released (or dequeued) by the P2P layer.
+        if (holdUntil > Date.now()) return
         const targets = relays.filter((r) => connected.has(r) && !acks.has(r))
         if (targets.length === 0) return
         let toSend = event
@@ -231,8 +233,8 @@ export class SyncEngine {
     )
   }
 
-  enqueue(event: NostrEvent, resign: boolean): void {
-    this.#store.enqueue(event, resign)
+  enqueue(event: NostrEvent, resign: boolean, holdUntil = 0): void {
+    this.#store.enqueue(event, resign, holdUntil)
   }
 
   close(): void {

@@ -28,6 +28,7 @@ import { envKeyStore } from './keystore/env.js'
 import type { KeyStore } from './keystore/types.js'
 import { type KyselyDatabase, type SqlExecutor, createKysely } from './kysely.js'
 import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLength, parseStreamPayload, splitChanges } from './protocol.js'
+import type { P2POptions } from './p2p.js'
 import { PublicData } from './public.js'
 import { presetOf } from './public-tables.js'
 import { RelayPool, type RelayPoolOptions } from './relay-pool.js'
@@ -70,6 +71,11 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
    * may ignore it, and old envelopes are unreadable without old keys anyway.
    */
   pruneOldEvents?: boolean
+  /**
+   * Direct WebRTC sync between devices (via nostr-p2p). Default where WebRTC exists:
+   * `{ mode: 'own-devices' }`. `'members'` also connects to other members (they see your IP).
+   */
+  p2p?: P2POptions
   /** Blossom servers for encrypted files (`db.blobs`). Default: DEFAULT_BLOB_SERVERS. */
   blobServers?: readonly string[]
   /** fetch implementation for Blossom (tests / custom networking). */
@@ -539,9 +545,19 @@ export class AnoDBCore<S extends SchemaDefinition> {
     this.store.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id, innerJson)
     const outer = this.wrap(innerJson, key.tag, key.key)
     this.store.putRaw(outer, key.tag)
-    this.sync?.enqueue(outer, true)
+    const hold = this.holdForPeers(space, outer)
+    this.sync?.enqueue(outer, true, hold > 0 ? Date.now() + hold : 0)
+    this.afterEnvelope(space, outer, hold > 0)
     return { seq, msgId: inner.id }
   }
+
+  /** P2P hook: how long (ms) to keep a new envelope out of relays while peers acknowledge it. */
+  protected holdForPeers(_space: string, _outer: NostrEvent): number {
+    return 0
+  }
+
+  /** P2P hook: a new envelope was stored (called inside the write transaction). */
+  protected afterEnvelope(_space: string, _outer: NostrEvent, _held: boolean): void {}
 
   /** Seal an inner message into an envelope with the given routing tag and conversation key. */
   protected wrap(innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): NostrEvent {
@@ -624,11 +640,14 @@ export class AnoDBCore<S extends SchemaDefinition> {
   }
 
   /** Verify and apply one envelope. */
-  protected ingest(_relay: string, outer: NostrEvent): IngestResult {
+  protected ingest(source: string, outer: NostrEvent): IngestResult {
     if (this.#closed || outer.kind !== WRAP_KIND) return 'invalid'
     const tag = outer.tags.find((t) => t[0] === TAG)?.[1]
     if (!tag) return 'invalid'
-    if (this.store.hasRaw(outer.id)) return 'seen'
+    if (this.store.hasRaw(outer.id)) {
+      if (source !== 'p2p') this.store.putRaw(outer, tag, true) // now known to be on a relay
+      return 'seen'
+    }
     const ek = this.keysByTag.get(tag)
     if (!ek) return this.ingestOther(tag, outer)
     if (outer.content.length > 120_000 || !verifySignedEvent(outer)) return 'invalid'
@@ -661,7 +680,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     const msgId = inner.id
     const device = inner.pubkey
     const changed = this.store.transaction(() => {
-      this.store.putRaw(outer, tag)
+      this.store.putRaw(outer, tag, source !== 'p2p')
       if (this.store.hasMessage(ek.space, device, payload.seq)) return new Set<string>()
       this.store.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId, JSON.stringify(inner))
       result = 'new'

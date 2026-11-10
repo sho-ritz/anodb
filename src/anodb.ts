@@ -3,6 +3,7 @@ import { fromCaptured } from './capture.js'
 import { bytesToHex, hexToBytes, randomHex, sha256Hex, signWith, verifySignedEvent } from './crypto.js'
 import { type AnoDBOptions, prepare } from './db.js'
 import { TAG, WRAP_KIND } from './protocol.js'
+import { type P2PMode, type PeerInfo, P2PSync } from './p2p.js'
 import { type PublicRow, presetOf } from './public-tables.js'
 import type { Filter } from './relay-pool.js'
 import { AnoDBSharing } from './sharing.js'
@@ -33,15 +34,86 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   #reconcileTimer: ReturnType<typeof setInterval> | null = null
   #lastRepair = 0
   #reconciling = new Set<string>()
+  #p2p: P2PSync | null = null
 
   protected override async afterInit(): Promise<void> {
     await super.afterInit()
+    this.#startP2P()
     if (this.sync) {
       this.#reconcileTimer = setInterval(() => {
         for (const r of this.sync?.pool.connected() ?? []) void this.reconcile(r)
       }, this.opts.reconcileIntervalMs ?? 10 * 60_000)
       ;(this.#reconcileTimer as { unref?: () => void }).unref?.()
     }
+  }
+
+  // ---- direct WebRTC sync ---------------------------------------------------------------
+
+  /** Effective P2P mode: own devices by default where WebRTC exists. */
+  get p2pMode(): P2PMode {
+    const o = this.opts.p2p
+    const rtc = o?.rtc ?? (globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection
+    if (!this.sync || !rtc) return 'off'
+    return o?.mode ?? 'own-devices'
+  }
+
+  #startP2P(): void {
+    const mode = this.p2pMode
+    if (mode === 'off') return
+    this.#p2p = new P2PSync(
+      {
+        appId: this.appId,
+        relays: () => this.sync?.pool.relays ?? [],
+        deviceSk: this.deviceSk,
+        devicePubkey: this.devicePubkey,
+        rooms: () =>
+          this.store
+            .spaces()
+            .filter((s) => s.status === 'active' && (mode === 'members' || s.personal))
+            .flatMap((s) => {
+              const k = this.keysBySpace.get(s.id)?.[0]
+              return k ? [{ space: s.id, keyId: k.keyId, key: k.key }] : []
+            }),
+        allowedDevices: (space) => {
+          const m = this.membership(space)
+          const out = new Set<string>()
+          for (const [identity] of m.roles) {
+            for (const d of this.store.devices(identity)) if (!d.revoked && !m.revokedDevices.has(d.device)) out.add(d.device)
+          }
+          return out
+        },
+        ingest: (e) => this.ingestGated('p2p', e) !== 'invalid',
+        delivered: (entryId) => {
+          this.store.dequeue(entryId)
+          this.store.markRawLocal(entryId)
+          this.emitStatus()
+        },
+        release: (entryId) => {
+          this.store.releaseOutbox(entryId)
+          void this.sync?.flush()
+        },
+      },
+      this.opts.p2p ?? {},
+    )
+    this.#p2p.start()
+  }
+
+  protected override holdForPeers(space: string): number {
+    return this.#p2p?.holdMs(space) ?? 0
+  }
+
+  protected override afterEnvelope(space: string, outer: NostrEvent, held: boolean): void {
+    if (this.#p2p) queueMicrotask(() => this.#p2p?.send(space, outer, held))
+  }
+
+  /** Raw P2P room state (troubleshooting). */
+  p2pDiagnostics(): ReturnType<P2PSync['diagnostics']> {
+    return this.#p2p?.diagnostics() ?? []
+  }
+
+  /** Devices currently connected directly (for status UIs). */
+  p2pPeers(): PeerInfo[] {
+    return this.#p2p?.peers() ?? []
   }
 
   // ---- NIP-77 + gap repair ------------------------------------------------------------
@@ -304,6 +376,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
 
   override async close(): Promise<void> {
     if (this.#reconcileTimer) clearInterval(this.#reconcileTimer)
+    await this.#p2p?.close()
     await super.close()
   }
 }

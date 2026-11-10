@@ -1,5 +1,6 @@
 export { AnoDB, createAnoDB } from './anodb.js'
 export type { PublicSyncFilter, SyncGap } from './anodb.js'
+export type { P2PMode, P2POptions, PeerInfo } from './p2p.js'
 export { publicTable, presets } from './public-tables.js'
 export type { PresetName } from './public-tables.js'
 export { AnoDBCore, AnoDBError } from './db.js'

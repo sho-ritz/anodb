@@ -184,3 +184,14 @@ Files are stored on Blossom servers (BUD-01/02/11/12), encrypted with AES-256-GC
 Uploads/deletes carry `Authorization: Nostr <base64url(kind 24242 event)>` with `t`, `x`,
 `expiration` and `server` tags, signed by `sha256("anodb/v2/blob/" + hex(deviceSk) + "/" + salt)`.
 Clients MUST verify the sha256 of downloaded bytes before decrypting.
+
+## 9. Direct delivery (WebRTC, via nostr-p2p)
+
+- Room: `joinRoom("anodb:" + appId, hex(sha256("anodb/v2/p2p/" + hex(epochKey))), { transport: "direct" })`.
+- Channel `anodb` messages:
+  - `{ t: "hi", proof }` — `proof` is an event of kind 27305 signed by the device key with
+    `content = roomId + ":" + <recipient session pubkey>`; only devices of current members are accepted.
+  - `{ t: "e", e: <envelope> }` — a regular envelope (§2), verified exactly like one from a relay.
+  - `{ t: "a", id }` — acknowledgement after successful ingestion.
+- A sender MAY skip relays for an envelope only if every active device of every member of the space
+  acknowledged it; otherwise it MUST publish it to relays (default after 2 s).
