@@ -6,6 +6,12 @@
 
 <p align="center"><strong>A decentralized, local-first database.</strong><br />Zero servers to run. Zero servers to trust.</p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/@anodb/core"><img src="https://img.shields.io/npm/v/@anodb/core?label=%40anodb%2Fcore" alt="@anodb/core on npm" /></a>
+  <a href="https://www.npmjs.com/package/@anodb/cli"><img src="https://img.shields.io/npm/v/@anodb/cli?label=%40anodb%2Fcli" alt="@anodb/cli on npm" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+</p>
+
 anoDB is a decentralized, local-first database SDK that treats on-device SQLite as the source of truth and distributes changes as **end-to-end encrypted Nostr events** through existing public relays.
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
@@ -45,6 +51,8 @@ One interactive command does the whole setup:
 Then use it from any component:
 
 ```tsx
+import { useAnoDB, useQuery } from '@anodb/core/react'
+
 const db = useAnoDB()
 const todos = useQuery((db) => db.selectFrom('todo').selectAll(), [])
 await db.insertInto('todo').values({ title: 'Milk', done: false }).execute()
@@ -53,11 +61,26 @@ await db.insertInto('todo').values({ title: 'Milk', done: false }).execute()
 No bundler configuration, no server, no account. Keys are generated on each user's device on first
 launch. Only one tab per origin opens the database; other tabs get `AnoDBError('tab-locked')`.
 
-Manual setup in a browser:
+### Packages
+
+The product is **anoDB**; on npm it lives under the `@anodb` scope.
+
+| Package | What it is |
+|---|---|
+| [`@anodb/core`](https://www.npmjs.com/package/@anodb/core) | The database: sync, sharing, keys, files, React hooks (`@anodb/core/react`) and Node driver (`@anodb/core/node`) |
+| [`@anodb/cli`](https://www.npmjs.com/package/@anodb/cli) | `npx @anodb/cli init` — the setup wizard (you never import it) |
+| [`nostr-p2p`](https://www.npmjs.com/package/nostr-p2p) | WebRTC over Nostr signaling, used internally by `@anodb/core` |
+
+### Manual setup
+
+```sh
+npm install @anodb/core sql.js   # sql.js only for browsers / Tauri
+npx anodb assets                 # copy the SQLite WASM files to public/anodb/
+```
 
 ```ts
 import { browserDriver, createAnoDB } from '@anodb/core'
-const db = await createAnoDB({ appId, schema, driver: await browserDriver({ name: appId }) }) // sql.js from /anodb
+const db = await createAnoDB({ appId, schema, driver: await browserDriver({ name: appId }) })
 ```
 
 Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 22.13+ (`node:sqlite`), and React Native / Expo (`expo-sqlite`).
