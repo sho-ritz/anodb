@@ -40,7 +40,8 @@
   "files": [
     "dist",
     "PROTOCOL.md",
-    "docs"
+    "docs/DESIGN.md",
+    "docs/DECISIONS.md"
   ],
   "sideEffects": false,
   "scripts": {
@@ -54,7 +55,7 @@
   "dependencies": {
     "@noble/hashes": "^2.4.0",
     "kysely": "^0.29.8",
-    "nostr-p2p": "github:sho-ritz/nostr-p2p#v0.1.1",
+    "nostr-p2p": "^0.1.1",
     "nostr-tools": "^2.26.0"
   },
   "devDependencies": {
@@ -70,7 +71,7 @@
     "ws": "^8.22.2"
   },
   "bin": {
-    "anodb": "./dist/cli/main.js"
+    "anodb": "dist/cli/main.js"
   },
   "peerDependencies": {
     "react": ">=18"
