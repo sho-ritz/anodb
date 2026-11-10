@@ -4,9 +4,9 @@
 
 <h1 align="center">anoDB — Absolutely None DB</h1>
 
-<p align="center"><strong>A local-first SQLite database that syncs over Nostr relays — no backend to provision.</strong></p>
+<p align="center"><strong>A decentralized, local-first database.</strong><br />Zero servers to run. Zero servers to trust.</p>
 
-anoDB is a local-first database SDK that treats on-device SQLite as the source of truth and distributes changes as **end-to-end encrypted Nostr events** through existing public relays.
+anoDB is a decentralized, local-first database SDK that treats on-device SQLite as the source of truth and distributes changes as **end-to-end encrypted Nostr events** through existing public relays.
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
