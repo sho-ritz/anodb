@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/anodb-logo.svg" alt="anoDB — Absolutely None DB" width="720" />
+  <img src="assets/anodb-logo.svg" alt="anoDB — Absolutely No DB" width="720" />
 </p>
 
-<h1 align="center">anoDB — Absolutely None DB</h1>
+<h1 align="center">anoDB — Absolutely No DB</h1>
 
 <p align="center"><strong>A decentralized, local-first database.</strong><br />Zero servers to run. Zero servers to trust.</p>
 

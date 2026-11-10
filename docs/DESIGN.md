@@ -8,7 +8,7 @@
 
 ## 1. 一言で
 
-**anoDB（Absolutely None DB）は「端末内の SQLite を正とし、変更を暗号化した Nostr イベントとして既存リレーに流す」Local-first DB の SDK。**
+**anoDB（Absolutely No DB）は「端末内の SQLite を正とし、変更を暗号化した Nostr イベントとして既存リレーに流す」Local-first DB の SDK。**
 開発者が用意・運用するサーバー（DB・API・BaaS プロジェクト）は**まったく無い**。
 
 - SQL ライクで型安全な API（Kysely）と、生 SQL の書き込み互換

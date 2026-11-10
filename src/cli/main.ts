@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { type InitFlags, runInit } from './init.js'
 
-const HELP = `anodb — Absolutely None DB
+const HELP = `anodb — Absolutely No DB
 
 Usage:
   npx anodb init [options]

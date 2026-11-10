@@ -1,7 +1,7 @@
 {
   "name": "anodb",
   "version": "0.6.0",
-  "description": "Absolutely None DB — a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
+  "description": "Absolutely No DB — a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
