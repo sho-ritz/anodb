@@ -1,4 +1,4 @@
-import type { ColumnType, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
+import type { ColumnType, JsonColumn, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
 
 const IDENT = /^[A-Za-z][A-Za-z0-9_]*$/
 export const RESERVED_COLUMNS = new Set(['id', 'space', 'createdAt', 'updatedAt', 'isDeleted'])
@@ -7,6 +7,15 @@ const COLUMN_TYPES = new Set<ColumnType>(['text', 'integer', 'real', 'boolean', 
 /** System cells. They travel in the change log like user cells. */
 export const SYS_DELETED = '$deleted'
 export const SYS_CREATED = '$createdAt'
+
+/**
+ * A `json` column with a TypeScript type for its value (reads return the parsed value):
+ *
+ *   defineSchema({ note: { meta: json<{ tags: string[] }>() } })
+ */
+export function json<T = unknown>(): JsonColumn<T> {
+  return 'json' as JsonColumn<T>
+}
 
 /** Identity function that validates the schema and keeps literal types for inference. */
 export function defineSchema<const S extends SchemaDefinition>(schema: S): S {

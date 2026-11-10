@@ -45,7 +45,7 @@ describe('sync (v0.2)', () => {
     const [row] = await a.insertInto('todo').values({ title: 'from A' }).returning('id').execute()
     await until(async () => (await titles(b)).includes('from A'), 3000, 'B receives')
     await b.updateTable('todo').set({ done: true }).where('id', '=', row!.id).execute()
-    await until(async () => (await a.selectFrom('todo').select('done').execute())[0]?.done === 1, 3000, 'A receives')
+    await until(async () => (await a.selectFrom('todo').select('done').execute())[0]?.done === true, 3000, 'A receives')
     await b.deleteFrom('todo').execute()
     await until(async () => (await titles(a)).length === 0, 3000, 'delete replicates')
   })
@@ -99,7 +99,7 @@ describe('sync (v0.2)', () => {
     await r.start()
     const state = async (d: DB) => JSON.stringify(await d.selectFrom('todo').select(['title', 'done']).execute())
     await until(async () => (await state(a)) === (await state(b)) && a.status.pendingEvents + b.status.pendingEvents === 0, 4000)
-    expect(JSON.parse(await state(a))).toEqual([{ title: 'B', done: 1 }])
+    expect(JSON.parse(await state(a))).toEqual([{ title: 'B', done: true }])
   })
 
   it('applies writes that arrive before the op that authorizes them', async () => {

@@ -421,6 +421,7 @@ import { openDB } from './db${ts ? '' : '.js'}'
 // Wrap your app: <DBProvider><App /></DBProvider>. Then in any component:
 //   const todos = useQuery((db) => db.selectFrom('todo').selectAll(), [])
 //   await db.insertInto('todo').values({ title: 'Milk', done: false }).execute()   // const db = useAnoDB()
+// Ready-made sharing UI: <PairDevice />, <DeviceList />, <InviteLink space={id} />, <JoinSpace />, <Members space={id} />
 export function DBProvider({ children, fallback = null }${ts ? ': { children: ReactNode; fallback?: ReactNode }' : ''}) {
   const [db, setDb] = useState${ts ? '<Awaited<ReturnType<typeof openDB>> | null>' : ''}(null)
   const [error, setError] = useState${ts ? '<Error | null>' : ''}(null)

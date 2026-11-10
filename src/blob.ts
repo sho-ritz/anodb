@@ -182,7 +182,7 @@ export class BlobStore {
   }
 
   /** Download, verify the hash and decrypt. Tries the reference's servers, then the configured ones. */
-  async get(refOrJson: BlobRef | string): Promise<{ data: Uint8Array; type: string; name?: string }> {
+  async get(refOrJson: unknown): Promise<{ data: Uint8Array; type: string; name?: string }> {
     const ref = parseRef(refOrJson)
     const candidates = [...new Set([...ref.servers.map(normalizeServer), ...this.#servers])]
     const errors: string[] = []
@@ -210,13 +210,13 @@ export class BlobStore {
   }
 
   /** Download as a browser `Blob` (handy for `URL.createObjectURL`). */
-  async getBlob(ref: BlobRef | string): Promise<Blob> {
+  async getBlob(ref: unknown): Promise<Blob> {
     const { data, type } = await this.get(ref)
     return new Blob([data as BlobPart], { type })
   }
 
   /** Ask the servers to delete the blob. Only works from the device that uploaded it. */
-  async delete(refOrJson: BlobRef | string): Promise<BlobUploadReport[]> {
+  async delete(refOrJson: unknown): Promise<BlobUploadReport[]> {
     const ref = parseRef(refOrJson)
     const sk = this.#uploadKey(ref.salt)
     return Promise.all(
@@ -256,8 +256,8 @@ export function isBlobRef(r: unknown): r is BlobRef {
   )
 }
 
-/** Accepts the object or the JSON text read back from a `json` column. */
-function parseRef(r: BlobRef | string): BlobRef {
+/** Accepts a BlobRef, the value read back from a `json` column, or its JSON text. */
+function parseRef(r: unknown): BlobRef {
   let ref: unknown = r
   if (typeof r === 'string') {
     try {

@@ -1,6 +1,6 @@
 {
   "name": "@anodb/core",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Absolutely No DB — a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
   "type": "module",
   "license": "MIT",
@@ -57,7 +57,8 @@
     "@noble/hashes": "^2.4.0",
     "kysely": "^0.29.8",
     "nostr-p2p": "^0.1.1",
-    "nostr-tools": "^2.26.0"
+    "nostr-tools": "^2.26.0",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

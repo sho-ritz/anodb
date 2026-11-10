@@ -1,6 +1,6 @@
 import initSqlJs from 'sql.js'
 import { describe, expect, it } from 'vitest'
-import { createAnoDB, defineSchema, sql, sqlJsDriver } from '../src/index.js'
+import { createAnoDB, defineSchema, json, sql, sqlJsDriver } from '../src/index.js'
 import { memoryKeyStore } from '../src/keystore/memory.js'
 import { nodeSqlite } from '../src/node.js'
 import type { SqliteDriver } from '../src/types.js'
@@ -32,10 +32,40 @@ describe.each(drivers)('SQL-like API (%s)', (_n, makeDriver) => {
       .innerJoin('tag', 'tag.todoId', 'todo.id')
       .select(['todo.title', 'todo.done', 'todo.meta', 'tag.name', 'todo.createdAt'])
       .execute()
-    expect(joined).toEqual([{ title: 'milk', done: 1, meta: '{"tags":["x"]}', name: 'shop', createdAt: expect.any(Number) }])
+    expect(joined).toEqual([{ title: 'milk', done: true, meta: { tags: ['x'] }, name: 'shop', createdAt: expect.any(Number) }])
 
-    await d.deleteFrom('todo').where('done', '=', 1).execute()
+    await d.deleteFrom('todo').where('done', '=', true).execute()
     expect(await d.selectFrom('todo').selectAll().execute()).toEqual([])
+  })
+
+  it('reads booleans as true/false and JSON as values, through aliases, joins and live queries', async () => {
+    const typed = defineSchema({
+      todo: { title: 'text', done: 'boolean', meta: json<{ tags: string[] }>() },
+      tag: { name: 'text', todoId: 'text', done: 'text' }, // same column name, different type
+    })
+    const d = await open(typed, [], { driver: makeDriver() })
+    const [row] = await d.insertInto('todo').values({ title: 'a', done: true, meta: { tags: ['x'] } }).returning(['id', 'done', 'meta']).execute()
+    expect(row).toMatchObject({ done: true, meta: { tags: ['x'] } })
+    const tags: string[] = row!.meta!.tags // json<T>() types the value
+    expect(tags).toEqual(['x'])
+    await d.insertInto('tag').values({ name: 'n', todoId: row!.id, done: 'text!' }).execute()
+
+    expect(await d.selectFrom('todo').selectAll().execute()).toMatchObject([{ done: true, meta: { tags: ['x'] } }])
+    expect(await d.selectFrom('todo as t').select(['t.done as finished', 't.meta']).execute()).toEqual([{ finished: true, meta: { tags: ['x'] } }])
+    const joined = await d.selectFrom('todo').innerJoin('tag', 'tag.todoId', 'todo.id').select(['todo.done', 'tag.done as tagDone']).selectAll('tag').execute()
+    expect(joined[0]).toMatchObject({ done: 'text!', tagDone: 'text!' }) // selectAll('tag') last: tag.done (text) wins
+    const [j2] = await d.selectFrom('todo').innerJoin('tag', 'tag.todoId', 'todo.id').select(['todo.done', 'tag.done as tagDone']).execute()
+    expect(j2).toEqual({ done: true, tagDone: 'text!' })
+    expect(await d.selectFrom('todo').select('done').where('done', '=', true).execute()).toEqual([{ done: true }])
+    // expressions and raw SQL keep SQLite values
+    expect(await d.selectFrom('todo').select(sql<number>`done + 0`.as('n')).execute()).toEqual([{ n: 1 }])
+    expect(await d.execute('SELECT done FROM todo')).toEqual([{ done: 1 }])
+
+    const seen: unknown[] = []
+    const stop = d.subscribe(d.selectFrom('todo').select(['done', 'meta']), (rows) => seen.push(rows))
+    onCleanup(stop)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(seen.at(-1)).toEqual([{ done: true, meta: { tags: ['x'] } }])
   })
 
   it('accepts arbitrary SQL writes (UPDATE … LIKE, INSERT … SELECT, upsert)', async () => {

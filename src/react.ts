@@ -1,3 +1,4 @@
+'use client'
 import type { Compilable } from 'kysely'
 import { type ReactNode, createContext, createElement, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { SchemaDefinition, SyncStatus } from './types.js'
@@ -70,7 +71,7 @@ export function useAnoDB<D extends ReactiveDB = ReactiveDB>(): D {
  * Live query. `build` receives the database and returns a Kysely query (or SQL). Re-runs when the
  * tables it reads change, locally or through sync. Returns `undefined` until the first result.
  *
- *   const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', 0), [])
+ *   const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', false), [])
  */
 export function useQuery<D extends ReactiveDB, R>(build: (db: D) => Query<R>, deps: readonly unknown[]): R[] | undefined {
   const db = useAnoDB<D>()
@@ -96,3 +97,19 @@ export function useSyncStatus(): SyncStatus {
   useEffect(() => void (ref.current = db.status), [db])
   return useSyncExternalStore(subscribe, () => ref.current, () => ref.current)
 }
+
+export {
+  DeviceList,
+  InviteLink,
+  Invitations,
+  JoinRequests,
+  JoinSpace,
+  Members,
+  PairDevice,
+  QRCode,
+  parseAppLink,
+  toAppLink,
+  useIncomingLink,
+  useLive,
+} from './ui.js'
+export type { InviteLinkProps, JoinSpaceProps, Labels, Lang, MembersProps, PairDeviceProps, SharingDB } from './ui.js'

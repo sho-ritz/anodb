@@ -10,18 +10,20 @@ import {
   SqliteIntrospector,
   SqliteQueryCompiler,
 } from 'kysely'
-import type { ColumnType as AnoColumnType, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
+import { TypedResultsPlugin } from './result-types.js'
+import type { ColumnType as AnoColumnType, JsonColumn, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
 
+type JsonValue<C> = C extends JsonColumn<infer T> ? T : unknown
 type SelectTs<C extends AnoColumnType> = C extends 'text'
   ? string
   : C extends 'integer' | 'real'
     ? number
     : C extends 'boolean'
-      ? 0 | 1
-      : string
-type WriteTs<C extends AnoColumnType> = C extends 'boolean' ? boolean | 0 | 1 : C extends 'json' ? unknown : SelectTs<C>
+      ? boolean
+      : JsonValue<C>
+type WriteTs<C extends AnoColumnType> = C extends 'boolean' ? boolean | 0 | 1 : SelectTs<C>
 
-/** Kysely table type for a schema table. Booleans read as 0 | 1 and JSON reads as text (SQLite semantics). */
+/** Kysely table type for a schema table. Booleans read as `boolean`, JSON as the parsed value. */
 export type KyselyTable<D extends TableDefinition> = {
   space: ColumnType<string, string | undefined, never>
   id: ColumnType<string, string | undefined, never>
@@ -109,12 +111,12 @@ class AnoDriver implements Driver {
   async destroy(): Promise<void> {}
 }
 
-export function createKysely<S extends SchemaDefinition>(exec: SqlExecutor): Kysely<KyselyDatabase<S>> {
+export function createKysely<S extends SchemaDefinition>(exec: SqlExecutor, schema: S): Kysely<KyselyDatabase<S>> {
   const dialect: Dialect = {
     createAdapter: () => new SqliteAdapter(),
     createDriver: () => new AnoDriver(exec),
     createQueryCompiler: () => new SqliteQueryCompiler(),
     createIntrospector: (db) => new SqliteIntrospector(db),
   }
-  return new Kysely<KyselyDatabase<S>>({ dialect })
+  return new Kysely<KyselyDatabase<S>>({ dialect, plugins: [new TypedResultsPlugin(schema)] })
 }

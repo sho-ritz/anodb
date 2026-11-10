@@ -1,4 +1,4 @@
-import { CompiledQuery, type Compilable, type Kysely } from 'kysely'
+import { CompiledQuery, type Compilable, type Kysely, type RootOperationNode } from 'kysely'
 import { BlobStore, DEFAULT_BLOB_SERVERS } from './blob.js'
 import { type CapturedCell, beginCapture, endCapture, fromCaptured, installCapture } from './capture.js'
 import {
@@ -27,6 +27,7 @@ import { browserKeyStore } from './keystore/browser.js'
 import { envKeyStore } from './keystore/env.js'
 import type { KeyStore } from './keystore/types.js'
 import { type KyselyDatabase, type SqlExecutor, createKysely } from './kysely.js'
+import { resultConverter } from './result-types.js'
 import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLength, parseStreamPayload, splitChanges } from './protocol.js'
 import type { P2POptions } from './p2p.js'
 import { PublicData } from './public.js'
@@ -272,7 +273,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
           retryIntervalMs: i.opts.retryIntervalMs ?? 30_000,
         })
       : null
-    this.kysely = createKysely<S>(this.executor())
+    this.kysely = createKysely<S>(this.executor(), this.schema)
     this.blobs = new BlobStore({
       deviceSk: i.deviceSk,
       servers: i.opts.blobServers ?? DEFAULT_BLOB_SERVERS,
@@ -349,12 +350,15 @@ export class AnoDBCore<S extends SchemaDefinition> {
     onError?: (e: unknown) => void,
   ): () => void {
     const compiled = compileQuery(query)
+    // Kysely queries keep typed results (booleans, JSON) even though they re-run as raw SQL here.
+    const node = (compiled as { query?: RootOperationNode }).query
+    const convert = node ? resultConverter(this.schema, node) : null
     const tables = new Set(Object.keys(this.schema).filter((t) => compiled.sql.includes(`"${t}"`) || new RegExp(`\\b${t}\\b`).test(compiled.sql)))
     let alive = true
     const run = () => {
       this.kysely
         .executeQuery<R>(CompiledQuery.raw(compiled.sql, [...compiled.parameters]))
-        .then((r) => alive && cb(r.rows))
+        .then((r) => alive && cb(convert ? (r.rows.map((row) => convert(row as Record<string, unknown>)) as R[]) : r.rows))
         .catch((e) => onError?.(e))
     }
     const listener: ChangeListener = (changed) => {

@@ -42,7 +42,7 @@ describe('encrypted blobs on Blossom', () => {
     await a.insertInto('notes').values({ text: 'invoice', photo: ref }).execute()
     await until(async () => (await dev.db.selectFrom('notes').select('photo').execute()).length === 1, 4000)
     const [row] = await dev.db.selectFrom('notes').select('photo').execute()
-    const got = await dev.db.blobs.get(row!.photo!) // JSON text straight from the column
+    const got = await dev.db.blobs.get(row!.photo) // the json column's value, as read
     expect(Buffer.from(got.data).equals(Buffer.from(bytes(100_000)))).toBe(true)
   })
 

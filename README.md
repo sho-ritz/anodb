@@ -16,7 +16,7 @@ anoDB is a decentralized, local-first database SDK that treats on-device SQLite 
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.7 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.8 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -29,7 +29,7 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
 - 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
-- ⚛️ **React hooks** — `useQuery`, `useSyncStatus`.
+- ⚛️ **React** — `useQuery`, `useSyncStatus`, and ready-made `<PairDevice />`, `<InviteLink />`, `<JoinSpace />`, `<Members />` components.
 
 ## Get started
 
@@ -119,7 +119,7 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 ```
 
 - Every table gets `id`, `space`, `createdAt` and `updatedAt` (`space` defaults to your personal space).
-- Following SQLite semantics, `boolean` reads as `0 | 1` and `json` reads as JSON text.
+- `boolean` columns read as `true / false` and `json` columns as parsed values (also through JOINs, aliases and live queries). Raw SQL strings (`db.execute`) return plain SQLite values.
 
 ### Keys (most secure defaults)
 
@@ -251,9 +251,30 @@ On NIP-77 relays, reconciliation is exact and lost envelopes are re-uploaded aut
 import { AnoDBProvider, useQuery, useSyncStatus } from '@anodb/core/react'
 
 <AnoDBProvider db={db}><App /></AnoDBProvider>
-const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', 0), [])
+const todos = useQuery((db) => db.selectFrom('todo').selectAll().where('done', '=', false), [])
 const status = useSyncStatus()
 ```
+
+### Ready-made components
+
+Sharing and multi-device are anoDB's core features, so their UI ships with it:
+
+```tsx
+import { DeviceList, InviteLink, JoinSpace, Members, PairDevice } from '@anodb/core/react'
+
+<PairDevice />            {/* add a device: QR code + a code to compare on both devices */}
+<DeviceList />            {/* your devices, revoke with a confirming second click */}
+<InviteLink space={id} /> {/* one-time invite link + QR, and the join requests to approve */}
+<JoinSpace onJoined={setSpace} /> {/* join with a link; invitations sent to your npub */}
+<Members space={id} />    {/* roles and removal for owners / admins */}
+```
+
+- Plain HTML with `anodb-*` class names and only layout styles — style them like the rest of your app.
+- English and Japanese built in (`lang="ja"`, default: the browser's language); override any text with `labels`.
+- Links and QR codes are ordinary `https://your-app/#anodb=…` URLs. Scanning one with a phone camera opens
+  your app with the request filled in — nothing is approved without a click, and pairing always shows a
+  code to compare.
+- Building your own? `useLive((db) => db.members(id))`, `toAppLink()`, `parseAppLink()` and `<QRCode />` are exported too.
 
 ## Column types
 
@@ -262,8 +283,14 @@ const status = useSyncStatus()
 | `text` | `string` | `string` | TEXT |
 | `integer` | `number` (safe integer) | `number` | INTEGER |
 | `real` | `number` | `number` | REAL |
-| `boolean` | `boolean \| 0 \| 1` | `0 \| 1` | INTEGER |
-| `json` | any JSON value | `string` (JSON text) | TEXT |
+| `boolean` | `boolean` | `boolean` | INTEGER (0 / 1) |
+| `json` | any JSON value | `unknown` | TEXT |
+| `json<T>()` | `T` | `T` | TEXT |
+
+```ts
+import { defineSchema, json } from '@anodb/core'
+const schema = defineSchema({ note: { title: 'text', meta: json<{ tags: string[] }>() } })
+```
 
 All columns are nullable.
 

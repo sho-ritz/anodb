@@ -1,6 +1,6 @@
 {
   "name": "@anodb/cli",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Set up anoDB in your project: npx @anodb/cli init",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@anodb/core": "^0.7.1"
+    "@anodb/core": "^0.8.0"
   },
   "publishConfig": {
     "access": "public"

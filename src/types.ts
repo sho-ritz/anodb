@@ -18,6 +18,10 @@ export interface SqliteDriver {
 
 export type ColumnType = 'text' | 'integer' | 'real' | 'boolean' | 'json'
 
+declare const JSON_TYPE: unique symbol
+/** A `json` column with a TypeScript type for its value: `json<{ tags: string[] }>()`. */
+export type JsonColumn<T> = 'json' & { readonly [JSON_TYPE]?: T }
+
 export type TableDefinition = Readonly<Record<string, ColumnType>>
 export type SchemaDefinition = Readonly<Record<string, TableDefinition>>
 
