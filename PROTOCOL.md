@@ -170,3 +170,17 @@ Standard events, unencrypted, signed by the identity key:
 
 A client publishing a new version of a replaceable event MUST use a `created_at` greater than the
 version it replaces.
+
+## 8. Blob references (Blossom)
+
+Files are stored on Blossom servers (BUD-01/02/11/12), encrypted with AES-256-GCM
+(`blob = iv(12) || ciphertext || tag`). The reference stored in a `json` column:
+
+```jsonc
+{ "v": 1, "sha256": "<sha256 of the encrypted blob>", "size": <plaintext bytes>, "type": "<mime>",
+  "key": "<AES key, hex>", "servers": ["https://…"], "salt": "<hex>", "name"?: "…" }
+```
+
+Uploads/deletes carry `Authorization: Nostr <base64url(kind 24242 event)>` with `t`, `x`,
+`expiration` and `server` tags, signed by `sha256("anodb/v2/blob/" + hex(deviceSk) + "/" + salt)`.
+Clients MUST verify the sha256 of downloaded bytes before decrypting.

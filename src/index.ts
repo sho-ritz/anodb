@@ -7,6 +7,8 @@ export type { Device, Invitation, JoinRequest, Member, PairingOffer } from './sh
 export type { Role } from './membership.js'
 export type { AnoDBErrorCode, AnoDBOptions, ChangeListener, ErrorListener, SpaceInfo, StatusListener } from './db.js'
 export { defineSchema } from './schema.js'
+export { BLOSSOM_AUTH_KIND, BlobError, BlobStore, DEFAULT_BLOB_SERVERS, isBlobRef } from './blob.js'
+export type { BlobPutOptions, BlobRef, BlobUploadReport } from './blob.js'
 export type { KyselyDatabase, KyselyTable } from './kysely.js'
 export { sqlJsDriver } from './drivers/sqljs.js'
 export { sqlJsIndexedDB } from './drivers/sqljs-idb.js'

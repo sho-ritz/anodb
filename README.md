@@ -10,7 +10,7 @@ anoDB is a local-first database SDK that treats on-device SQLite as the source o
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.4 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.5 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -21,6 +21,7 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 - 🔀 **Deterministic merging** — Cell-level Last-Writer-Wins with Hybrid Logical Clocks; tolerant of out-of-order delivery, duplicates and retries.
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
+- 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
 - ⚛️ **React hooks** — `useQuery`, `useSyncStatus`.
 
 ## Get started
@@ -145,6 +146,29 @@ await db.selectFrom('posts').innerJoin('profiles', 'profiles.author', 'posts.aut
 
 Public tables are **not encrypted**. Notes and reactions cannot be edited (deleting publishes a NIP-09 request); profiles, follow lists and articles are replaceable.
 
+## Files (Blossom)
+
+Values are limited to ~44 KB, so files go to Blossom servers (Nostr's blob storage). They are
+encrypted on the device with a random key; the database only stores a small reference, which is
+synced end-to-end encrypted like any other value — so only members of the space can open the file.
+
+```ts
+const schema = defineSchema({ notes: { text: 'text', photo: 'json' } })
+
+const ref = await db.blobs.put(file, { type: file.type, name: file.name }) // encrypt + upload (mirrored)
+await db.insertInto('notes').values({ text: 'receipt', photo: ref }).execute()
+
+const [row] = await db.selectFrom('notes').select('photo').execute()
+const blob = await db.blobs.getBlob(row.photo)   // download, verify hash, decrypt
+img.src = URL.createObjectURL(blob)
+
+await db.blobs.delete(ref)                        // only from the device that uploaded it
+```
+
+- Servers see only ciphertext, its size, upload time and your IP. Each upload is signed by a throwaway key.
+- Downloads are verified against the sha256, so a server cannot alter a file; other servers are tried on failure.
+- Default servers: `DEFAULT_BLOB_SERVERS` (public servers that accept encrypted uploads). **Most public Blossom servers only accept images/video and reject ciphertext**, and none guarantee retention — use `blobServers` to add your own or paid servers.
+
 ## Sync health
 
 ```ts
@@ -185,6 +209,7 @@ All columns are nullable.
 - **Deletion uses tombstones.** Copies held by relays or other people are not erased; removed members keep what they already read.
 - **Losing every device loses your personal space** (by design, for security).
 - With only non-NIP-77 relays, more events in a single second than a relay's result limit can be missed; `syncHealth()` reports the gap.
+- Files depend on Blossom servers' retention policies (none are guaranteed).
 - The local SQLite file itself is not encrypted; rely on disk encryption.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the threat model and open issues.

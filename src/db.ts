@@ -1,4 +1,5 @@
 import { CompiledQuery, type Compilable, type Kysely } from 'kysely'
+import { BlobStore, DEFAULT_BLOB_SERVERS } from './blob.js'
 import { type CapturedCell, beginCapture, endCapture, fromCaptured, installCapture } from './capture.js'
 import {
   bytesToHex,
@@ -69,6 +70,10 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
    * may ignore it, and old envelopes are unreadable without old keys anyway.
    */
   pruneOldEvents?: boolean
+  /** Blossom servers for encrypted files (`db.blobs`). Default: DEFAULT_BLOB_SERVERS. */
+  blobServers?: readonly string[]
+  /** fetch implementation for Blossom (tests / custom networking). */
+  fetch?: typeof fetch
   /** How often to run NIP-77 reconciliation with connected relays. Default 10 min. */
   reconcileIntervalMs?: number
   /** Wall clock in ms. For tests. */
@@ -209,6 +214,8 @@ export class AnoDBCore<S extends SchemaDefinition> {
   readonly devicePubkey: string
   /** Public Nostr data (profiles, notes, relay lists). */
   readonly nostr: PublicData
+  /** Encrypted files on Blossom servers; store the returned reference in a `json` column. */
+  readonly blobs: BlobStore
 
   protected readonly store: Store
   protected readonly keyStore: KeyStore
@@ -260,6 +267,11 @@ export class AnoDBCore<S extends SchemaDefinition> {
         })
       : null
     this.kysely = createKysely<S>(this.executor())
+    this.blobs = new BlobStore({
+      deviceSk: i.deviceSk,
+      servers: i.opts.blobServers ?? DEFAULT_BLOB_SERVERS,
+      ...(i.opts.fetch ? { fetch: i.opts.fetch } : {}),
+    })
     this.nostr = new PublicData({
       store: this.store,
       signer: () => this.requireIdentitySigner(),

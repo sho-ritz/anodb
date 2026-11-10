@@ -36,5 +36,19 @@ for (const url of ok) {
   console.log(`   ${supported ? '✔ NIP-77' : '– no NIP-77 (time-based fallback)'}  ${url}  (${Date.now() - t} ms)`)
 }
 console.log('   gaps:', JSON.stringify(db.syncHealth().gaps))
+
+console.log('4) encrypted blob on each default Blossom server')
+let blobsOk = true
+for (const server of db.blobs.servers) {
+  try {
+    const ref = await db.blobs.put(new TextEncoder().encode(`anodb smoke ${Date.now()}`), { servers: [server] })
+    const back = await db.blobs.get({ ...ref, servers: [server] })
+    const del = (await db.blobs.delete(ref))[0]
+    console.log(`   ✔ ${server}  (${back.data.length} bytes back, delete ${del.ok ? 'ok' : del.status})`)
+  } catch (e) {
+    blobsOk = false
+    console.log(`   ✖ ${server}  ${e.reports?.[0]?.status ?? ''} ${e.reports?.[0]?.reason ?? e.message}`)
+  }
+}
 await db.close()
-process.exit(ok.length === relays.length && s.pendingEvents === 0 ? 0 : 1)
+process.exit(ok.length === relays.length && s.pendingEvents === 0 && blobsOk ? 0 : 1)

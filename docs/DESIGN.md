@@ -1,6 +1,6 @@
 # anoDB 設計書
 
-> 最終更新: 2026-11-10 ／ 対象: **v0.4**（プロトコル v2）
+> 最終更新: 2026-11-10 ／ 対象: **v0.5**（プロトコル v2）
 > 設計判断の一覧は [DECISIONS.md](DECISIONS.md)、ワイヤフォーマットは [../PROTOCOL.md](../PROTOCOL.md)、
 > 初期構想メモは [concept-memo-2026-11-09.md](concept-memo-2026-11-09.md)。
 
@@ -198,6 +198,17 @@ defineSchema({ posts: publicTable('note'), profiles: publicTable('profile'), fol
 
 ---
 
+## 8.5 ファイル（Blossom）
+
+1 セルは約 44KB までなので、ファイルは Blossom サーバー（Nostr エコシステムのファイル置き場、HTTP）に置く。
+
+1. 端末でランダムな鍵を作り、**AES-256-GCM で暗号化**
+2. 暗号文を複数のサーバーに `PUT /upload`（BUD-02）。認可は kind 24242（BUD-11、Base64url、`server` タグでそのサーバー専用）を**ファイルごとの使い捨て鍵**で署名。鍵は `sha256(端末鍵, ソルト)` から導出するので、アップロードした端末だけが後で削除（BUD-12）できる
+3. DB には参照 `{ sha256, size, type, key, servers, salt }` を `json` 列として保存 → 通常の値と同じく E2EE で同期され、メンバーだけが復号できる
+4. 取得時は sha256 を検証してから復号（改ざん検出）。失敗したら別のサーバーを試す
+
+公開サーバーの多くは画像・動画しか受け付けず、暗号文（application/octet-stream）を拒否する（2026-11-10 時点で 16 台中 3 台のみ受け付け）。Content-Type を偽る回避はしない。保存の保証も無いので、確実に残すには自前・有料サーバーを `blobServers` に足す。
+
 ## 9. 脅威モデル（まとめ）
 
 | 攻撃者 | 防げること | 防げないこと |
@@ -217,7 +228,7 @@ defineSchema({ posts: publicTable('note'), profiles: publicTable('profile'), fol
 
 | 項目 | 状態 |
 |---|---|
-| 1 セルの大きさ | 約 44KB まで。大きなデータは Blossom 等に置いて参照する（未実装） |
+| 1 セルの大きさ | 約 44KB まで。大きなデータは `db.blobs`（Blossom）に置いて参照する |
 | ブラウザの永続化 | sql.js のイメージを IndexedDB に保存。OPFS ドライバは未実装 |
 | 前方秘匿性 | 世代鍵の更新による区切りのみ（MLS 級ではない） |
 | 型別 CRDT | LWW のみ（カウンタ・集合・テキスト CRDT は未実装） |
