@@ -104,6 +104,8 @@ describe('sharing (v0.3)', () => {
     const space = await owner.createSpace('team')
     await owner.insertInto('todo').values({ title: 'team task', space }).execute()
     const link = await owner.createInviteLink(space, { role: 'writer', expiresInMs: 60_000 })
+    // opening your own link (same browser) explains itself instead of waiting forever
+    await expect(owner.requestJoin(link, 'me')).rejects.toMatchObject({ code: 'own-invite' })
     const requests: string[] = []
     owner.onJoinRequest((req) => requests.push(req.id))
     await bob.requestJoin(link, 'Bob')

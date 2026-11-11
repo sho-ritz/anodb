@@ -16,7 +16,7 @@ import {
   spaceTag,
   verifySignedEvent,
 } from './crypto.js'
-import { AnoDBCore, type EpochKey } from './db.js'
+import { AnoDBCore, AnoDBError, type EpochKey } from './db.js'
 import { KEY_PACKAGE_KIND, createDelegation, createKeyPackage, createRevocation, delegationName, isEvent, parseKeyPackage, verifyDelegation } from './identity.js'
 import {
   type MemberOp,
@@ -557,6 +557,8 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const secret = u.searchParams.get('s')
     if (u.protocol !== 'anodb:' || !secret || !/^[0-9a-f]{32}$/.test(secret)) throw new Error('anoDB: invalid invite link')
     if (u.searchParams.get('app') !== this.appId) throw new Error('anoDB: invite link is for another app')
+    if (this.store.invitesOut().some((i) => i.secret === secret))
+      throw new AnoDBError('own-invite', 'This is your own invite link. Open it in another browser, a private window or on the other person’s device.')
     this.store.setMeta(`joinreq:${sha256Hex(secret)}`, '1')
     const devices = this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
     this.#sendSecret(secret, { t: 'joinreq', devices, name })

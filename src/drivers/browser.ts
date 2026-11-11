@@ -1,4 +1,5 @@
 import { AnoDBError } from '../db.js'
+import { forwardLinkToOtherTab } from '../links.js'
 import type { SqliteDriver } from '../types.js'
 import { sqlJsIndexedDB } from './sqljs-idb.js'
 
@@ -12,7 +13,8 @@ export interface BrowserDriverOptions {
   assetsUrl?: string
   /**
    * Only one tab per origin may own the database file (two tabs would overwrite each other's
-   * saves). Default true: a second tab gets `AnoDBError` with code `'tab-locked'`.
+   * saves). Default true: a second tab gets `AnoDBError` with code `'tab-locked'`. If that tab was
+   * opened with an `#anodb=` link (invite, pairing), the link is handed to the open tab.
    */
   singleTab?: boolean
 }
@@ -74,7 +76,13 @@ export async function browserDriver(opts: BrowserDriverOptions): Promise<SqliteD
   let release: (() => void) | null = () => {}
   if (opts.singleTab !== false) {
     release = await acquireTabLock(opts.name)
-    if (!release) throw new AnoDBError('tab-locked', 'This app is already open in another tab.')
+    if (!release)
+      throw new AnoDBError(
+        'tab-locked',
+        forwardLinkToOtherTab()
+          ? 'This app is already open in another tab. The link was sent there — switch to that tab.'
+          : 'This app is already open in another tab.',
+      )
   }
   try {
     const SQL = await loadSqlJs(opts.assetsUrl)

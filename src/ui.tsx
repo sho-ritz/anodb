@@ -16,6 +16,7 @@
 import qrcode from 'qrcode-generator'
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Role } from './membership.js'
+import { LINK_CHANNEL } from './links.js'
 import { useAnoDB } from './react.js'
 import type { Device, Invitation, JoinRequest, Member } from './sharing.js'
 import type { SpaceInfo } from './db.js'
@@ -82,7 +83,10 @@ const en = {
   inviteLink: 'Invite link',
   yourName: 'Your name (shown to the admin)',
   requestJoin: 'Request to join',
-  requested: 'Request sent. You join as soon as an admin approves it.',
+  requested: 'Request sent. Waiting for the person who invited you to approve it — they need to have the app open. Keep this page open: you join automatically.',
+  invitedTitle: 'You were invited to a shared list',
+  awaitingApproval: 'Waiting for approval',
+  invitedBody: 'Enter the name the others will see, then send a request. The person who invited you approves it, and the list appears here.',
   joined: 'Joined',
   invitations: 'Invitations',
   accept: 'Accept',
@@ -130,7 +134,10 @@ const ja: Labels = {
   inviteLink: '招待リンク',
   yourName: 'あなたの名前（管理者に表示されます）',
   requestJoin: '参加をリクエスト',
-  requested: 'リクエストを送りました。管理者が承認すると参加できます。',
+  requested: 'リクエストを送りました。招待した人の承認を待っています（相手がアプリを開いている必要があります）。このページを開いたままにしてください。承認されると自動で参加します。',
+  invitedTitle: '共有リストに招待されています',
+  awaitingApproval: '承認待ち',
+  invitedBody: 'ほかのメンバーに表示する名前を入力して、リクエストを送ってください。招待した人が承認すると、ここにリストが表示されます。',
   joined: '参加しました',
   invitations: '招待',
   accept: '参加する',
@@ -226,7 +233,20 @@ export function useIncomingLink(kind: 'pair' | 'join'): [string | null, () => vo
     }
     read()
     window.addEventListener('hashchange', read)
-    return () => window.removeEventListener('hashchange', read)
+    // A link opened in another tab while this one holds the database (see browserDriver).
+    const ch = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(LINK_CHANNEL) : null
+    if (ch)
+      ch.onmessage = (e: MessageEvent<{ href?: unknown }>) => {
+        const l = typeof e.data?.href === 'string' ? parseAppLink(e.data.href) : null
+        if (!l || parseAppLink(location.href) === l) return
+        // Put it in this page's URL so every useIncomingLink (including ones mounted later) sees it.
+        history.replaceState(null, '', `${location.pathname}${location.search}#anodb=${encodeURIComponent(l)}`)
+        window.dispatchEvent(new HashChangeEvent('hashchange'))
+      }
+    return () => {
+      window.removeEventListener('hashchange', read)
+      ch?.close()
+    }
   }, [kind])
   const clear = useCallback(() => {
     setLink(null)
@@ -629,15 +649,17 @@ export function JoinSpace(props: JoinSpaceProps) {
 
   return (
     <section className={props.className ?? 'anodb-join'} style={col}>
-      <h3 style={{ margin: 0 }}>{l.join}</h3>
+      <h3 style={{ margin: 0 }}>{sent ? l.awaitingApproval : incoming ? l.invitedTitle : l.join}</h3>
+      {incoming && !sent && <p className="anodb-hint" style={{ margin: 0 }}>{l.invitedBody}</p>}
       <form
-        style={col}
+        style={sent ? { display: 'none' } : col}
         onSubmit={(e) => {
           e.preventDefault()
           const uri = parseAppLink(text)
           if (!uri?.startsWith('anodb://join')) return setError(l.invalidLink)
           before.current = new Set(spaces)
-          void run(db.requestJoin(uri, name.trim())).then(() => {
+          void run(db.requestJoin(uri, name.trim()).then(() => true)).then((ok) => {
+            if (!ok) return
             setSent(true)
             setText('')
             clearIncoming()
@@ -650,7 +672,11 @@ export function JoinSpace(props: JoinSpaceProps) {
           <button className="anodb-button">{l.requestJoin}</button>
         </div>
       </form>
-      {sent && <span className="anodb-hint">{l.requested}</span>}
+      {sent && (
+        <span className="anodb-hint" role="status">
+          {l.requested}
+        </span>
+      )}
       <ErrorText error={error} />
       <Invitations {...props} />
     </section>

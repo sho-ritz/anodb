@@ -430,7 +430,7 @@ export function DBProvider({ children, fallback = null }${ts ? ': { children: Re
   }, [])
   if (error) {
     const code = (error${ts ? ' as { code?: string }' : ''}).code
-    return <p>{code === 'tab-locked' ? 'This app is already open in another tab.' : \`Could not open the database: \${error.message}\`}</p>
+    return <p>{code === 'tab-locked' ? error.message : \`Could not open the database: \${error.message}\`}</p>
   }
   if (!db) return fallback
   return <AnoDBProvider db={db}>{children}</AnoDBProvider>
