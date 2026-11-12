@@ -1,7 +1,7 @@
 import { decodeHlc } from './hlc.js'
 import type { Change } from './protocol.js'
 import { PUBLIC_SPACE, presetOf } from './public-tables.js'
-import { SYS_CREATED, SYS_DELETED, createTableSql, quoteIdent, tableFingerprint, toSql } from './schema.js'
+import { SYS_CREATED, SYS_DELETED, createTableSql, ownerOfRow, quoteIdent, tableFingerprint, toSql } from './schema.js'
 import type { NostrEvent, SchemaDefinition, SqlValue, SqliteDriver } from './types.js'
 
 const INTERNAL_SCHEMA = `
@@ -91,6 +91,8 @@ export class Store {
     this.#ensureColumn('anodb_raw', 'relay', 'INTEGER NOT NULL DEFAULT 1')
     this.#ensureColumn('anodb_outbox', 'hold_until', 'INTEGER NOT NULL DEFAULT 0')
     this.#ensureColumn('anodb_messages', 'inner', "TEXT NOT NULL DEFAULT ''")
+    // identity whose signed change set the cell (null for cells from older versions)
+    this.#ensureColumn('anodb_cells', 'by', 'TEXT')
   }
 
   /** Add a column created by a newer version (CREATE TABLE IF NOT EXISTS does not alter tables). */
@@ -149,17 +151,17 @@ export class Store {
 
   // ---- schema / projections ------------------------------------------------
 
-  applySchema(schema: SchemaDefinition, defaultSpace: string): void {
+  applySchema(schema: SchemaDefinition, defaultSpace: string, owner?: string): void {
     this.#schema = schema
     this.transaction(() => {
       for (const [table, def] of Object.entries(schema)) {
         const preset = presetOf(def)
         const space = preset ? PUBLIC_SPACE : defaultSpace
-        const fp = `${tableFingerprint(def)}|${space}|${preset ? preset.kind : ''}`
+        const fp = `${tableFingerprint(def)}|${space}|${preset ? preset.kind : ''}|${owner ?? ''}`
         const key = `schema:${table}`
         if (this.getMeta(key) === fp) continue
         this.#db.exec(`DROP TABLE IF EXISTS ${quoteIdent(table)}`)
-        this.#db.exec(createTableSql(table, def, space))
+        this.#db.exec(createTableSql(table, def, space, preset ? undefined : owner))
         const rows = this.#db.all<{ space: string; row_id: string }>('SELECT DISTINCT space, row_id FROM anodb_cells WHERE tbl = ?', [table])
         for (const r of rows) this.#project(r.space, table, r.row_id)
         this.setMeta(key, fp)
@@ -167,19 +169,25 @@ export class Store {
     })
   }
 
-  /** LWW merge. Returns tables whose visible state may have changed. Run inside `transaction`. */
-  applyChanges(space: string, changes: readonly Change[]): Set<string> {
+  /**
+   * LWW merge. `by` is the identity that signed the changes (a snapshot cell may carry its own as a
+   * 6th element). Returns tables whose visible state may have changed. Run inside `transaction`.
+   */
+  applyChanges(space: string, changes: readonly Change[], by?: string): Set<string> {
     const dirty = new Map<string, Set<string>>()
-    for (const [table, rowId, column, value, hlc] of changes) {
+    for (const c of changes) {
+      const [table, rowId, column, value, hlc] = c
+      const cellBy = (c as readonly unknown[])[5]
+      const writer = typeof cellBy === 'string' && /^[0-9a-f]{64}$/.test(cellBy) ? cellBy : (by ?? null)
       const current = this.#db.all<{ hlc: string }>(
         'SELECT hlc FROM anodb_cells WHERE space = ? AND tbl = ? AND row_id = ? AND col = ?',
         [space, table, rowId, column],
       )[0]
       if (current && current.hlc >= hlc) continue
       this.#db.run(
-        `INSERT INTO anodb_cells (space, tbl, row_id, col, value, hlc) VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(space, tbl, row_id, col) DO UPDATE SET value = excluded.value, hlc = excluded.hlc`,
-        [space, table, rowId, column, JSON.stringify(value ?? null), hlc],
+        `INSERT INTO anodb_cells (space, tbl, row_id, col, value, hlc, by) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(space, tbl, row_id, col) DO UPDATE SET value = excluded.value, hlc = excluded.hlc, by = excluded.by`,
+        [space, table, rowId, column, JSON.stringify(value ?? null), hlc, writer],
       )
       let rows = dirty.get(table)
       if (!rows) dirty.set(table, (rows = new Set()))
@@ -191,14 +199,14 @@ export class Store {
     return new Set(dirty.keys())
   }
 
-  /** All current cells of a space (for snapshots). */
+  /** All current cells of a space (for snapshots), with the signing identity as a 6th element when known. */
   cells(space: string): Change[] {
     return this.#db
-      .all<{ tbl: string; row_id: string; col: string; value: string; hlc: string }>(
-        'SELECT tbl, row_id, col, value, hlc FROM anodb_cells WHERE space = ? ORDER BY tbl, row_id, col',
+      .all<{ tbl: string; row_id: string; col: string; value: string; hlc: string; by: string | null }>(
+        'SELECT tbl, row_id, col, value, hlc, by FROM anodb_cells WHERE space = ? ORDER BY tbl, row_id, col',
         [space],
       )
-      .map((c) => [c.tbl, c.row_id, c.col, JSON.parse(c.value), c.hlc] as const)
+      .map((c) => (c.by ? [c.tbl, c.row_id, c.col, JSON.parse(c.value), c.hlc, c.by] : [c.tbl, c.row_id, c.col, JSON.parse(c.value), c.hlc]) as unknown as Change)
   }
 
   /** Drop all cells of a space and its projected rows. Run inside `transaction`. */
@@ -212,15 +220,19 @@ export class Store {
   #project(space: string, table: string, rowId: string): void {
     const def = this.#schema[table]
     if (!def) return // kept in cells; projected once the schema knows the table
-    const cells = this.#db.all<{ col: string; value: string; hlc: string }>(
-      'SELECT col, value, hlc FROM anodb_cells WHERE space = ? AND tbl = ? AND row_id = ?',
+    const cells = this.#db.all<{ col: string; value: string; hlc: string; by: string | null }>(
+      'SELECT col, value, hlc, by FROM anodb_cells WHERE space = ? AND tbl = ? AND row_id = ?',
       [space, table, rowId],
     )
     const values = new Map<string, unknown>()
     let maxHlc = ''
+    let updatedBy: string | null = null
     for (const c of cells) {
       values.set(c.col, JSON.parse(c.value))
-      if (c.hlc > maxHlc) maxHlc = c.hlc
+      if (c.hlc > maxHlc) {
+        maxHlc = c.hlc
+        updatedBy = c.by
+      }
     }
     if (values.get(SYS_DELETED) === true || cells.length === 0) {
       this.#db.run(`DELETE FROM ${quoteIdent(table)} WHERE space = ? AND id = ?`, [space, rowId])
@@ -234,8 +246,10 @@ export class Store {
       ...cols.map((c) => toSql(def[c]!, values.get(c))),
       typeof created === 'number' ? created : null,
       decodeHlc(maxHlc).millis,
+      ownerOfRow(rowId),
+      updatedBy,
     ]
-    const names = ['space', 'id', ...cols, 'createdAt', 'updatedAt'].map(quoteIdent).join(', ')
+    const names = ['space', 'id', ...cols, 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'].map(quoteIdent).join(', ')
     this.#db.run(`INSERT OR REPLACE INTO ${quoteIdent(table)} (${names}) VALUES (${params.map(() => '?').join(', ')})`, params)
   }
 

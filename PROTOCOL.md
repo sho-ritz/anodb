@@ -69,6 +69,21 @@ System columns: `$deleted` (`true` = tombstone), `$createdAt` (ms). Changes are 
 signing identity is authorized (§5) for that device and sequence number; unauthorized messages are
 kept and re-evaluated whenever membership changes.
 
+### 4.1 Row ownership
+
+A row id of the form `<identity hex>` or `<identity hex>-<1–63 of [A-Za-z0-9_]>` is **owned** by that
+identity. Every device applies this rule to each change, using the identity that signed it:
+
+| change by | owned by signer | owned by someone else | not owned |
+|---|---|---|---|
+| `$createdAt` | ✓ | ✗ | ✓ |
+| data cell | ✓ | ✗ (✓ in tables the app marks shared) | ✓ |
+| `$deleted` | ✓ | owner / admin only (✓ in shared tables) | ✓ |
+
+Refused changes are ignored, not stored as state. Implementations create ids as
+`<own identity>-<16 hex random>` by default, expose the owner as `createdBy` and the signer of the
+newest cell as `updatedBy`. Tables unknown to an implementation follow the owned rule.
+
 ## 5. Spaces and membership
 
 Every row belongs to a space; a user's personal data is a space whose only member is the user.
@@ -122,7 +137,10 @@ epoch.
 ### 5.4 Snapshots (`t: "snap"`)
 
 Parts `i/n` with `body: { ops?: [inner…], cells?: [change…] }`. Rows that are deleted carry only their
-`$deleted` cell. A complete snapshot from an authorized writer is merged like ordinary changes.
+`$deleted` cell. A cell may carry the identity that signed it as a 6th element. A snapshot restates
+other members' rows, so a complete snapshot is merged only if its author is the **owner or an
+admin** of the space (or the receiving identity itself, for its own new devices); cells that name a
+signer must still pass §4.1 for that signer.
 New members and newly paired devices receive keys for the **new** epoch only and catch up from
 snapshots.
 

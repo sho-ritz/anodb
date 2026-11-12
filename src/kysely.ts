@@ -29,6 +29,10 @@ export type KyselyTable<D extends TableDefinition> = {
   id: ColumnType<string, string | undefined, never>
   createdAt: ColumnType<number | null, never, never>
   updatedAt: ColumnType<number, never, never>
+  /** Identity (pubkey) that created the row, from the row id — cannot be forged. Null for rows with custom ids. */
+  createdBy: ColumnType<string | null, never, never>
+  /** Identity whose signed change last touched the row. */
+  updatedBy: ColumnType<string | null, never, never>
 } & { [K in Exclude<keyof D, symbol>]: ColumnType<SelectTs<D[K]> | null, WriteTs<D[K]> | null | undefined, WriteTs<D[K]> | null> }
 
 export type KyselyDatabase<S extends SchemaDefinition> = { -readonly [T in keyof S]: KyselyTable<S[T]> }

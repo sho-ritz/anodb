@@ -30,6 +30,7 @@ import {
   parseOp,
 } from './membership.js'
 import { type Change, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, parseInboxPayload, parseStreamPayload } from './protocol.js'
+import { changeAllowed } from './policy.js'
 import { SYS_DELETED } from './schema.js'
 import type { IngestResult } from './sync.js'
 import type { NostrEvent, SchemaDefinition } from './types.js'
@@ -135,10 +136,19 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return mayWrite(this.membership(space), identity, device, seq)
   }
 
+  protected override roleOf(space: string, identity: string): Role | undefined {
+    return this.membership(space).roles.get(identity)
+  }
+
   protected override rebuildSpace(space: string): Set<string> {
     const touched = super.rebuildSpace(space)
     for (const snap of this.#completeSnapshots(space)) {
-      for (const t of this.store.applyChanges(space, snap.cells)) touched.add(t)
+      // Cells that name their signer must still pass the row rule for that signer.
+      const cells = snap.cells.filter((c) => {
+        const by = (c as readonly unknown[])[5]
+        return typeof by !== 'string' || changeAllowed(this.schema, c, by, this.roleOf(space, by))
+      })
+      for (const t of this.store.applyChanges(space, cells)) touched.add(t)
     }
     return touched
   }
@@ -311,14 +321,21 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       const n = parts[0]!.n
       if (parts.length !== n || new Set(parts.map((p) => p.i)).size !== n || parts.some((p) => p.n !== n)) continue
       const last = Math.max(...parts.map((p) => p.seq))
-      if (!this.isAuthorizedWriter(space, parts[0]!.identity, parts[0]!.device, last)) continue
+      const author = parts[0]!.identity
+      if (!this.isAuthorizedWriter(space, author, parts[0]!.device, last)) continue
+      // A snapshot restates every cell, including other members' rows, so it is only trusted from
+      // someone who may manage the space (owner / admin) — or from this identity's own devices.
+      // A plain writer's snapshot could otherwise rewrite or impersonate anyone's rows.
+      const role = this.roleOf(space, author)
+      if (author !== this.pubkey && role !== 'owner' && role !== 'admin') continue
       const cells = parts.flatMap((p) => (Array.isArray(p.body?.cells) ? (p.body.cells as Change[]) : []))
       const h = parts.find((p) => p.i === 0)?.body as { heads?: unknown } | undefined
       const heads: Record<string, number> = {}
       if (h?.heads && typeof h.heads === 'object') {
         for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
       }
-      out.push({ cells: cells.filter((c) => Array.isArray(c) && c.length === 5), heads })
+      const valid = (c: unknown) => Array.isArray(c) && (c.length === 5 || (c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5])))
+      out.push({ cells: cells.filter(valid), heads })
     }
     return out
   }
@@ -330,7 +347,8 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   #maybeSnapshot(space: string): void {
     const since = Number(this.store.getMeta(`snap:${space}`) ?? '0')
     if (this.store.countMessages(space, 'ch', since) < SNAPSHOT_EVERY) return
-    if (!canWrite(this.membership(space).roles.get(this.pubkey))) return
+    const role = this.membership(space).roles.get(this.pubkey)
+    if (role !== 'owner' && role !== 'admin') return // others would not trust it (see #completeSnapshots)
     this.snapshot(space)
   }
 

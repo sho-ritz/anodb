@@ -16,7 +16,7 @@ anoDB is a decentralized, local-first database SDK that treats on-device SQLite 
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.8 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.9 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -29,6 +29,7 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
 - 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
+- 🔏 **Row ownership** — rows belong to their creator: others can’t edit, delete or impersonate them (checked on every device); `createdBy` / `updatedBy` come from signatures. `shared()` tables for collaboration.
 - ⚛️ **React** — `useQuery`, `useSyncStatus`, and ready-made `<PairDevice />`, `<InviteLink />`, `<JoinSpace />`, `<Members />` components.
 
 ## Get started
@@ -153,6 +154,21 @@ await db.setRole(family, who, 'reader')
 await db.removeMember(family, who)
 ```
 
+- **Rows belong to the member who created them.** Others can't edit or delete them, and can't
+  create rows in someone else's name. Every device enforces this when it applies a change, so a
+  modified client gets nowhere. Admins and the owner may delete (moderate) but not edit. Each
+  row has `createdBy` and `updatedBy` (identities taken from signatures, read-only). Mark
+  collaborative tables with `shared(...)` so that any writer can change any row:
+
+  ```ts
+  import { defineSchema, shared } from '@anodb/core'
+  defineSchema({
+    messages: { text: 'text' },                          // only the author can edit / delete
+    items: shared({ title: 'text', done: 'boolean' }),   // anyone in the space can tick items
+  })
+  // "one row per member" pattern: use your identity as the id — only you can write it
+  await db.insertInto('profiles').values({ id: db.pubkey, name: 'Taro', space }).execute()
+  ```
 - New members receive **only a snapshot of the current state** — no edit history and no deleted content.
 - Group keys rotate on member removal, device revocation, member addition and every 30 days.
 - After removal, writes beyond each device's sequence-number cut-off are rejected (backdating does not help).

@@ -1,12 +1,39 @@
 import type { ColumnType, JsonColumn, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
 
 const IDENT = /^[A-Za-z][A-Za-z0-9_]*$/
-export const RESERVED_COLUMNS = new Set(['id', 'space', 'createdAt', 'updatedAt', 'isDeleted'])
+export const RESERVED_COLUMNS = new Set(['id', 'space', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'isDeleted'])
 const COLUMN_TYPES = new Set<ColumnType>(['text', 'integer', 'real', 'boolean', 'json'])
 
 /** System cells. They travel in the change log like user cells. */
 export const SYS_DELETED = '$deleted'
 export const SYS_CREATED = '$createdAt'
+
+/**
+ * Row ownership. A row id that starts with an identity (`<64 hex pubkey>` or `<pubkey>-<suffix>`) is
+ * owned by that identity: only the owner may create it or change its cells, and only the owner or
+ * an admin / owner of the space may delete it. Every device checks this when it applies a change,
+ * so a member cannot edit, delete or impersonate someone else's rows. Default ids are owned by the
+ * writer. Ids without that prefix (older data, custom ids) are not owned and any writer may edit them.
+ */
+const OWNED_ID = /^([0-9a-f]{64})(?:-[A-Za-z0-9_]{1,63})?$/
+export const ownerOfRow = (rowId: string): string | null => OWNED_ID.exec(rowId)?.[1] ?? null
+
+const SHARED: unique symbol = Symbol.for('anodb.shared')
+
+/**
+ * Mark a table as shared: any writer of the space may change any row (a shared shopping list,
+ * a kanban board). Without it rows can only be changed by the member who created them.
+ *
+ *   defineSchema({ items: shared({ title: 'text', done: 'boolean' }) })
+ */
+export function shared<const T extends TableDefinition>(def: T): T {
+  return Object.assign({ ...def }, { [SHARED]: true }) as T
+}
+
+export const isShared = (def: TableDefinition | undefined): boolean => !!def && (def as { [SHARED]?: boolean })[SHARED] === true
+
+/** Bump to rebuild every projection (new system columns). */
+const PROJECTION_VERSION = 2
 
 /**
  * A `json` column with a TypeScript type for its value (reads return the parsed value):
@@ -47,16 +74,17 @@ const SQL_TYPE: Record<ColumnType, string> = {
   json: 'TEXT',
 }
 
-export function createTableSql(table: string, def: TableDefinition, defaultSpace: string): string {
+export function createTableSql(table: string, def: TableDefinition, defaultSpace: string, owner?: string): string {
   const cols = Object.entries(def).map(([c, t]) => `${quoteIdent(c)} ${SQL_TYPE[t]}`)
   const space = `space TEXT NOT NULL DEFAULT '${defaultSpace.replaceAll("'", "''")}'`
-  const id = 'id TEXT NOT NULL DEFAULT (lower(hex(randomblob(16))))'
-  return `CREATE TABLE ${quoteIdent(table)} (${[space, id, ...cols, '"createdAt" INTEGER', '"updatedAt" INTEGER NOT NULL DEFAULT 0', 'PRIMARY KEY (space, id)'].join(', ')})`
+  // New rows are owned by the writer: <pubkey>-<random>.
+  const id = owner && /^[0-9a-f]{64}$/.test(owner) ? `id TEXT NOT NULL DEFAULT ('${owner}-' || lower(hex(randomblob(8))))` : 'id TEXT NOT NULL DEFAULT (lower(hex(randomblob(16))))'
+  return `CREATE TABLE ${quoteIdent(table)} (${[space, id, ...cols, '"createdAt" INTEGER', '"updatedAt" INTEGER NOT NULL DEFAULT 0', '"createdBy" TEXT', '"updatedBy" TEXT', 'PRIMARY KEY (space, id)'].join(', ')})`
 }
 
 /** Stable fingerprint of a table definition; projection is rebuilt when it changes. */
 export function tableFingerprint(def: TableDefinition): string {
-  return JSON.stringify(Object.entries(def).sort(([a], [b]) => (a < b ? -1 : 1)))
+  return `v${PROJECTION_VERSION}|${isShared(def) ? 'shared' : 'owned'}|${JSON.stringify(Object.entries(def).sort(([a], [b]) => (a < b ? -1 : 1)))}`
 }
 
 /** Validate a user value against the column type. Returns the JSON-safe wire value. */

@@ -22,7 +22,7 @@ import {
 import { DEFAULT_RELAYS } from './defaults.js'
 import { Clock } from './hlc.js'
 import { createDelegation, isEvent, verifyDelegation } from './identity.js'
-import { spaceIdFor } from './membership.js'
+import { type Role, spaceIdFor } from './membership.js'
 import { browserKeyStore } from './keystore/browser.js'
 import { envKeyStore } from './keystore/env.js'
 import type { KeyStore } from './keystore/types.js'
@@ -32,6 +32,7 @@ import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLeng
 import type { P2POptions } from './p2p.js'
 import { PublicData } from './public.js'
 import { presetOf } from './public-tables.js'
+import { changeAllowed, policyMessage } from './policy.js'
 import { RelayPool, type RelayPoolOptions } from './relay-pool.js'
 import { SYS_CREATED, SYS_DELETED, validateSchema } from './schema.js'
 import { type Signer, localSigner } from './signer.js'
@@ -308,7 +309,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Switch the default (personal) space; rebuilds projections and their capture triggers. */
   protected setPersonal(space: string): void {
     this.personal = space
-    this.store.applySchema(this.schema, space)
+    this.store.applySchema(this.schema, space, this.pubkey)
     installCapture(this.store.driver, this.schema)
   }
 
@@ -444,13 +445,16 @@ export class AnoDBCore<S extends SchemaDefinition> {
       else value = fromCaptured(c.table, c.column, def[c.column]!, c.value)
       let list = bySpace.get(c.space)
       if (!list) bySpace.set(c.space, (list = []))
-      list.push([c.table, c.rowId, c.column, value, this.clock.tick()])
+      const change: Change = [c.table, c.rowId, c.column, value, this.clock.tick()]
+      // Same row-level rule every other device applies: refuse here instead of sending a change they would drop.
+      if (!changeAllowed(this.schema, change, this.pubkey, this.roleOf(c.space, this.pubkey))) throw new AnoDBError('unauthorized', policyMessage(change))
+      list.push(change)
       touched.add(c.table)
     }
     await this.gate.idle()
     this.store.transaction(() => {
       for (const [space, changes] of bySpace) {
-        this.store.applyChanges(space, changes)
+        this.store.applyChanges(space, changes, this.pubkey)
         for (const batch of splitChanges(changes)) this.sendToSpace(space, 'ch', { c: batch })
       }
       this.store.setMeta('hlc', this.clock.current())
@@ -715,7 +719,18 @@ export class AnoDBCore<S extends SchemaDefinition> {
     for (const c of p.c) if (c[4] > maxHlc) maxHlc = c[4]
     if (maxHlc) this.clock.receive(maxHlc)
     this.store.setMeta('hlc', this.clock.current())
-    return this.store.applyChanges(space, p.c)
+    return this.store.applyChanges(space, this.allowedChanges(space, identity, p.c), identity)
+  }
+
+  /** The changes of one signed message that pass the row-level rule (see policy.ts). */
+  protected allowedChanges(space: string, identity: string, changes: readonly Change[]): Change[] {
+    const role = this.roleOf(space, identity)
+    return changes.filter((c) => changeAllowed(this.schema, c, identity, role))
+  }
+
+  /** Role of an identity in a space (v0.2: the creator is the only member). */
+  protected roleOf(space: string, identity: string): Role | undefined {
+    return this.isAuthorizedWriter(space, identity, '', Number.MAX_SAFE_INTEGER) ? 'owner' : undefined
   }
 
   readonly #ownerCache = new Map<string, string | null>()
@@ -743,7 +758,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     for (const m of this.store.messages(space, 'ch')) {
       if (!this.isAuthorizedWriter(space, m.identity, m.device, m.seq)) continue
       const p = JSON.parse(m.payload) as { c: Change[] }
-      for (const t of this.store.applyChanges(space, p.c)) touched.add(t)
+      for (const t of this.store.applyChanges(space, this.allowedChanges(space, m.identity, p.c), m.identity)) touched.add(t)
     }
     return touched
   }
