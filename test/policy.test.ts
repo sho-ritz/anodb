@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { defineSchema, shared } from '../src/index.js'
+import { defineSchema, owned } from '../src/index.js'
 import { until } from './helpers/mock-relay.js'
 import { open, relay, sleep } from './helpers/setup.js'
 
 const schema = defineSchema({
-  messages: { text: 'text' },
-  items: shared({ title: 'text', done: 'boolean' }),
+  messages: owned({ text: 'text' }),
+  items: { title: 'text', done: 'boolean' },
 })
 type DB = Awaited<ReturnType<typeof open<typeof schema>>>
 
@@ -35,7 +35,7 @@ async function room() {
   return { owner, alice, bob, space }
 }
 
-describe('row ownership (createdBy / updatedBy and the row rule)', () => {
+describe('owned() tables (createdBy / updatedBy and the row rule)', () => {
   it('fills createdBy / updatedBy from signatures and ids are owned by the writer', async () => {
     const { alice, bob, space } = await room()
     await alice.insertInto('messages').values({ text: 'hi from alice', space }).execute()
@@ -85,7 +85,7 @@ describe('row ownership (createdBy / updatedBy and the row rule)', () => {
     await until(async () => (await texts(alice, space)).length === 0, 4000, 'moderated')
   })
 
-  it('shared() tables stay editable by every writer, with updatedBy telling who', async () => {
+  it('plain tables are editable by every writer, with updatedBy telling who', async () => {
     const { alice, bob, space } = await room()
     await alice.insertInto('items').values({ title: 'milk', done: false, space }).execute()
     await until(async () => (await bob.selectFrom('items').selectAll().execute()).length === 1, 4000, 'delivery')
@@ -106,5 +106,14 @@ describe('row ownership (createdBy / updatedBy and the row rule)', () => {
     b.snapshot(space)
     await sleep(1000)
     for (const d of [owner, alice]) expect((await texts(d, space)).map((m) => m.text)).toEqual(['real'])
+  })
+
+  it('plain tables still refuse rows created in someone else’s name', async () => {
+    const { owner, alice, bob, space } = await room()
+    await expect(bob.insertInto('items').values({ id: `${alice.pubkey}-fake`, title: 'by alice?', space }).execute()).rejects.toMatchObject({ code: 'unauthorized' })
+    // Without $createdAt the row is never born, even if its other cells are accepted.
+    forge(bob, space, [['items', `${alice.pubkey}-fake`, 'title', 'by alice?']])
+    await sleep(800)
+    for (const d of [owner, alice]) expect(await d.selectFrom('items').selectAll().execute()).toEqual([])
   })
 })

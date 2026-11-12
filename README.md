@@ -16,20 +16,21 @@ anoDB is a decentralized, local-first database SDK that treats on-device SQLite 
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync, sharing with other people, and reading/writing public Nostr data are available through a single type-safe, SQL-like API.
 
-> **Status: v0.9 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.10 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
 - 📴 **Offline-first** — Writes commit immediately to local SQLite. The network catches up later.
 - 🧾 **Type-safe SQL** — A [Kysely](https://kysely.dev) query builder with JOINs, plus raw SQL writes (`UPDATE … LIKE`, `INSERT … SELECT`, upserts) that are captured and synced.
-- 👥 **Sharing** — Spaces with owner / admin / writer / reader roles, invitations by npub or one-time links, removal with cut-offs, key rotation.
-- 🔐 **Secure by default** — Writes are signed by per-device keys, keys are stored encrypted, relays see only throwaway pubkeys and rotating tags, and new members never see deleted history.
+- 🗃️ **A plain database by default** — every user of your app reads and writes the same tables, no invites, no rules to set up (like Postgres without RLS).
+- 👥 **Private data when you want it** — an end-to-end encrypted personal space per user, and invite-only spaces with owner / admin / writer / reader roles, invitations by npub or one-time links, removal with cut-offs, key rotation.
+- 🔐 **Signed and encrypted** — Writes are signed by per-device keys, keys are stored encrypted, relays see only throwaway pubkeys and rotating tags, and new members of a space never see deleted history.
 - 🔀 **Deterministic merging** — Cell-level Last-Writer-Wins with Hybrid Logical Clocks; tolerant of out-of-order delivery, duplicates and retries.
 - ⚡ **Direct device-to-device sync** — Your devices connect over WebRTC ([nostr-p2p](https://github.com/sho-ritz/nostr-p2p)) and exchange changes in tens of milliseconds; relays remain the store for offline devices.
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 🌐 **Nostr tables** — Profiles, notes, follows, reactions and long-form articles as SQL tables, readable and writable by any Nostr client.
 - 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
-- 🔏 **Row ownership** — rows belong to their creator: others can’t edit, delete or impersonate them (checked on every device); `createdBy` / `updatedBy` come from signatures. `shared()` tables for collaboration.
+- 🔏 **Opt-in row rules** — `createdBy` / `updatedBy` come from signatures and can’t be forged; mark a table `owned()` so only a row’s creator can edit it (checked on every device).
 - ⚛️ **React** — `useQuery`, `useSyncStatus`, and ready-made `<PairDevice />`, `<InviteLink />`, `<JoinSpace />`, `<Members />` components.
 
 ## Get started
@@ -119,7 +120,7 @@ await db.transaction().execute(async (tx) => {
 const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(rows))
 ```
 
-- Every table gets `id`, `space`, `createdAt` and `updatedAt` (`space` defaults to your personal space).
+- Every table gets `id`, `space`, `createdAt`, `updatedAt`, `createdBy` and `updatedBy` (`space` defaults to the app space, see below).
 - `boolean` columns read as `true / false` and `json` columns as parsed values (also through JOINs, aliases and live queries). Raw SQL strings (`db.execute`) return plain SQLite values.
 
 ### Keys (most secure defaults)
@@ -134,6 +135,46 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 - With `identity: 'recovery'`, the identity key is handed to `onRecoveryKey` once and never stored on the device.
 - External signers: `signer: nip07Signer() | nip46Signer(uri) | nip55Signer(bridge)`.
 - Relays see only throwaway pubkeys, per-epoch tags, times and sizes (`metadataProtection: 'none'` turns this off for allow-listed relays).
+
+## Where data lives
+
+| Space | Who can read | Who can write | Use it for |
+|---|---|---|---|
+| **App space** (default, `db.appSpace`) | everyone who runs your appId | everyone | data that is meant to be public: a bulletin board, a public catalog, leaderboards |
+| **Personal space** (`db.personalSpace`) | your own devices | your own devices | private notes, settings, drafts |
+| **Shared spaces** (`db.createSpace`) | invited members | owner / admin / writer | a family list, a team, a chat room |
+
+```ts
+await db.insertInto('todo').values({ title: 'Seen by every user' }).execute()                         // app space
+await db.insertInto('todo').values({ title: 'Only my devices', space: db.personalSpace }).execute()   // encrypted
+// private by default instead: createAnoDB({ appId, schema, driver, defaultSpace: 'personal' })
+```
+
+> ⚠ The app space is **public**: its key is derived from the appId, which ships in your app's code.
+> Use a unique appId (e.g. `com.example.todo`) — apps with the same appId share the same database.
+> Like a database without row-level security, anyone can also change or delete any row there
+> unless the table is `owned()`.
+
+### Owned tables (opt-in row rule)
+
+By default any writer may change or delete any row. In an `owned(...)` table only the member who
+created a row can change it; deleting is also allowed for admins and the owner of a shared space
+(moderation), but they can't edit it. Every device enforces this when it applies a change, so a
+modified client gets nowhere.
+
+```ts
+import { defineSchema, owned } from '@anodb/core'
+defineSchema({
+  todo: { title: 'text', done: 'boolean' },   // anyone can tick items
+  messages: owned({ text: 'text' }),          // only the author can edit / delete
+  profiles: owned({ name: 'text' }),
+})
+// "one row per member": use your identity as the id — in an owned table only you can write it
+await db.insertInto('profiles').values({ id: db.pubkey, name: 'Taro' }).execute()
+```
+
+In every table, `createdBy` / `updatedBy` are taken from signatures (read-only), and nobody can
+create a row whose id names someone else.
 
 ## Sharing (spaces)
 
@@ -154,21 +195,6 @@ await db.setRole(family, who, 'reader')
 await db.removeMember(family, who)
 ```
 
-- **Rows belong to the member who created them.** Others can't edit or delete them, and can't
-  create rows in someone else's name. Every device enforces this when it applies a change, so a
-  modified client gets nowhere. Admins and the owner may delete (moderate) but not edit. Each
-  row has `createdBy` and `updatedBy` (identities taken from signatures, read-only). Mark
-  collaborative tables with `shared(...)` so that any writer can change any row:
-
-  ```ts
-  import { defineSchema, shared } from '@anodb/core'
-  defineSchema({
-    messages: { text: 'text' },                          // only the author can edit / delete
-    items: shared({ title: 'text', done: 'boolean' }),   // anyone in the space can tick items
-  })
-  // "one row per member" pattern: use your identity as the id — only you can write it
-  await db.insertInto('profiles').values({ id: db.pubkey, name: 'Taro', space }).execute()
-  ```
 - New members receive **only a snapshot of the current state** — no edit history and no deleted content.
 - Group keys rotate on member removal, device revocation, member addition and every 30 days.
 - After removal, writes beyond each device's sequence-number cut-off are rejected (backdating does not help).

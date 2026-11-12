@@ -9,31 +9,31 @@ export const SYS_DELETED = '$deleted'
 export const SYS_CREATED = '$createdAt'
 
 /**
- * Row ownership. A row id that starts with an identity (`<64 hex pubkey>` or `<pubkey>-<suffix>`) is
- * owned by that identity: only the owner may create it or change its cells, and only the owner or
- * an admin / owner of the space may delete it. Every device checks this when it applies a change,
- * so a member cannot edit, delete or impersonate someone else's rows. Default ids are owned by the
- * writer. Ids without that prefix (older data, custom ids) are not owned and any writer may edit them.
+ * Row ids that name their creator. Default ids are `<64 hex pubkey>-<random>`, so `createdBy` can be
+ * read from the id. Nobody can create a row whose id names someone else (checked on every device),
+ * so `createdBy` cannot be forged. Ids without that prefix (older data, custom ids) have no creator.
  */
 const OWNED_ID = /^([0-9a-f]{64})(?:-[A-Za-z0-9_]{1,63})?$/
 export const ownerOfRow = (rowId: string): string | null => OWNED_ID.exec(rowId)?.[1] ?? null
 
-const SHARED: unique symbol = Symbol.for('anodb.shared')
+const OWNED: unique symbol = Symbol.for('anodb.owned')
 
 /**
- * Mark a table as shared: any writer of the space may change any row (a shared shopping list,
- * a kanban board). Without it rows can only be changed by the member who created them.
+ * Opt-in row-level rule. By default every writer may change or delete any row (like a table
+ * without row-level security). In an `owned(...)` table only the row's creator may change it;
+ * deleting is also allowed for admins / the owner of a shared space (moderation). Every device
+ * enforces it when it applies a change, so a modified client cannot get around it.
  *
- *   defineSchema({ items: shared({ title: 'text', done: 'boolean' }) })
+ *   defineSchema({ messages: owned({ text: 'text' }) })
  */
-export function shared<const T extends TableDefinition>(def: T): T {
-  return Object.assign({ ...def }, { [SHARED]: true }) as T
+export function owned<const T extends TableDefinition>(def: T): T {
+  return Object.assign({ ...def }, { [OWNED]: true }) as T
 }
 
-export const isShared = (def: TableDefinition | undefined): boolean => !!def && (def as { [SHARED]?: boolean })[SHARED] === true
+export const isOwned = (def: TableDefinition | undefined): boolean => !!def && (def as { [OWNED]?: boolean })[OWNED] === true
 
 /** Bump to rebuild every projection (new system columns). */
-const PROJECTION_VERSION = 2
+const PROJECTION_VERSION = 3
 
 /**
  * A `json` column with a TypeScript type for its value (reads return the parsed value):
@@ -84,7 +84,7 @@ export function createTableSql(table: string, def: TableDefinition, defaultSpace
 
 /** Stable fingerprint of a table definition; projection is rebuilt when it changes. */
 export function tableFingerprint(def: TableDefinition): string {
-  return `v${PROJECTION_VERSION}|${isShared(def) ? 'shared' : 'owned'}|${JSON.stringify(Object.entries(def).sort(([a], [b]) => (a < b ? -1 : 1)))}`
+  return `v${PROJECTION_VERSION}|${isOwned(def) ? 'owned' : 'open'}|${JSON.stringify(Object.entries(def).sort(([a], [b]) => (a < b ? -1 : 1)))}`
 }
 
 /** Validate a user value against the column type. Returns the JSON-safe wire value. */

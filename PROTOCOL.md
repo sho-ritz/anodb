@@ -69,24 +69,33 @@ System columns: `$deleted` (`true` = tombstone), `$createdAt` (ms). Changes are 
 signing identity is authorized (§5) for that device and sequence number; unauthorized messages are
 kept and re-evaluated whenever membership changes.
 
-### 4.1 Row ownership
+### 4.1 Row creators and owned tables
 
-A row id of the form `<identity hex>` or `<identity hex>-<1–63 of [A-Za-z0-9_]>` is **owned** by that
-identity. Every device applies this rule to each change, using the identity that signed it:
+A row id of the form `<identity hex>` or `<identity hex>-<1–63 of [A-Za-z0-9_]>` names its
+**creator**. Every device applies this rule to each change, using the identity that signed it:
 
-| change by | owned by signer | owned by someone else | not owned |
-|---|---|---|---|
-| `$createdAt` | ✓ | ✗ | ✓ |
-| data cell | ✓ | ✗ (✓ in tables the app marks shared) | ✓ |
-| `$deleted` | ✓ | owner / admin only (✓ in shared tables) | ✓ |
+| change by | creator = signer | creator = someone else, plain table | … `owned` table | no creator in id |
+|---|---|---|---|---|
+| `$createdAt` | ✓ | ✗ | ✗ | ✓ |
+| data cell | ✓ | ✓ | ✗ | ✓ |
+| `$deleted` | ✓ | ✓ | owner / admin only | ✓ |
 
-Refused changes are ignored, not stored as state. Implementations create ids as
-`<own identity>-<16 hex random>` by default, expose the owner as `createdBy` and the signer of the
-newest cell as `updatedBy`. Tables unknown to an implementation follow the owned rule.
+Tables are plain by default (any writer may change any row, like SQL without row-level security);
+the app marks tables `owned`. A row whose id names a creator is visible only once its `$createdAt`
+cell exists, so nobody can make a row appear in someone else's name. Refused changes are ignored,
+not stored as state. Implementations create ids as `<own identity>-<16 hex random>` by default,
+expose the creator as `createdBy` and the signer of the newest cell as `updatedBy`. Tables unknown to
+an implementation follow the owned rule.
 
 ## 5. Spaces and membership
 
 Every row belongs to a space; a user's personal data is a space whose only member is the user.
+
+**App space.** `id = h32("anodb/v2/app-space/" + appId)`, `key = sha256("anodb/v2/app-key/" + appId)`
+(epoch 1, never rotated). Everyone who knows the appId can read it, and any message with a valid
+delegation (§3) is an authorized `writer`, subject to §4.1. It has no ops and no snapshots; `op` and
+`snap` messages in it are ignored. Its contents are public: the encryption only keeps relays from
+indexing plain text.
 `spaceId = hex(sha256("anodb/v2/space-id/" + owner + "/" + nonce))[0:32]`, so only the owner can
 produce the valid `create` op.
 

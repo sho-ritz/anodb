@@ -234,7 +234,10 @@ export class Store {
         updatedBy = c.by
       }
     }
-    if (values.get(SYS_DELETED) === true || cells.length === 0) {
+    // A row whose id names its creator exists only once that creator created it (others may not
+    // write its $createdAt), so edits to a plain table cannot conjure a row in someone else's name.
+    const unborn = ownerOfRow(rowId) !== null && !values.has(SYS_CREATED)
+    if (values.get(SYS_DELETED) === true || cells.length === 0 || unborn) {
       this.#db.run(`DELETE FROM ${quoteIdent(table)} WHERE space = ? AND id = ?`, [space, rowId])
       return
     }

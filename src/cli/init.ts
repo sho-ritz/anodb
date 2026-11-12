@@ -441,8 +441,10 @@ export function DBProvider({ children, fallback = null }${ts ? ': { children: Re
 export function schemaTemplate(): string {
   return `import { defineSchema } from '@anodb/core'
 
-// Each table automatically gets: id, space, createdAt, updatedAt.
+// Each table automatically gets: id, space, createdAt, updatedAt, createdBy, updatedBy.
 // Column types: 'text' | 'integer' | 'real' | 'boolean' | 'json'
+// Rows go to the app space by default: shared by every user of this appId (public, anyone can edit).
+// Private data: { space: db.personalSpace }. Only the creator may edit: owned({ ... }).
 export const schema = defineSchema({
   todo: { title: 'text', done: 'boolean' },
 })

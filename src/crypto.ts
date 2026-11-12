@@ -93,6 +93,14 @@ export const decrypt = (payload: string, convKey: Uint8Array) => nip44.decrypt(p
 
 export const sha256Hex = (s: string) => bytesToHex(sha256(utf8ToBytes(s)))
 
+/**
+ * The app space: one database shared by everyone who runs the same appId. Its id and key are
+ * derived from the appId alone, so anyone who knows the appId can read it — it is public data,
+ * encrypted only so relays do not index it as plain text.
+ */
+export const appSpaceId = (appId: string) => h32(`anodb/v2/app-space/${appId}`)
+export const appSpaceKey = (appId: string): Uint8Array => sha256(utf8ToBytes(`anodb/v2/app-key/${appId}`))
+
 const ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 /** 22-char base62 random id (~131 bits, rejection-sampled). */
 export function newId(): string {

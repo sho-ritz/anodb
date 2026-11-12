@@ -133,10 +133,14 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   }
 
   protected override isAuthorizedWriter(space: string, identity: string, device: string, seq: number): boolean {
+    // App space: anyone, except devices this device knows to be revoked (revocations are
+    // published in the identity's own spaces, so other users may not know about them).
+    if (space === this.appSpace) return !this.store.devices(identity).some((d) => d.device === device && d.revoked)
     return mayWrite(this.membership(space), identity, device, seq)
   }
 
   protected override roleOf(space: string, identity: string): Role | undefined {
+    if (space === this.appSpace) return 'writer'
     return this.membership(space).roles.get(identity)
   }
 
@@ -171,6 +175,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   /** Invite by npub / pubkey. The invitee must have published a key package. */
   async invite(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void> {
+    this.#notAppSpace(space)
     const identity = parsePubkey(who)
     const devices = await this.#fetchKeyPackage(identity)
     if (devices.length === 0) throw new Error(`anoDB: ${npubEncode(identity)} has not published a key package (db.publishKeyPackage())`)
@@ -201,6 +206,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   async #postOp(space: string, op: MemberOp): Promise<void> {
     this.assertOpen()
+    this.#notAppSpace(space)
     await this.gate.idle()
     const before = this.membership(space)
     const records = this.store.opRecords(space)
@@ -233,6 +239,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
    * invitation instead), then a snapshot of the current state is posted in the new epoch.
    */
   async rotateKey(space: string, invitees = new Map<string, string | undefined>()): Promise<void> {
+    this.#notAppSpace(space)
     this.assertOpen()
     const m = this.membership(space)
     const s = this.store.spaces().find((x) => x.id === space)
@@ -364,7 +371,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   // ---- receiving membership effects ------------------------------------------------------
 
   protected override onMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['onMessage']>[3]): Set<string> {
-    if (p.t === 'snap') {
+    if (p.t === 'snap' && space !== this.appSpace) {
       // Import portable ops carried by the snapshot, then re-evaluate everything.
       const ops = (p.body as { ops?: unknown }).ops
       if (Array.isArray(ops)) for (const o of ops) if (typeof o === 'string') this.#importInner(space, o)
@@ -376,7 +383,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   protected override afterRemoteMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['afterRemoteMessage']>[3]): void {
     this.store.putDevice(device, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
-    if (p.t !== 'op') return
+    if (p.t !== 'op' || space === this.appSpace) return
     const m = this.membership(space)
     const s = this.store.spaces().find((x) => x.id === space)
     if (s?.status === 'active' && !m.roles.has(this.pubkey) && m.owner !== null) {
@@ -561,6 +568,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   /** One-time, expiring link. Whoever opens it can only *ask* to join; an admin must approve. */
   async createInviteLink(space: string, opts: { role?: Exclude<Role, 'owner'>; expiresInMs?: number } = {}): Promise<string> {
+    this.#notAppSpace(space)
     if (!mayManage(this.membership(space), this.pubkey)) throw new Error('anoDB: only owners and admins can invite')
     const secret = randomHex(16)
     const role = opts.role ?? 'writer'
@@ -693,7 +701,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
         this.store.putDevice(device, this.pubkey, JSON.stringify(delegation), name)
         const spaces: KeyGrant[] = []
         for (const s of this.store.spaces()) {
-          if (s.status !== 'active') continue
+          if (s.status !== 'active' || s.id === this.appSpace) continue // derived from the appId
           const k = this.currentKey(s.id)
           spaces.push({ sp: s.id, name: s.name, personal: s.personal, num: k.num, key: bytesToHex(k.key), ops: this.store.inners(s.id, 'op') })
         }
@@ -744,7 +752,12 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   // ---- write permission check uses roles ---------------------------------------------------------
 
+  #notAppSpace(space: string): void {
+    if (space === this.appSpace) throw new Error('anoDB: the app space is open to every user of the app; it has no members. Create a space for invite-only data.')
+  }
+
   protected override assertCanWrite(space: string): void {
+    if (space === this.appSpace) return
     const s = this.store.spaces().find((x) => x.id === space)
     if (!s || s.status !== 'active') throw new Error(`anoDB: unknown or inactive space "${space}"`)
     if (!canWrite(this.membership(space).roles.get(this.pubkey))) throw new Error(`anoDB: no write permission in space ${space}`)
