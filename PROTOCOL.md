@@ -90,12 +90,6 @@ an implementation follow the owned rule.
 ## 5. Spaces and membership
 
 Every row belongs to a space; a user's personal data is a space whose only member is the user.
-
-**App space.** `id = h32("anodb/v2/app-space/" + appId)`, `key = sha256("anodb/v2/app-key/" + appId)`
-(epoch 1, never rotated). Everyone who knows the appId can read it, and any message with a valid
-delegation (§3) is an authorized `writer`, subject to §4.1. It has no ops and no snapshots; `op` and
-`snap` messages in it are ignored. Its contents are public: the encryption only keeps relays from
-indexing plain text.
 `spaceId = hex(sha256("anodb/v2/space-id/" + owner + "/" + nonce))[0:32]`, so only the owner can
 produce the valid `create` op.
 

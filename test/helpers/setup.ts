@@ -31,10 +31,8 @@ export async function open<const S extends SchemaDefinition>(
     driver: nodeSqlite(':memory:'),
     keyStore: memoryKeyStore(),
     relays: relays.map((r) => r.url),
-    discoveryRelays: [],
     relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },
     retryIntervalMs: 100,
-    defaultSpace: 'personal', // most suites exercise the private personal space
     ...extra,
   })
   cleanup.push(() => db.close())
@@ -65,10 +63,8 @@ export async function pairedDevice<const S extends SchemaDefinition>(
       driver: nodeSqlite(file),
       keyStore,
       relays: relays.map((r) => r.url),
-      discoveryRelays: [],
-      relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },
+        relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },
       retryIntervalMs: 100,
-      defaultSpace: 'personal',
       ...extra,
     })
     cleanup.push(() => d.close())

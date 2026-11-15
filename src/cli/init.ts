@@ -443,8 +443,8 @@ export function schemaTemplate(): string {
 
 // Each table automatically gets: id, space, createdAt, updatedAt, createdBy, updatedBy.
 // Column types: 'text' | 'integer' | 'real' | 'boolean' | 'json'
-// Rows go to the app space by default: shared by every user of this appId (public, anyone can edit).
-// Private data: { space: db.personalSpace }. Only the creator may edit: owned({ ... }).
+// Rows go to your personal space by default (encrypted, only your devices).
+// Share with db.createSpace() + invitations. Only the creator may edit a row: owned({ ... }).
 export const schema = defineSchema({
   todo: { title: 'text', done: 'boolean' },
 })

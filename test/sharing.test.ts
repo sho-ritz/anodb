@@ -131,10 +131,8 @@ describe('sharing (v0.3)', () => {
       schema,
       keyStore: ksB,
       relays: [r.url],
-      discoveryRelays: [],
       relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },
       retryIntervalMs: 100,
-      defaultSpace: 'personal' as const,
     }
     const b0 = await createAnoDB({ ...optsB, driver: nodeSqlite(file) })
     const offer = await b0.startPairing()

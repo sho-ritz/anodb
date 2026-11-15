@@ -1,13 +1,10 @@
-import type { CapturedCell } from './capture.js'
-import { fromCaptured } from './capture.js'
-import { bytesToHex, hexToBytes, randomHex, sha256Hex, signWith, verifySignedEvent } from './crypto.js'
+import { bytesToHex, hexToBytes, randomHex, sha256Hex, signWith } from './crypto.js'
 import { type AnoDBOptions, prepare } from './db.js'
 import { TAG, WRAP_KIND } from './protocol.js'
 import { type P2PMode, type PeerInfo, P2PSync } from './p2p.js'
-import { type PublicRow, presetOf } from './public-tables.js'
 import type { Filter } from './relay-pool.js'
 import { AnoDBSharing } from './sharing.js'
-import type { NostrEvent, SchemaDefinition, SqlValue } from './types.js'
+import type { NostrEvent, SchemaDefinition } from './types.js'
 
 const BACKFILL_PAGE = 500
 
@@ -18,17 +15,7 @@ export interface SyncGap {
   missing: number[]
 }
 
-export interface PublicSyncFilter {
-  authors?: string[]
-  ids?: string[]
-  since?: number
-  until?: number
-  limit?: number
-  /** Tag filters without the `#`, e.g. `{ t: ['anodb'] }`. */
-  tags?: Record<string, string[]>
-}
-
-/** anoDB database handle: SQL-like API, spaces & sharing, NIP-77 sync, public Nostr tables. */
+/** anoDB database handle: SQL-like API, spaces & sharing, NIP-77 sync. */
 export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   readonly #negUnsupported = new Set<string>()
   #reconcileTimer: ReturnType<typeof setInterval> | null = null
@@ -251,128 +238,6 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   }
 
   // ---- public tables ----------------------------------------------------------------------
-
-  /** Insert/update/delete on a public table → signed standard Nostr events (identity key). */
-  protected override async commitPublic(cells: CapturedCell[]): Promise<void> {
-    const signer = this.requireIdentitySigner()
-    const groups = new Map<string, CapturedCell[]>()
-    for (const c of cells) {
-      const k = `${c.table}\u0000${c.rowId}`
-      groups.set(k, [...(groups.get(k) ?? []), c])
-    }
-    const touched = new Set<string>()
-    for (const group of groups.values()) {
-      const table = group[0]!.table
-      const def = this.schema[table]!
-      const preset = presetOf(def)!
-      const inserted = group.some((c) => c.op === 'i')
-      const deleted = group.some((c) => c.op === 'd')
-      if (inserted && deleted) continue
-      let current = inserted ? undefined : this.store.publicRows(table, 'id = ?', [group[0]!.rowId])[0]
-      if (!inserted && !current) continue
-      if (current && current.author !== this.pubkey) throw new Error("anoDB: you can only change your own public events")
-      if (!inserted && !deleted && preset.replace === 'none') throw new Error(`anoDB: kind ${preset.kind} events cannot be edited; delete and insert instead`)
-      if (inserted && preset.replace === 'author' && preset.kind === 0) current = this.store.publicRows(table, 'id = ?', [this.pubkey])[0]
-      const row: Record<string, SqlValue> = { ...(current ?? {}) }
-      for (const c of group) {
-        if (c.column.startsWith('$') || c.column === 'author') continue
-        fromCaptured(table, c.column, def[c.column]!, c.value) // type check
-        row[c.column] = c.value
-      }
-      row.author = this.pubkey
-      if (preset.kind === 3 && typeof row.target === 'string') row.id = `${this.pubkey}:${row.target}`
-      else if (preset.replace === 'address') row.id = `${this.pubkey}:${row.d ?? ''}`
-      else if (current) row.id = current.id as string
-      const mine = this.store.publicRows(table, 'author = ?', [this.pubkey]).filter((r) => r.id !== row.id)
-      if (!deleted) mine.push(row)
-      const templates = preset.build(row as PublicRow, mine as PublicRow[], deleted)
-      for (const t of templates) {
-        // Replaceable versions must be strictly newer than what we have (relays keep the newest;
-        // equal timestamps fall back to "lowest id wins").
-        if (preset.replace !== 'none' && t.kind !== 5) {
-          const prev = this.store.publicRows(table, preset.replace === 'author' ? 'author = ?' : 'id = ?', [preset.replace === 'author' ? this.pubkey : String(row.id)])
-          const last = Math.max(0, ...prev.map((p) => (typeof p.createdAt === 'number' ? Math.floor(p.createdAt / 1000) : 0)))
-          if (t.created_at <= last) t.created_at = last + 1
-        }
-        const ev = await signer.signEvent(t)
-        await this.gate.idle()
-        if (ev.kind === 5) this.store.deletePublicRows(table, 'id = ?', [String(row.id)])
-        else this.applyPublicEvent(table, ev)
-        this.enqueuePlain(ev)
-      }
-      if (deleted && preset.kind === 3) this.store.deletePublicRows(table, 'id = ?', [String(row.id)])
-      touched.add(table)
-    }
-    this.notify(touched, 'local')
-  }
-
-  /** Project a verified event into a public table (replaceable semantics per preset). */
-  protected applyPublicEvent(table: string, e: NostrEvent): boolean {
-    const preset = presetOf(this.schema[table])
-    if (!preset || e.kind !== preset.kind) return false
-    const ms = e.created_at * 1000
-    const rows = preset.rows(e)
-    if (preset.replace === 'author') {
-      const existing = this.store.publicRows(table, 'author = ?', [e.pubkey])
-      if (existing.some((r) => typeof r.createdAt === 'number' && r.createdAt > ms)) return false
-      this.store.deletePublicRows(table, 'author = ?', [e.pubkey])
-    } else {
-      for (const r of rows) {
-        const old = this.store.publicRows(table, 'id = ?', [r.id])[0]
-        if (old && typeof old.createdAt === 'number' && old.createdAt >= ms && preset.replace === 'address') return false
-        if (old && preset.replace === 'none') return false
-      }
-    }
-    for (const r of rows) this.store.putPublicRow(table, { ...r, createdAt: ms, updatedAt: ms })
-    return true
-  }
-
-  /**
-   * Fetch standard events into a public table (verified, cached for offline use). With `live`,
-   * keeps a subscription open; call the returned `stop()` to end it.
-   */
-  async syncPublic<T extends Extract<keyof S, string>>(
-    table: T,
-    filter: PublicSyncFilter = {},
-    opts: { live?: boolean; relays?: readonly string[]; timeoutMs?: number } = {},
-  ): Promise<{ received: number; stop: () => void }> {
-    const preset = presetOf(this.schema[table])
-    if (!preset) throw new Error(`anoDB: ${table} is not a public table`)
-    const f: Filter = { kinds: [preset.kind] }
-    if (filter.authors) f.authors = filter.authors
-    if (filter.ids) f.ids = filter.ids
-    if (filter.since !== undefined) f.since = filter.since
-    if (filter.until !== undefined) f.until = filter.until
-    if (filter.limit !== undefined) f.limit = filter.limit
-    for (const [k, v] of Object.entries(filter.tags ?? {})) f[`#${k}`] = v
-    let relays = [...(opts.relays ?? [])]
-    if (filter.authors && filter.authors.length <= 20) {
-      for (const a of filter.authors) {
-        const list = await this.nostr.getRelayList(a, opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {})
-        relays.push(...(list.value?.write ?? []))
-      }
-    }
-    relays = [...new Set([...(this.sync?.pool.relays ?? []), ...(this.opts.discoveryRelays ?? []), ...relays])]
-    const events = await this.nostr.fetch([f], { relays, timeoutMs: opts.timeoutMs })
-    let received = 0
-    await this.gate.idle()
-    this.store.transaction(() => {
-      for (const e of events) if (this.applyPublicEvent(table, e)) received++
-    })
-    if (received) this.notify(new Set([table]), 'remote')
-    let stop = () => {}
-    if (opts.live && this.sync) {
-      const live: Filter = { ...f, since: Math.floor(this.now() / 1000) }
-      delete live.limit
-      stop = this.sync.pool.subscribe(() => [live], {
-        onEvent: (_r, e) => {
-          if (!verifySignedEvent(e) || this.gate.busy || this.closed) return
-          if (this.store.transaction(() => this.applyPublicEvent(table, e))) this.notify(new Set([table]), 'remote')
-        },
-      })
-    }
-    return { received, stop }
-  }
 
   override async close(): Promise<void> {
     if (this.#reconcileTimer) clearInterval(this.#reconcileTimer)

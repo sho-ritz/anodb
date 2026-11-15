@@ -1,6 +1,5 @@
 import { decodeHlc } from './hlc.js'
 import type { Change } from './protocol.js'
-import { PUBLIC_SPACE, presetOf } from './public-tables.js'
 import { SYS_CREATED, SYS_DELETED, createTableSql, ownerOfRow, quoteIdent, tableFingerprint, toSql } from './schema.js'
 import type { NostrEvent, SchemaDefinition, SqlValue, SqliteDriver } from './types.js'
 
@@ -41,10 +40,7 @@ CREATE TABLE IF NOT EXISTS anodb_acks (
   PRIMARY KEY (event_id, relay)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS anodb_cursors (relay TEXT NOT NULL, tag TEXT NOT NULL, since INTEGER NOT NULL, PRIMARY KEY (relay, tag)) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS anodb_public (
-  pubkey TEXT NOT NULL, kind INTEGER NOT NULL, event TEXT NOT NULL, created_at INTEGER NOT NULL, fetched_at INTEGER NOT NULL,
-  PRIMARY KEY (pubkey, kind)
-) WITHOUT ROWID;
+DROP TABLE IF EXISTS anodb_public;
 `
 
 export type AckStatus = 'ok' | 'rejected'
@@ -155,13 +151,11 @@ export class Store {
     this.#schema = schema
     this.transaction(() => {
       for (const [table, def] of Object.entries(schema)) {
-        const preset = presetOf(def)
-        const space = preset ? PUBLIC_SPACE : defaultSpace
-        const fp = `${tableFingerprint(def)}|${space}|${preset ? preset.kind : ''}|${owner ?? ''}`
+        const fp = `${tableFingerprint(def)}|${defaultSpace}|${owner ?? ''}`
         const key = `schema:${table}`
         if (this.getMeta(key) === fp) continue
         this.#db.exec(`DROP TABLE IF EXISTS ${quoteIdent(table)}`)
-        this.#db.exec(createTableSql(table, def, space, preset ? undefined : owner))
+        this.#db.exec(createTableSql(table, def, defaultSpace, owner))
         const rows = this.#db.all<{ space: string; row_id: string }>('SELECT DISTINCT space, row_id FROM anodb_cells WHERE tbl = ?', [table])
         for (const r of rows) this.#project(r.space, table, r.row_id)
         this.setMeta(key, fp)
@@ -355,24 +349,6 @@ export class Store {
 
   forgetPrunable(eventId: string): void {
     this.#db.run('DELETE FROM anodb_prune WHERE event_id = ?', [eventId])
-  }
-
-  // ---- public table rows ---------------------------------------------------------
-
-  publicRows(table: string, where: string, params: readonly SqlValue[]): Array<Record<string, SqlValue>> {
-    return this.#db.all(`SELECT * FROM ${quoteIdent(table)} WHERE space = '${PUBLIC_SPACE}' AND ${where}`, params)
-  }
-
-  putPublicRow(table: string, row: Record<string, SqlValue>): void {
-    const cols = Object.keys(row)
-    this.#db.run(
-      `INSERT OR REPLACE INTO ${quoteIdent(table)} (space, ${cols.map(quoteIdent).join(', ')}) VALUES ('${PUBLIC_SPACE}', ${cols.map(() => '?').join(', ')})`,
-      cols.map((c) => row[c] ?? null),
-    )
-  }
-
-  deletePublicRows(table: string, where: string, params: readonly SqlValue[]): void {
-    this.#db.run(`DELETE FROM ${quoteIdent(table)} WHERE space = '${PUBLIC_SPACE}' AND ${where}`, params)
   }
 
   // ---- devices -------------------------------------------------------------------
@@ -597,31 +573,5 @@ export class Store {
 
   resetCursors(): void {
     this.#db.run('DELETE FROM anodb_cursors')
-  }
-
-  // ---- public (replaceable) event cache ---------------------------------
-
-  getPublic(pubkey: string, kind: number): { event: NostrEvent; fetchedAt: number } | undefined {
-    const row = this.#db.all<{ event: string; fetched_at: number }>('SELECT event, fetched_at FROM anodb_public WHERE pubkey = ? AND kind = ?', [
-      pubkey,
-      kind,
-    ])[0]
-    return row && { event: JSON.parse(row.event) as NostrEvent, fetchedAt: row.fetched_at }
-  }
-
-  putPublic(event: NostrEvent | undefined, pubkey: string, kind: number, fetchedAt: number): void {
-    const existing = this.getPublic(pubkey, kind)
-    const newer =
-      event &&
-      (!existing || event.created_at > existing.event.created_at || (event.created_at === existing.event.created_at && event.id < existing.event.id))
-    if (newer) {
-      this.#db.run(
-        `INSERT INTO anodb_public (pubkey, kind, event, created_at, fetched_at) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(pubkey, kind) DO UPDATE SET event = excluded.event, created_at = excluded.created_at, fetched_at = excluded.fetched_at`,
-        [pubkey, kind, JSON.stringify(event), event.created_at, fetchedAt],
-      )
-    } else if (existing) {
-      this.#db.run('UPDATE anodb_public SET fetched_at = ? WHERE pubkey = ? AND kind = ?', [fetchedAt, pubkey, kind])
-    }
   }
 }

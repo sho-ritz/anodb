@@ -149,7 +149,7 @@ describe('keys and identity', () => {
     expect(keys).toHaveLength(1)
     expect(await ks.get('identity')).toBeNull()
     expect(() => d.exportIdentityKey()).toThrow(/not stored/)
-    await expect(d.nostr.publishNote('x')).rejects.toThrow(/identity key is not on this device/)
+    await expect(d.publishKeyPackage()).rejects.toThrow(/identity key is not on this device/)
     // writes still work: they are signed by the device key
     await d.insertInto('todo').values({ title: 'ok' }).execute()
     await expect(open(schema, [], { identity: 'recovery' })).rejects.toThrow(/onRecoveryKey/)

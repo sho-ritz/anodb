@@ -21,7 +21,6 @@ const db = await createAnoDB({
   keyStore: memoryKeyStore(),
   relays: ok,
   minAcks: ok.length,
-  discoveryRelays: [],
 })
 db.onError((e) => console.error('   error:', e.code, e.message))
 await db.insertInto('ping').values({ at: Date.now() }).execute()

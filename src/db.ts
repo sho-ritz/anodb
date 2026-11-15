@@ -2,8 +2,6 @@ import { CompiledQuery, type Compilable, type Kysely, type RootOperationNode } f
 import { BlobStore, DEFAULT_BLOB_SERVERS } from './blob.js'
 import { type CapturedCell, beginCapture, endCapture, fromCaptured, installCapture } from './capture.js'
 import {
-  appSpaceId,
-  appSpaceKey,
   bytesToHex,
   conversationKey,
   decrypt,
@@ -32,8 +30,6 @@ import { type KyselyDatabase, type SqlExecutor, createKysely } from './kysely.js
 import { resultConverter } from './result-types.js'
 import { type Change, MESSAGE_KIND, type StreamPayload, TAG, WRAP_KIND, byteLength, parseStreamPayload, splitChanges } from './protocol.js'
 import type { P2POptions } from './p2p.js'
-import { PublicData } from './public.js'
-import { presetOf } from './public-tables.js'
 import { changeAllowed, policyMessage } from './policy.js'
 import { RelayPool, type RelayPoolOptions } from './relay-pool.js'
 import { SYS_CREATED, SYS_DELETED, validateSchema } from './schema.js'
@@ -60,19 +56,11 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   onRecoveryKey?: (nsec: string) => void
   /** External identity signer (NIP-07 / NIP-46 / NIP-55). Only needed for identity operations. */
   signer?: Signer
-  /**
-   * Where rows go when `space` is not given. `'app'` (default): the app space, one database shared
-   * by every user of this appId — anyone can read and write it, like a plain database without RLS
-   * (use `owned()` tables to restrict edits). `'personal'`: your private, end-to-end encrypted space
-   * that only your own devices can read.
-   */
-  defaultSpace?: 'app' | 'personal'
   /** Human-readable name of this device, shown to the owner. */
   deviceName?: string
   /** `'wrap'` (default): envelopes are signed by throwaway keys. `'none'`: signed by the device key. */
   metadataProtection?: 'wrap' | 'none'
   relays?: readonly string[]
-  discoveryRelays?: readonly string[]
   /** A write leaves the outbox after this many relays accepted it. Default: min(2, relays.length). */
   minAcks?: number
   retryIntervalMs?: number
@@ -229,8 +217,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
   readonly pubkey: string
   readonly npub: string
   readonly devicePubkey: string
-  /** Public Nostr data (profiles, notes, relay lists). */
-  readonly nostr: PublicData
   /** Encrypted files on Blossom servers; store the returned reference in a `json` column. */
   readonly blobs: BlobStore
 
@@ -248,8 +234,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected readonly opts: AnoDBOptions<S>
   protected readonly kysely: Kysely<KyselyDatabase<S>>
   protected personal = ''
-  /** Id of the app space (see `defaultSpace`). */
-  readonly appSpace: string
   readonly #changeListeners = new Set<ChangeListener>()
   readonly #errorListeners = new Set<ErrorListener>()
   readonly #statusListeners = new Set<StatusListener>()
@@ -261,7 +245,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
   constructor(i: Internals<S>) {
     this.opts = i.opts
     this.appId = i.opts.appId
-    this.appSpace = appSpaceId(i.opts.appId)
     this.schema = i.opts.schema
     this.store = i.store
     this.keyStore = i.keyStore
@@ -292,21 +275,11 @@ export class AnoDBCore<S extends SchemaDefinition> {
       servers: i.opts.blobServers ?? DEFAULT_BLOB_SERVERS,
       ...(i.opts.fetch ? { fetch: i.opts.fetch } : {}),
     })
-    this.nostr = new PublicData({
-      store: this.store,
-      signer: () => this.requireIdentitySigner(),
-      pool,
-      discoveryRelays: i.opts.discoveryRelays,
-      now: this.now,
-      enqueue: (event) => this.enqueuePlain(event),
-    })
   }
 
   /** @internal */
   async _init(): Promise<void> {
     await this.loadKeys()
-    this.addKey({ space: this.appSpace, keyId: keyId(appSpaceKey(this.appId)), num: 1, key: appSpaceKey(this.appId), tag: spaceTag(appSpaceKey(this.appId)), createdAt: Date.now() })
-    if (!this.store.spaces().some((s) => s.id === this.appSpace)) this.store.upsertSpace(this.appSpace, 'app', false)
     let personal = this.store.spaces().find((s) => s.personal && s.status === 'active')
     if (!personal) {
       const id = await this.createSpaceInternal('personal', true)
@@ -320,10 +293,10 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Extension point for subclasses. */
   protected async afterInit(): Promise<void> {}
 
-  /** Switch the personal space; rebuilds projections and their capture triggers. */
+  /** Switch the personal space (the default for inserts); rebuilds projections and their capture triggers. */
   protected setPersonal(space: string): void {
     this.personal = space
-    this.store.applySchema(this.schema, this.defaultSpace, this.pubkey)
+    this.store.applySchema(this.schema, space, this.pubkey)
     installCapture(this.store.driver, this.schema)
   }
 
@@ -440,14 +413,9 @@ export class AnoDBCore<S extends SchemaDefinition> {
     const touched = new Set<string>()
     const nowMs = this.now()
     const writable = new Set<string>()
-    const publicCells: CapturedCell[] = []
     for (const c of cells) {
       const def = this.schema[c.table]
       if (!def) continue
-      if (presetOf(def)) {
-        publicCells.push(c)
-        continue
-      }
       if (!ID_RE.test(c.rowId)) throw new Error(`anoDB: invalid row id "${c.rowId}" (1–128 chars of A-Z a-z 0-9 _ -)`)
       if (!writable.has(c.space)) {
         this.assertCanWrite(c.space)
@@ -475,13 +443,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     })
     this.notify(touched, 'local')
     this.afterLocalWrite([...bySpace.keys()])
-    if (publicCells.length > 0) await this.commitPublic(publicCells)
     void this.sync?.flush()
-  }
-
-  /** Writes to public tables become signed standard Nostr events (implemented by AnoDB). */
-  protected async commitPublic(_cells: CapturedCell[]): Promise<void> {
-    throw new Error('anoDB: public tables are not supported by this build')
   }
 
   /** Hook (v0.3: automatic snapshots / key rotation). */
@@ -498,19 +460,13 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   // ---- spaces & keys ----------------------------------------------------------
 
-  /** Id of this identity's personal space: private, only your own devices can read it. */
+  /** Id of this identity's personal space: the default for inserts, readable only by your own devices. */
   get personalSpace(): string {
     return this.personal
   }
 
-  /** Space that inserts without `space` go to (the app space unless `defaultSpace: 'personal'`). */
-  get defaultSpace(): string {
-    return this.opts.defaultSpace === 'personal' ? this.personal : this.appSpace
-  }
-
-  /** Personal and shared spaces this identity belongs to (the app space is not listed). */
   spaces(): SpaceInfo[] {
-    return this.store.spaces().filter((s) => s.id !== this.appSpace)
+    return this.store.spaces()
   }
 
   protected async loadKeys(): Promise<void> {
@@ -729,7 +685,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   /** Apply a newly stored, signature-valid message. Returns changed tables. Runs inside a transaction. */
   protected onMessage(space: string, identity: string, device: string, p: StreamPayload): Set<string> {
-    if (space === this.appSpace && p.t !== 'ch') return new Set() // no membership or snapshots there
     if (p.t === 'op') {
       this.invalidateMembership(space)
       return this.rebuildSpace(space)
@@ -751,7 +706,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   /** Role of an identity in a space (v0.2: the creator is the only member). */
   protected roleOf(space: string, identity: string): Role | undefined {
-    if (space === this.appSpace) return 'writer'
     return this.isAuthorizedWriter(space, identity, '', Number.MAX_SAFE_INTEGER) ? 'owner' : undefined
   }
 
@@ -763,7 +717,6 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   /** v0.2: only the space creator (owner) may write. Generalised to roles in v0.3. */
   protected isAuthorizedWriter(space: string, identity: string, _device: string, _seq: number): boolean {
-    if (space === this.appSpace) return true // anyone with a valid device delegation
     if (!this.#ownerCache.has(space)) {
       let owner: string | null = null
       for (const m of this.store.messages(space, 'op')) {
