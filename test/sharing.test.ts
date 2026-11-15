@@ -29,7 +29,7 @@ describe('sharing (v0.3)', () => {
     await owner.insertInto('todo').values({ title: 'milk', space }).execute()
     const invited: string[] = []
     alice.onInvitation((i) => invited.push(i.space))
-    await owner.invite(space, alice.npub, 'writer')
+    await owner.addMember(space, alice.npub, 'writer')
     await until(() => invited.length === 1, 3000, 'invitation')
     expect(alice.invitations()).toMatchObject([{ space, role: 'writer', name: 'family', from: owner.pubkey }])
     await sleep(100)
@@ -48,7 +48,7 @@ describe('sharing (v0.3)', () => {
     await owner.insertInto('todo').values({ title: 'TOP-SECRET-DRAFT', space }).execute()
     await owner.deleteFrom('todo').where('title', '=', 'TOP-SECRET-DRAFT').execute()
     await owner.insertInto('todo').values({ title: 'public plan', space }).execute()
-    await owner.invite(space, alice.npub, 'writer')
+    await owner.addMember(space, alice.npub, 'writer')
     await until(() => alice.invitations().length === 1)
     await alice.acceptInvitation(space)
     await until(async () => (await titles(alice, space)).includes('public plan'))
@@ -59,7 +59,7 @@ describe('sharing (v0.3)', () => {
   it('readers can read but their writes are rejected locally and remotely', async () => {
     const r = await relay()
     const { owner, alice, space } = await shared(r)
-    await owner.invite(space, alice.npub, 'reader')
+    await owner.addMember(space, alice.npub, 'reader')
     await until(() => alice.invitations().length === 1)
     await alice.acceptInvitation(space)
     await owner.insertInto('todo').values({ title: 'visible', space }).execute()
@@ -76,7 +76,7 @@ describe('sharing (v0.3)', () => {
   it('removal: cut-off rejects later writes and the removed member cannot read new data', async () => {
     const r = await relay()
     const { owner, alice, space } = await shared(r)
-    await owner.invite(space, alice.npub, 'writer')
+    await owner.addMember(space, alice.npub, 'writer')
     await until(() => alice.invitations().length === 1)
     await alice.acceptInvitation(space)
     await alice.insertInto('todo').values({ title: 'before removal', space }).execute()
@@ -96,28 +96,21 @@ describe('sharing (v0.3)', () => {
     await until(() => alice.spaces().find((s) => s.id === space)?.status === 'removed', 3000, 'alice notices removal')
   })
 
-  it('invite links: request → approval → automatic join; links are single-use', async () => {
+  it('addMember with device delegations handed over directly (the path anoAuth uses)', async () => {
     const r = await relay()
     const owner = await open(schema, [r])
-    const bob = await open(schema, [r])
-    const eve = await open(schema, [r])
+    const bob = await open(schema, [r]) // never published a key package
     const space = await owner.createSpace('team')
     await owner.insertInto('todo').values({ title: 'team task', space }).execute()
-    const link = await owner.createInviteLink(space, { role: 'writer', expiresInMs: 60_000 })
-    // opening your own link (same browser) explains itself instead of waiting forever
-    await expect(owner.requestJoin(link, 'me')).rejects.toMatchObject({ code: 'own-invite' })
-    const requests: string[] = []
-    owner.onJoinRequest((req) => requests.push(req.id))
-    await bob.requestJoin(link, 'Bob')
-    await until(() => requests.length === 1, 3000, 'join request')
-    expect(owner.joinRequests()[0]).toMatchObject({ identity: bob.pubkey, name: 'Bob', role: 'writer' })
-    await owner.approveJoinRequest(requests[0]!)
+    await expect(owner.addMember(space, bob.npub, 'writer')).rejects.toThrow(/key package/)
+    await owner.addMember(space, bob.npub, 'writer', { devices: bob.deviceDelegations() })
+    await until(() => bob.invitations().length === 1, 3000, 'invitation')
+    await bob.acceptInvitation(space)
     await until(async () => (await titles(bob, space)).includes('team task'), 4000, 'bob joins')
-    // the link is used up: a second requester is ignored
-    await eve.requestJoin(link)
-    await sleep(300)
-    expect(owner.joinRequests()).toEqual([])
-    await expect(owner.approveJoinRequest(requests[0]!)).rejects.toThrow()
+    // delegations that are not signed by the named identity are refused
+    const eve = await open(schema, [r])
+    await expect(owner.addMember(space, eve.npub, 'writer', { devices: bob.deviceDelegations() })).rejects.toThrow(/delegated/)
+    expect(owner.members(space).some((m) => m.identity === eve.pubkey)).toBe(false)
   })
 
   it('pairs a new device by QR (identity key is not copied) and revokes a device', async () => {

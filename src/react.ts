@@ -99,11 +99,9 @@ export function useSyncStatus(): SyncStatus {
 }
 
 export {
+  AddMember,
   DeviceList,
-  InviteLink,
   Invitations,
-  JoinRequests,
-  JoinSpace,
   Members,
   PairDevice,
   QRCode,
@@ -112,4 +110,4 @@ export {
   useIncomingLink,
   useLive,
 } from './ui.js'
-export type { InviteLinkProps, JoinSpaceProps, Labels, Lang, MembersProps, PairDeviceProps, SharingDB } from './ui.js'
+export type { AddMemberProps, Labels, Lang, MembersProps, PairDeviceProps, SharingDB } from './ui.js'

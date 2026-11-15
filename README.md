@@ -23,14 +23,14 @@ True to its name, it requires **absolutely no developer-operated server**: no AP
 - 📴 **Offline-first** — Writes commit immediately to local SQLite. The network catches up later.
 - 🧾 **Type-safe SQL** — A [Kysely](https://kysely.dev) query builder with JOINs, plus raw SQL writes (`UPDATE … LIKE`, `INSERT … SELECT`, upserts) that are captured and synced.
 - 🗃️ **A plain database by default** — your data, on all your devices, with no invites and no rules to set up.
-- 👥 **Sharing when you want it** — invite-only spaces with owner / admin / writer / reader roles, invitations by npub or one-time links, removal with cut-offs, key rotation.
+- 👥 **Sharing when you want it** — spaces with owner / admin / writer / reader roles, members added by public key, removal with cut-offs, key rotation. *How* people get invited (links, approval, sign-in with Google or your company's SSO) is left to your app or [anoAuth](#who-may-join-is-up-to-you).
 - 🔐 **Signed and encrypted** — Writes are signed by per-device keys, keys are stored encrypted, relays see only throwaway pubkeys and rotating tags, and new members of a space never see deleted history.
 - 🔀 **Deterministic merging** — Cell-level Last-Writer-Wins with Hybrid Logical Clocks; tolerant of out-of-order delivery, duplicates and retries.
 - ⚡ **Direct device-to-device sync** — Your devices connect over WebRTC ([nostr-p2p](https://github.com/sho-ritz/nostr-p2p)) and exchange changes in tens of milliseconds; relays remain the store for offline devices.
 - 🔁 **4-layer sync** — NIP-77 Negentropy, time-based fallback, sequence-gap detection, snapshots. A durable outbox retries until `minAcks` relays acknowledge.
 - 📎 **Encrypted files** — Large files go to [Blossom](https://github.com/hzrd149/blossom) servers, encrypted on the device; only a reference is stored in the database.
 - 🔏 **Opt-in row rules** — `createdBy` / `updatedBy` come from signatures and can’t be forged; mark a table `owned()` so only a row’s creator can edit it (checked on every device).
-- ⚛️ **React** — `useQuery`, `useSyncStatus`, and ready-made `<PairDevice />`, `<InviteLink />`, `<JoinSpace />`, `<Members />` components.
+- ⚛️ **React** — `useQuery`, `useSyncStatus`, and ready-made `<PairDevice />`, `<AddMember />`, `<Invitations />`, `<Members />` components.
 
 ## Get started
 
@@ -140,7 +140,7 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 | Space | Who can read and write | Use it for |
 |---|---|---|
 | **Personal space** (default, `db.personalSpace`) | your own devices | everything that is yours: no invites, no rules — just a database that follows you across devices |
-| **Shared spaces** (`db.createSpace`) | the members you invite (owner / admin / writer / reader) | a family list, a team, a chat room |
+| **Shared spaces** (`db.createSpace`) | the members you add (owner / admin / writer / reader) | a family list, a team, a chat room |
 
 Everything is end-to-end encrypted. Without a server, *who can read* means *who holds the key*, so
 sharing always means handing the key to someone — that is what an invitation does.
@@ -172,14 +172,12 @@ create a row whose id names someone else.
 const family = await db.createSpace('Family')
 await db.insertInto('todo').values({ title: 'Milk', space: family }).execute()
 
-// Invite by npub (the invitee publishes a key package first: db.publishKeyPackage())
-await db.invite(family, 'npub1alice…', 'writer')        // owner / admin / writer / reader
-// Invitee: nothing syncs until they accept
+// Add by public key (owners / admins): the space key is delivered to their devices.
+// Their devices come from the key package they published (alice.publishKeyPackage()),
+// or are handed over directly: { devices: alice.deviceDelegations() }
+await db.addMember(family, 'npub1alice…', 'writer')     // admin / writer / reader
+// The new member: nothing syncs until they accept
 alice.onInvitation((i) => …); await alice.acceptInvitation(i.space)
-
-// One-time, expiring invite link; an admin must approve each request
-const link = await db.createInviteLink(family, { role: 'reader', expiresInMs: 86_400_000 })
-db.onJoinRequest((req) => db.approveJoinRequest(req.id))
 
 await db.setRole(family, who, 'reader')
 await db.removeMember(family, who)
@@ -188,6 +186,13 @@ await db.removeMember(family, who)
 - New members receive **only a snapshot of the current state** — no edit history and no deleted content.
 - Group keys rotate on member removal, device revocation, member addition and every 30 days.
 - After removal, writes beyond each device's sequence-number cut-off are rejected (backdating does not help).
+
+### Who may join is up to you
+
+anoDB only knows public keys: it adds and removes members and delivers keys to them. Deciding
+*who* may join — invite links, approval by an admin, "anyone who signs in with Google as
+@company.com", a company SSO — is a separate concern, planned as **anoAuth**, which runs on an
+admin's device and calls `addMember` when someone qualifies.
 
 ### Adding and revoking devices
 
@@ -270,20 +275,20 @@ const status = useSyncStatus()
 Sharing and multi-device are anoDB's core features, so their UI ships with it:
 
 ```tsx
-import { DeviceList, InviteLink, JoinSpace, Members, PairDevice } from '@anodb/core/react'
+import { AddMember, DeviceList, Invitations, Members, PairDevice } from '@anodb/core/react'
 
 <PairDevice />            {/* add a device: QR code + a code to compare on both devices */}
 <DeviceList />            {/* your devices, revoke with a confirming second click */}
-<InviteLink space={id} /> {/* one-time invite link + QR, and the join requests to approve */}
-<JoinSpace onJoined={setSpace} /> {/* join with a link; invitations sent to your npub */}
+<AddMember space={id} />  {/* add someone by npub (owners / admins) */}
+<Invitations onJoined={setSpace} /> {/* spaces you were added to: accept / decline */}
 <Members space={id} />    {/* roles and removal for owners / admins */}
 ```
 
 - Plain HTML with `anodb-*` class names and only layout styles — style them like the rest of your app.
 - English and Japanese built in (`lang="ja"`, default: the browser's language); override any text with `labels`.
-- Links and QR codes are ordinary `https://your-app/#anodb=…` URLs. Scanning one with a phone camera opens
-  your app with the request filled in — nothing is approved without a click, and pairing always shows a
-  code to compare.
+- Pairing links and QR codes are ordinary `https://your-app/#anodb=…` URLs. Scanning one with a phone
+  camera opens your app with the request filled in — nothing is approved without a click, and pairing
+  always shows a code to compare.
 - Building your own? `useLive((db) => db.members(id))`, `toAppLink()`, `parseAppLink()` and `<QRCode />` are exported too.
 
 ## Column types

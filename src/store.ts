@@ -23,11 +23,9 @@ CREATE TABLE IF NOT EXISTS anodb_prune (event_id TEXT PRIMARY KEY, salt TEXT NOT
 CREATE TABLE IF NOT EXISTS anodb_devices (
   device TEXT PRIMARY KEY, identity TEXT NOT NULL, delegation TEXT NOT NULL, name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS anodb_invites_out (secret TEXT PRIMARY KEY, space TEXT NOT NULL, role TEXT NOT NULL, expires INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0);
+DROP TABLE IF EXISTS anodb_invites_out;
 CREATE TABLE IF NOT EXISTS anodb_invites_in (space TEXT PRIMARY KEY, sender TEXT NOT NULL, role TEXT NOT NULL, name TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, received_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS anodb_join_requests (
-  id TEXT PRIMARY KEY, secret TEXT NOT NULL, identity TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, received_at INTEGER NOT NULL
-);
+DROP TABLE IF EXISTS anodb_join_requests;
 CREATE TABLE IF NOT EXISTS anodb_cells (
   space TEXT NOT NULL, tbl TEXT NOT NULL, row_id TEXT NOT NULL, col TEXT NOT NULL, value TEXT NOT NULL, hlc TEXT NOT NULL,
   PRIMARY KEY (space, tbl, row_id, col)
@@ -372,20 +370,6 @@ export class Store {
 
   // ---- invitations ---------------------------------------------------------------
 
-  putInviteOut(secret: string, space: string, role: string, expires: number): void {
-    this.#db.run('INSERT INTO anodb_invites_out (secret, space, role, expires) VALUES (?, ?, ?, ?)', [secret, space, role, expires])
-  }
-
-  invitesOut(): Array<{ secret: string; space: string; role: string; expires: number; used: boolean }> {
-    return this.#db
-      .all<{ secret: string; space: string; role: string; expires: number; used: number }>('SELECT secret, space, role, expires, used FROM anodb_invites_out')
-      .map((r) => ({ ...r, used: r.used === 1 }))
-  }
-
-  markInviteUsed(secret: string): void {
-    this.#db.run('UPDATE anodb_invites_out SET used = 1 WHERE secret = ?', [secret])
-  }
-
   putInviteIn(space: string, sender: string, role: string, name: string, payload: string): void {
     this.#db.run(
       `INSERT INTO anodb_invites_in (space, sender, role, name, payload, status, received_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)
@@ -406,24 +390,6 @@ export class Store {
     this.#db.run('UPDATE anodb_invites_in SET status = ? WHERE space = ?', [status, space])
   }
 
-  putJoinRequest(id: string, secret: string, identity: string, payload: string): void {
-    this.#db.run("INSERT OR IGNORE INTO anodb_join_requests (id, secret, identity, payload, status, received_at) VALUES (?, ?, ?, ?, 'pending', ?)", [
-      id,
-      secret,
-      identity,
-      payload,
-      Date.now(),
-    ])
-  }
-
-  joinRequests(status = 'pending'): Array<{ id: string; secret: string; identity: string; payload: string }> {
-    return this.#db.all('SELECT id, secret, identity, payload FROM anodb_join_requests WHERE status = ? ORDER BY received_at', [status])
-  }
-
-  setJoinRequestStatus(id: string, status: string): void {
-    this.#db.run('UPDATE anodb_join_requests SET status = ? WHERE id = ?', [status, id])
-  }
-
   /** Forget all spaces and data (device pairing adopts another identity). Keeps node id and clock. */
   wipe(): void {
     this.transaction(() => {
@@ -437,9 +403,7 @@ export class Store {
         'anodb_acks',
         'anodb_cursors',
         'anodb_devices',
-        'anodb_invites_out',
         'anodb_invites_in',
-        'anodb_join_requests',
       ]) {
         this.#db.run(`DELETE FROM ${t}`)
       }

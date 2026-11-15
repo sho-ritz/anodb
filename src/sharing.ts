@@ -53,15 +53,6 @@ export interface Invitation {
   from: string
 }
 
-export interface JoinRequest {
-  id: string
-  space: string
-  role: Role
-  identity: string
-  npub: string
-  name: string
-}
-
 export interface PairingOffer {
   uri: string
   /** Show this; the approving device shows the same code. */
@@ -98,7 +89,6 @@ const pairingCode = (devicePk: string, secret: string) => String(parseInt(sha256
 /** Adds multi-user spaces, roles, invitations, key rotation, snapshots and device pairing. */
 export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   readonly #membership = new Map<string, Membership>()
-  readonly #joinListeners = new Set<(r: JoinRequest) => void>()
   readonly #inviteListeners = new Set<(i: Invitation) => void>()
   #pairing: { secret: string; resolve: () => void; promise: Promise<void> } | null = null
 
@@ -169,12 +159,27 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return this.membership(space).roles.get(this.pubkey)
   }
 
-  /** Invite by npub / pubkey. The invitee must have published a key package. */
-  async invite(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void> {
+  /**
+   * Add a member by npub / pubkey and deliver the space key to their devices (owners / admins).
+   * Who may join is decided outside anoDB (e.g. anoAuth): this is the primitive it calls.
+   * `devices`: the member's device delegations; when omitted, their published key package is used
+   * (`db.publishKeyPackage()`). The new member sees an invitation and must accept it.
+   */
+  async addMember(space: string, who: string, role: Exclude<Role, 'owner'>, opts: { devices?: NostrEvent[] } = {}): Promise<void> {
     const identity = parsePubkey(who)
-    const devices = await this.#fetchKeyPackage(identity)
-    if (devices.length === 0) throw new Error(`anoDB: ${npubEncode(identity)} has not published a key package (db.publishKeyPackage())`)
-    await this.#addMember(space, identity, role, devices.map((d) => d.delegation))
+    const given = opts.devices ?? (await this.#fetchKeyPackage(identity)).map((d) => d.delegation)
+    const delegations = given.filter((d) => {
+      const device = d.tags.find((t) => t[0] === 'device')?.[1]
+      return !!device && verifyDelegation(d, device) === identity
+    })
+    if (delegations.length === 0) {
+      throw new Error(
+        opts.devices
+          ? `anoDB: none of the given devices is delegated by ${npubEncode(identity)}`
+          : `anoDB: ${npubEncode(identity)} has not published a key package (db.publishKeyPackage())`,
+      )
+    }
+    await this.#addMember(space, identity, role, delegations)
   }
 
   async setRole(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void> {
@@ -217,13 +222,13 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     void this.sync?.flush()
   }
 
-  async #addMember(space: string, identity: string, role: Exclude<Role, 'owner'>, delegations: NostrEvent[], req?: string): Promise<void> {
+  async #addMember(space: string, identity: string, role: Exclude<Role, 'owner'>, delegations: NostrEvent[]): Promise<void> {
     for (const d of delegations) {
       const device = d.tags.find((t) => t[0] === 'device')?.[1]
       if (device && verifyDelegation(d, device) === identity) this.store.putDevice(device, identity, JSON.stringify(d), delegationName(d))
     }
     if (!this.membership(space).roles.has(identity)) await this.#postOp(space, { type: 'add', identity, role })
-    await this.rotateKey(space, new Map([[identity, req]]))
+    await this.rotateKey(space, new Set([identity]))
   }
 
   // ---- key rotation & snapshots -------------------------------------------------------
@@ -232,7 +237,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
    * New epoch key: delivered to every active device of every member (new members get an
    * invitation instead), then a snapshot of the current state is posted in the new epoch.
    */
-  async rotateKey(space: string, invitees = new Map<string, string | undefined>()): Promise<void> {
+  async rotateKey(space: string, invitees: ReadonlySet<string> = new Set()): Promise<void> {
     this.assertOpen()
     const m = this.membership(space)
     const s = this.store.spaces().find((x) => x.id === space)
@@ -247,10 +252,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       for (const [identity] of m.roles) {
         for (const d of this.store.devices(identity)) {
           if (d.revoked || d.device === this.devicePubkey || m.revokedDevices.has(d.device)) continue
-          const invite = invitees.has(identity)
-          const body = invite
-            ? { ...grant, t: 'invite', role: m.roles.get(identity), ...(invitees.get(identity) ? { req: invitees.get(identity) } : {}) }
-            : { ...grant, t: 'key' }
+          const body = invitees.has(identity) ? { ...grant, t: 'invite', role: m.roles.get(identity) } : { ...grant, t: 'key' }
           this.#sendInbox(d.device, body)
         }
       }
@@ -413,7 +415,6 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   protected override subscriptionTags(): string[] {
     const tags = [...super.subscriptionTags(), inboxTag(this.devicePubkey)]
     const now = this.now()
-    for (const i of this.store.invitesOut()) if (!i.used && i.expires > now) tags.push(secretTag(i.secret))
     if (this.#pairing) tags.push(secretTag(this.#pairing.secret))
     return tags
   }
@@ -452,7 +453,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
         return 'invalid'
       }
     } else {
-      secret = this.store.invitesOut().find((i) => secretTag(i.secret) === tag)?.secret ?? (this.#pairing && secretTag(this.#pairing.secret) === tag ? this.#pairing.secret : null)
+      secret = this.#pairing && secretTag(this.#pairing.secret) === tag ? this.#pairing.secret : null
       if (!secret) return 'invalid'
       convKey = secretKeyFor(secret)
     }
@@ -472,7 +473,6 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     try {
       if (secret === null) this.#onInbox(sender, inner.pubkey, p)
       else if (this.#pairing?.secret === secret && p.t === 'pair') void this.#onPaired(sender, p)
-      else if (p.t === 'joinreq') this.#onJoinRequest(secret, sender, inner.pubkey, p)
     } catch {
       return 'invalid'
     }
@@ -481,7 +481,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   #onInbox(sender: string, senderDevice: string, p: Record<string, unknown>): void {
     if (p.t !== 'key' && p.t !== 'invite') return
-    const g = p as unknown as KeyGrant & { role?: Role; req?: string }
+    const g = p as unknown as KeyGrant & { role?: Role }
     if (typeof g.sp !== 'string' || typeof g.key !== 'string' || !/^[0-9a-f]{64}$/.test(g.key) || !Array.isArray(g.ops)) return
     // Validate against the ops carried in the grant (plus what we know).
     const before = this.store.opRecords(g.sp).length
@@ -495,12 +495,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     this.store.putDevice(senderDevice, sender, JSON.stringify(p.dlg), delegationName(p.dlg as NostrEvent))
     const known = this.store.spaces().find((s) => s.id === g.sp)
     if (p.t === 'invite' && known?.status !== 'active') {
-      const requested = g.req && this.store.getMeta(`joinreq:${g.req}`)
       this.store.putInviteIn(g.sp, sender, m.roles.get(this.pubkey)!, String(g.name ?? ''), JSON.stringify(g))
-      if (requested) {
-        void this.acceptInvitation(g.sp)
-        return
-      }
       const inv: Invitation = { space: g.sp, name: String(g.name ?? ''), role: m.roles.get(this.pubkey)!, from: sender }
       for (const fn of this.#inviteListeners) fn(inv)
       return
@@ -557,78 +552,15 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     this.store.setInviteInStatus(space, 'declined')
   }
 
-  // ---- invite links ---------------------------------------------------------------------------
-
-  /** One-time, expiring link. Whoever opens it can only *ask* to join; an admin must approve. */
-  async createInviteLink(space: string, opts: { role?: Exclude<Role, 'owner'>; expiresInMs?: number } = {}): Promise<string> {
-    if (!mayManage(this.membership(space), this.pubkey)) throw new Error('anoDB: only owners and admins can invite')
-    const secret = randomHex(16)
-    const role = opts.role ?? 'writer'
-    this.store.putInviteOut(secret, space, role, this.now() + (opts.expiresInMs ?? 24 * 3600_000))
-    this.sync?.refresh()
-    return `anodb://join?app=${encodeURIComponent(this.appId)}&s=${secret}`
+  /**
+   * This identity's current device delegations (signed by the identity). Hand them to whoever adds
+   * you (`addMember(space, npub, role, { devices })`) when you have not published a key package.
+   */
+  deviceDelegations(): NostrEvent[] {
+    return this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
   }
 
-  /** Invitee: ask to join via a link. The invitation that follows is accepted automatically. */
-  async requestJoin(link: string, name = ''): Promise<void> {
-    const u = new URL(link)
-    const secret = u.searchParams.get('s')
-    if (u.protocol !== 'anodb:' || !secret || !/^[0-9a-f]{32}$/.test(secret)) throw new Error('anoDB: invalid invite link')
-    if (u.searchParams.get('app') !== this.appId) throw new Error('anoDB: invite link is for another app')
-    if (this.store.invitesOut().some((i) => i.secret === secret))
-      throw new AnoDBError('own-invite', 'This is your own invite link. Open it in another browser, a private window or on the other person’s device.')
-    this.store.setMeta(`joinreq:${sha256Hex(secret)}`, '1')
-    const devices = this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
-    this.#sendSecret(secret, { t: 'joinreq', devices, name })
-  }
-
-  #onJoinRequest(secret: string, identity: string, _device: string, p: Record<string, unknown>): void {
-    const inv = this.store.invitesOut().find((i) => i.secret === secret)
-    if (!inv || inv.used || inv.expires <= this.now()) return
-    const id = sha256Hex(`${secret}/${identity}`).slice(0, 32)
-    this.store.putJoinRequest(id, secret, identity, JSON.stringify(p))
-    const req = this.#toJoinRequest({ id, secret, identity, payload: JSON.stringify(p) })
-    if (req) for (const fn of this.#joinListeners) fn(req)
-  }
-
-  #toJoinRequest(r: { id: string; secret: string; identity: string; payload: string }): JoinRequest | null {
-    const inv = this.store.invitesOut().find((i) => i.secret === r.secret)
-    if (!inv) return null
-    const p = JSON.parse(r.payload) as { name?: unknown }
-    return { id: r.id, space: inv.space, role: inv.role as Role, identity: r.identity, npub: npubEncode(r.identity), name: typeof p.name === 'string' ? p.name.slice(0, 64) : '' }
-  }
-
-  joinRequests(): JoinRequest[] {
-    return this.store.joinRequests().map((r) => this.#toJoinRequest(r)).filter((r) => r !== null)
-  }
-
-  onJoinRequest(fn: (r: JoinRequest) => void): () => void {
-    this.#joinListeners.add(fn)
-    return () => this.#joinListeners.delete(fn)
-  }
-
-  async approveJoinRequest(id: string): Promise<void> {
-    const r = this.store.joinRequests().find((x) => x.id === id)
-    if (!r) throw new Error('anoDB: no such join request')
-    const inv = this.store.invitesOut().find((i) => i.secret === r.secret)
-    if (!inv || inv.used || inv.expires <= this.now()) throw new Error('anoDB: invite link expired or already used')
-    const p = JSON.parse(r.payload) as { devices?: unknown[] }
-    const delegations = (p.devices ?? []).filter(isEvent)
-    this.store.transaction(() => {
-      this.store.markInviteUsed(r.secret)
-      this.store.setJoinRequestStatus(id, 'approved')
-    })
-    await this.#addMember(inv.space, r.identity, inv.role as Exclude<Role, 'owner'>, delegations, sha256Hex(r.secret))
-    this.sync?.refresh()
-  }
-
-  rejectJoinRequest(id: string): void {
-    this.store.setJoinRequestStatus(id, 'rejected')
-  }
-
-  // ---- key packages ----------------------------------------------------------------------------
-
-  /** Publish the list of this identity's devices so others can invite it by npub (needs the identity key). */
+  /** Publish the list of this identity's devices so others can add it by npub (needs the identity key). */
   async publishKeyPackage(): Promise<NostrEvent> {
     const signer = this.requireIdentitySigner()
     const delegations = this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)

@@ -89,7 +89,7 @@ export type ChangeListener = (tables: ReadonlySet<string>, origin: 'local' | 're
 export type ErrorListener = (error: AnoDBError) => void
 export type StatusListener = (status: SyncStatus) => void
 
-export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol' | 'tab-locked' | 'own-invite'
+export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol' | 'tab-locked'
 
 export class AnoDBError extends Error {
   readonly code: AnoDBErrorCode
@@ -678,7 +678,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Hook after a new remote message was stored (v0.3: membership handling). */
   protected afterRemoteMessage(_space: string, _identity: string, _device: string, _p: StreamPayload): void {}
 
-  /** Envelope for a tag that is not a space key (inbox, invite secrets). Implemented in v0.3. */
+  /** Envelope for a tag that is not a space key (inbox, pairing secret). Implemented in v0.3. */
   protected ingestOther(_tag: string, _outer: NostrEvent): IngestResult {
     return 'invalid'
   }

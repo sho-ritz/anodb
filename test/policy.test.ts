@@ -27,7 +27,7 @@ async function room() {
   await until(() => alice.status.pendingEvents === 0 && bob.status.pendingEvents === 0)
   const space = await owner.createSpace('room')
   for (const d of [alice, bob]) {
-    await owner.invite(space, d.npub, 'writer')
+    await owner.addMember(space, d.npub, 'writer')
     await until(() => d.invitations().length === 1, 3000, 'invitation')
     await d.acceptInvitation(space)
   }

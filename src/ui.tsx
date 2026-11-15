@@ -5,8 +5,8 @@
  *
  *   <PairDevice />            add a device to your identity (QR code + safety code)
  *   <DeviceList />            your devices, with revoke
- *   <InviteLink space={id} /> one-time invite link + QR, and the join requests to approve
- *   <JoinSpace />             paste / open an invite link, see invitations by npub
+ *   <AddMember space={id} />  add someone by npub (owners / admins)
+ *   <Invitations />           spaces you were added to, with accept / decline
  *   <Members space={id} />    members with roles (owners / admins can change them)
  *
  * Links and QR codes are ordinary `https://your-app/#anodb=…` URLs: scanning one with a phone's
@@ -18,7 +18,7 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, us
 import type { Role } from './membership.js'
 import { LINK_CHANNEL } from './links.js'
 import { useAnoDB } from './react.js'
-import type { Device, Invitation, JoinRequest, Member } from './sharing.js'
+import type { Device, Invitation, Member } from './sharing.js'
 import type { SpaceInfo } from './db.js'
 
 /** The parts of AnoDB these components use. */
@@ -31,11 +31,7 @@ export interface SharingDB {
   roleIn(space: string): Role | undefined
   setRole(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void>
   removeMember(space: string, who: string): Promise<void>
-  createInviteLink(space: string, opts?: { role?: Exclude<Role, 'owner'>; expiresInMs?: number }): Promise<string>
-  requestJoin(link: string, name?: string): Promise<void>
-  joinRequests(): JoinRequest[]
-  approveJoinRequest(id: string): Promise<void>
-  rejectJoinRequest(id: string): void
+  addMember(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void>
   invitations(): Invitation[]
   acceptInvitation(space: string): Promise<void>
   declineInvitation(space: string): void
@@ -70,23 +66,10 @@ const en = {
   revoked: 'revoked',
   revoke: 'Revoke',
   confirmRevoke: 'Revoke for good?',
-  invite: 'Invite',
   role: 'Role',
-  createLink: 'Create invite link',
-  linkHint: 'One-time link. It expires in {hours} h, and you approve each request below.',
-  requests: 'Join requests',
-  none: 'None',
-  approveRequest: 'Approve',
-  reject: 'Reject',
-  cannotInvite: 'Only owners and admins can invite.',
-  join: 'Join with a link',
-  inviteLink: 'Invite link',
-  yourName: 'Your name (shown to the admin)',
-  requestJoin: 'Request to join',
-  requested: 'Request sent. Waiting for the person who invited you to approve it — they need to have the app open. Keep this page open: you join automatically.',
-  invitedTitle: 'You were invited to a shared list',
-  awaitingApproval: 'Waiting for approval',
-  invitedBody: 'Enter the name the others will see, then send a request. The person who invited you approves it, and the list appears here.',
+  addMember: 'Add a member',
+  add: 'Add',
+  added: 'Added. They see an invitation the next time they open the app.',
   joined: 'Joined',
   invitations: 'Invitations',
   accept: 'Accept',
@@ -121,23 +104,10 @@ const ja: Labels = {
   revoked: '失効済み',
   revoke: '失効',
   confirmRevoke: '本当に失効させますか？',
-  invite: '招待',
   role: '役割',
-  createLink: '招待リンクを作成',
-  linkHint: '1回限りのリンクです。{hours} 時間で期限が切れ、参加リクエストは下で1件ずつ承認します。',
-  requests: '参加リクエスト',
-  none: 'なし',
-  approveRequest: '承認',
-  reject: '拒否',
-  cannotInvite: '招待できるのはオーナーと管理者だけです。',
-  join: 'リンクで参加',
-  inviteLink: '招待リンク',
-  yourName: 'あなたの名前（管理者に表示されます）',
-  requestJoin: '参加をリクエスト',
-  requested: 'リクエストを送りました。招待した人の承認を待っています（相手がアプリを開いている必要があります）。このページを開いたままにしてください。承認されると自動で参加します。',
-  invitedTitle: '共有リストに招待されています',
-  awaitingApproval: '承認待ち',
-  invitedBody: 'ほかのメンバーに表示する名前を入力して、リクエストを送ってください。招待した人が承認すると、ここにリストが表示されます。',
+  addMember: 'メンバーを追加',
+  add: '追加',
+  added: '追加しました。相手が次にアプリを開くと招待が表示されます。',
   joined: '参加しました',
   invitations: '招待',
   accept: '参加する',
@@ -224,7 +194,7 @@ export function parseAppLink(text: string): string | null {
 }
 
 /** An `anodb://<kind>` link this page was opened with (`#anodb=…`), and a way to clear it. */
-export function useIncomingLink(kind: 'pair' | 'join'): [string | null, () => void] {
+export function useIncomingLink(kind: 'pair'): [string | null, () => void] {
   const [link, setLink] = useState<string | null>(null)
   useEffect(() => {
     const read = () => {
@@ -524,36 +494,41 @@ export function DeviceList(props: CommonProps) {
 
 const MANAGER: Partial<Record<Role, true>> = { owner: true, admin: true }
 
-export interface InviteLinkProps extends CommonProps {
+export interface AddMemberProps extends CommonProps {
   space: string
-  /** Link lifetime. Default 24 h. */
-  expiresInMs?: number
-  /** Show join requests below the link. Default true. */
-  showRequests?: boolean
-  linkBase?: string
 }
 
-/** One-time invite link (with QR code) for a space, and the join requests waiting for approval. */
-export function InviteLink(props: InviteLinkProps) {
+/**
+ * Add someone to a space by npub (owners / admins). They must have published a key package
+ * (`db.publishKeyPackage()`); they then see an invitation to accept. Deciding *who* may join —
+ * links, approval, sign-in with an external provider — is left to the app or anoAuth.
+ */
+export function AddMember(props: AddMemberProps) {
   const l = useLabels(props)
   const db = useSharingDB()
   const me = useLive((d) => d.roleIn(props.space), [props.space])
   const roles: Array<Exclude<Role, 'owner'>> = me === 'owner' ? ['writer', 'reader', 'admin'] : ['writer', 'reader']
   const [role, setRole] = useState<Exclude<Role, 'owner'>>('writer')
-  const [link, setLink] = useState<string | null>(null)
+  const [npub, setNpub] = useState('')
+  const [done, setDone] = useState(false)
   const { error, run } = useErr()
-  const expires = props.expiresInMs ?? 24 * 3600_000
-  useEffect(() => setLink(null), [props.space])
-  if (!me || !MANAGER[me]) {
-    return (
-      <p className={props.className ?? 'anodb-invite'} style={{ margin: 0 }}>
-        {l.cannotInvite}
-      </p>
-    )
-  }
+  if (!me || !MANAGER[me]) return null
   return (
-    <section className={props.className ?? 'anodb-invite'} style={col}>
-      <h3 style={{ margin: 0 }}>{l.invite}</h3>
+    <form
+      className={props.className ?? 'anodb-add-member'}
+      style={col}
+      onSubmit={(e) => {
+        e.preventDefault()
+        setDone(false)
+        void run(db.addMember(props.space, npub.trim(), role).then(() => true)).then((ok) => {
+          if (!ok) return
+          setNpub('')
+          setDone(true)
+        })
+      }}
+    >
+      <h3 style={{ margin: 0 }}>{l.addMember}</h3>
+      <input className="anodb-input" aria-label="npub" placeholder="npub1…" value={npub} onChange={(e) => setNpub(e.target.value)} />
       <div style={row}>
         <select className="anodb-select" aria-label={l.role} value={role} onChange={(e) => setRole(e.target.value as Exclude<Role, 'owner'>)}>
           {roles.map((r) => (
@@ -562,128 +537,21 @@ export function InviteLink(props: InviteLinkProps) {
             </option>
           ))}
         </select>
-        <button className="anodb-button" onClick={() => void run(db.createInviteLink(props.space, { role, expiresInMs: expires })).then((u) => u && setLink(toAppLink(u, props.linkBase)))}>
-          {l.createLink}
+        <button className="anodb-button" disabled={!npub.trim()}>
+          {l.add}
         </button>
       </div>
-      {link && (
-        <div style={col}>
-          <QRCode value={link} title={l.inviteLink} />
-          <span style={mono}>{link}</span>
-          <div style={row}>
-            <CopyButton text={link} l={l} />
-          </div>
-          <span className="anodb-hint">{l.linkHint.replace('{hours}', String(Math.round(expires / 3600_000)))}</span>
-        </div>
-      )}
-      <ErrorText error={error} />
-      {props.showRequests !== false && <JoinRequests space={props.space} {...(props.lang ? { lang: props.lang } : {})} {...(props.labels ? { labels: props.labels } : {})} />}
-    </section>
-  )
-}
-
-/** Join requests for one space (or all spaces) with approve / reject. */
-export function JoinRequests(props: CommonProps & { space?: string }) {
-  const l = useLabels(props)
-  const db = useSharingDB()
-  const requests = useLive((d) => d.joinRequests().filter((r) => !props.space || r.space === props.space), [props.space])
-  const { error, run } = useErr()
-  return (
-    <section className={props.className ?? 'anodb-requests'} style={col}>
-      <h4 style={{ margin: 0 }}>{l.requests}</h4>
-      {requests.length === 0 && <span className="anodb-hint">{l.none}</span>}
-      <ul style={list}>
-        {requests.map((r) => (
-          <li key={r.id} style={{ ...row, justifyContent: 'space-between' }}>
-            <span>
-              {r.name || `${r.npub.slice(0, 12)}…`} <span className="anodb-badge">{r.role}</span>
-            </span>
-            <span style={row}>
-              <button className="anodb-button" onClick={() => void run(db.approveJoinRequest(r.id))}>
-                {l.approveRequest}
-              </button>
-              <button className="anodb-button anodb-secondary" onClick={() => db.rejectJoinRequest(r.id)}>
-                {l.reject}
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <ErrorText error={error} />
-    </section>
-  )
-}
-
-export interface JoinSpaceProps extends CommonProps {
-  /** Called with the space id once you are a member. */
-  onJoined?: (space: string) => void
-  /** Pre-filled name shown to the admin. */
-  defaultName?: string
-}
-
-/** Join with an invite link (pasted or opened via QR), and accept invitations sent to your npub. */
-export function JoinSpace(props: JoinSpaceProps) {
-  const l = useLabels(props)
-  const db = useSharingDB()
-  const [incoming, clearIncoming] = useIncomingLink('join')
-  const [text, setText] = useState('')
-  const [name, setName] = useState(props.defaultName ?? '')
-  const [sent, setSent] = useState(false)
-  const { error, setError, run } = useErr()
-  const spaces = useLive((d) => d.spaces().filter((s) => s.status === 'active').map((s) => s.id))
-  const before = useRef<Set<string> | null>(null)
-  const onJoined = props.onJoined
-
-  useEffect(() => {
-    if (incoming) setText(incoming)
-  }, [incoming])
-  useEffect(() => {
-    if (!before.current) return
-    const added = spaces.find((s) => !before.current!.has(s))
-    if (added) {
-      before.current = null
-      setSent(false)
-      onJoined?.(added)
-    }
-  }, [spaces, onJoined])
-
-  return (
-    <section className={props.className ?? 'anodb-join'} style={col}>
-      <h3 style={{ margin: 0 }}>{sent ? l.awaitingApproval : incoming ? l.invitedTitle : l.join}</h3>
-      {incoming && !sent && <p className="anodb-hint" style={{ margin: 0 }}>{l.invitedBody}</p>}
-      <form
-        style={sent ? { display: 'none' } : col}
-        onSubmit={(e) => {
-          e.preventDefault()
-          const uri = parseAppLink(text)
-          if (!uri?.startsWith('anodb://join')) return setError(l.invalidLink)
-          before.current = new Set(spaces)
-          void run(db.requestJoin(uri, name.trim()).then(() => true)).then((ok) => {
-            if (!ok) return
-            setSent(true)
-            setText('')
-            clearIncoming()
-          })
-        }}
-      >
-        <input className="anodb-input" aria-label={l.inviteLink} placeholder={l.inviteLink} value={text} onChange={(e) => setText(e.target.value)} />
-        <div style={row}>
-          <input className="anodb-input" aria-label={l.yourName} placeholder={l.yourName} value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 0 }} />
-          <button className="anodb-button">{l.requestJoin}</button>
-        </div>
-      </form>
-      {sent && (
+      {done && (
         <span className="anodb-hint" role="status">
-          {l.requested}
+          {l.added}
         </span>
       )}
       <ErrorText error={error} />
-      <Invitations {...props} />
-    </section>
+    </form>
   )
 }
 
-/** Invitations sent to your npub (`db.invite(space, npub, role)`), with accept / decline. */
+/** Invitations sent to your npub (`db.addMember(space, npub, role)`), with accept / decline. */
 export function Invitations(props: CommonProps & { onJoined?: (space: string) => void }) {
   const l = useLabels(props)
   const db = useSharingDB()

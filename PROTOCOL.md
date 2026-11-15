@@ -37,7 +37,7 @@ on their own; they travel inside encrypted messages (and in key packages, §6).
 |---|---|---|
 | space stream | `hex(sha256("anodb/v2/space/" + hex(epochKey)))[0:32]` | the epoch key itself |
 | device inbox | `hex(sha256("anodb/v2/inbox/" + devicePubkey))[0:32]` | ECDH(envelope key, device key) |
-| invite / pairing secret | `hex(sha256("anodb/v2/secret-tag/" + secret))[0:32]` | `sha256("anodb/v2/secret-key/" + secret)` |
+| pairing secret | `hex(sha256("anodb/v2/secret-tag/" + secret))[0:32]` | `sha256("anodb/v2/secret-key/" + secret)` |
 
 `keyId(epochKey) = hex(sha256("anodb/v2/key-id/" + hex(epochKey)))[0:16]`.
 
@@ -133,7 +133,7 @@ epoch.
 | `t` | fields | accepted when |
 |---|---|---|
 | `key` | `sp, name, personal, num, key, ops[]` | sender is admin+ of `sp` (or the same identity) under the carried + known ops, and the receiver is a member |
-| `invite` | as `key` + `role`, optional `req` | as above; stored until the user accepts (`req = sha256(link secret)` → auto-accept for own join requests) |
+| `invite` | as `key` + `role` | as above; stored until the user accepts |
 
 `ops` are complete signed inner op events, verifiable without the old epoch keys.
 
@@ -147,10 +147,12 @@ signer must still pass §4.1 for that signer.
 New members and newly paired devices receive keys for the **new** epoch only and catch up from
 snapshots.
 
-### 5.5 Invite links and pairing (secret routing)
+### 5.5 Pairing (secret routing)
 
-- Invite link: `anodb://join?app=<appId>&s=<secret>`. The requester sends `{ t: "joinreq", devices: [delegations], name }`
-  to the secret tag. An admin must approve; the link is single-use and expires.
+Membership is by identity only: an admin adds an identity with an `add` op and delivers keys to the
+devices its delegations name. How the admin learns the identity (links, approval, external sign-in)
+is outside this protocol.
+
 - Pairing: `anodb://pair?app=<appId>&d=<new device pubkey>&s=<secret>`; both devices display
   `sha256("anodb/v2/pair-code/" + d + "/" + s)` as a 6-digit code. The approving device sends
   `{ t: "pair", delegation, spaces: [grant…] }` to the secret tag. The identity key is never sent.
@@ -158,7 +160,7 @@ snapshots.
 ### 5.6 Key package (kind 10304, public, replaceable)
 
 `content = {"v":2,"delegations":[…]}` signed by the identity, listing current device delegations so
-others can invite by npub.
+others can add it by npub.
 
 ## 6. Sync (informative)
 

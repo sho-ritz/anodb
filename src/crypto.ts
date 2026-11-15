@@ -70,12 +70,12 @@ export function spaceTag(epochKey: Uint8Array): string {
   return h32(`anodb/v2/space/${bytesToHex(epochKey)}`)
 }
 
-/** Tag of a device inbox (key delivery, invites, pairing). */
+/** Tag of a device inbox (key delivery, invitations, pairing). */
 export function inboxTag(devicePubkey: string): string {
   return h32(`anodb/v2/inbox/${devicePubkey}`)
 }
 
-/** Tag and symmetric key derived from an invite link / pairing secret. */
+/** Tag and symmetric key derived from a pairing secret. */
 export function secretTag(secret: string): string {
   return h32(`anodb/v2/secret-tag/${secret}`)
 }
