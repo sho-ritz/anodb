@@ -162,12 +162,14 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   /**
    * Add a member by npub / pubkey and deliver the space key to their devices (owners / admins).
    * Who may join is decided outside anoDB (e.g. anoAuth): this is the primitive it calls.
-   * `devices`: the member's device delegations; when omitted, their published key package is used
-   * (`db.publishKeyPackage()`). The new member sees an invitation and must accept it.
+   * `devices`: the member's device delegations; when omitted, the devices this database already
+   * knows for that identity (e.g. a member of another shared space) or their published key package
+   * (`db.publishKeyPackage()`) are used. The new member sees an invitation and must accept it.
    */
   async addMember(space: string, who: string, role: Exclude<Role, 'owner'>, opts: { devices?: NostrEvent[] } = {}): Promise<void> {
     const identity = parsePubkey(who)
-    const given = opts.devices ?? (await this.#fetchKeyPackage(identity)).map((d) => d.delegation)
+    const known = this.store.devices(identity).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
+    const given = opts.devices ?? (known.length > 0 ? known : (await this.#fetchKeyPackage(identity)).map((d) => d.delegation))
     const delegations = given.filter((d) => {
       const device = d.tags.find((t) => t[0] === 'device')?.[1]
       return !!device && verifyDelegation(d, device) === identity
