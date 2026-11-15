@@ -1,7 +1,7 @@
 {
   "name": "@anodb/core",
-  "version": "0.10.0",
-  "description": "Absolutely No DB — a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
+  "version": "0.10.1",
+  "description": "Absolutely No DB \u2014 a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
@@ -46,7 +46,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
