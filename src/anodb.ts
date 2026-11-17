@@ -285,6 +285,13 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     }
   }
 
+  /** The sync engine asks for its tags whenever spaces or keys change: follow with the event subscription. */
+  protected override subscriptionTags(): string[] {
+    const tags = super.subscriptionTags()
+    if (this.#eventListeners.size > 0) queueMicrotask(() => this.#refreshEvents())
+    return tags
+  }
+
   #spaceTags(): string[] {
     const active = new Set(this.store.spaces().filter((s) => s.status === 'active').map((s) => s.id))
     return [...this.keysByTag.values()].filter((k) => active.has(k.space)).map((k) => k.tag)

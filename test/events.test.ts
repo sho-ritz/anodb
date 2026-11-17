@@ -63,4 +63,21 @@ describe('ephemeral events', () => {
     await sleep(500)
     expect(heard).toEqual([])
   })
+
+  it('a listener registered before joining hears the new space right away', async () => {
+    const r = await relay()
+    const a = await open(schema, [r])
+    const b = await open(schema, [r])
+    const heard: SpaceEvent[] = []
+    b.onEvent((e) => heard.push(e)) // before b is a member of anything shared
+    await b.publishKeyPackage()
+    await until(() => b.status.pendingEvents === 0)
+    const space = await a.createSpace('room')
+    await a.addMember(space, b.npub, 'writer')
+    await until(() => b.invitations().length === 1, 3000, 'invitation')
+    await b.acceptInvitation(space)
+    await sleep(300) // well under the 2 s fallback refresh
+    await a.emit(space, 'typing')
+    await until(() => heard.length === 1, 1500, 'event right after joining')
+  })
 })
