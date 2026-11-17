@@ -218,3 +218,11 @@ Clients MUST verify the sha256 of downloaded bytes before decrypting.
   - `{ t: "a", id }` — acknowledgement after successful ingestion.
 - A sender MAY skip relays for an envelope only if every active device of every member of the space
   acknowledged it; otherwise it MUST publish it to relays (default after 2 s).
+
+## 8. Ephemeral events
+
+Outer event kind **27303** (ephemeral: relays forward, do not store), signed by a throwaway key,
+`content = nip44(inner, epochKey)`, routed by the space stream tag. Inner event kind **7306**, signed
+by the device key, `content = { v: 2, sp, ep, type, d, dlg }`. Receivers accept it only if the inner
+signature and delegation verify, `sp` / `ep` match the routing key, it is at most 60 s old, and the
+identity is a member of the space. Events never enter the change log.

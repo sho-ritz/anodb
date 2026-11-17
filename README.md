@@ -16,7 +16,7 @@ anoDB is a decentralized, local-first database SDK that treats on-device SQLite 
 
 True to its name, it requires **absolutely no developer-operated server**: no API server, no database server, and no project setup. Offline reads and writes, multi-device sync and sharing with other people are available through a single type-safe, SQL-like API.
 
-> **Status: v0.10 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
+> **Status: v0.11 / experimental.** The protocol ([PROTOCOL.md](PROTOCOL.md), v2) may change incompatibly. See [docs/DESIGN.md](docs/DESIGN.md) for design details and limitations, and [docs/DECISIONS.md](docs/DECISIONS.md) for the decision log.
 
 ## Features
 
@@ -207,6 +207,22 @@ await db.revokeDevice(lostDevicePubkey)        // lost or stolen device
 ```
 
 > ⚠ Group keys are delivered to device keys only. **If you lose every device, your personal space cannot be recovered** (shared spaces can be restored by other members). Register at least two devices.
+
+## Ephemeral events
+
+For things that should reach whoever is online right now and then vanish — "typing…", presence,
+cursors — use events instead of rows:
+
+```ts
+const stop = db.onEvent((e) => showTyping(e.from), { space, type: 'typing' })
+await db.emit(space, 'typing', { on: true })
+```
+
+- Delivered to the space's members who are online; **never stored or synced later** (relays treat
+  them as ephemeral, kind 27303). Your own `emit` is not echoed back.
+- Encrypted with the space key and signed by your device like every write; `e.from` is the sender's
+  identity. Any member (readers included) may send; outsiders can neither send nor read.
+- Up to 8 KB each, dropped after 60 seconds.
 
 ## Direct sync over WebRTC
 

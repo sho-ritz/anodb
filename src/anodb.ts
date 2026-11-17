@@ -1,5 +1,6 @@
 import { bytesToHex, hexToBytes, randomHex, sha256Hex, signWith } from './crypto.js'
 import { type AnoDBOptions, prepare } from './db.js'
+import { EVENT_KIND, EVENT_MAX_AGE_SEC, type SpaceEvent, openEvent, sealEvent } from './events.js'
 import { TAG, WRAP_KIND } from './protocol.js'
 import { type P2PMode, type PeerInfo, P2PSync } from './p2p.js'
 import type { Filter } from './relay-pool.js'
@@ -22,6 +23,11 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   #lastRepair = 0
   #reconciling = new Set<string>()
   #p2p: P2PSync | null = null
+  readonly #eventListeners = new Set<{ fn: (e: SpaceEvent) => void; space?: string; type?: string }>()
+  readonly #seenEvents = new Set<string>()
+  #eventUnsub: (() => void) | null = null
+  #eventKey = ''
+  #eventTimer: ReturnType<typeof setInterval> | null = null
 
   protected override async afterInit(): Promise<void> {
     await super.afterInit()
@@ -239,7 +245,88 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
 
   // ---- public tables ----------------------------------------------------------------------
 
+  // ---- ephemeral events --------------------------------------------------------------
+
+  /**
+   * Send an ephemeral event to the members of `space` who are online ("typing…", presence).
+   * Not stored, not synced later; delivered at most once per listener. Any member may send.
+   */
+  async emit(space: string, type: string, data: unknown = null): Promise<void> {
+    this.assertOpen()
+    if (!this.roleOf(space, this.pubkey)) throw new Error(`anoDB: not a member of space ${space}`)
+    const pool = this.sync?.pool
+    if (!pool) return
+    const k = this.currentKey(space)
+    const e = sealEvent(this.deviceSk, { v: 2, sp: space, ep: k.keyId, type, d: data, dlg: this.delegation }, k.tag, k.key, Math.floor(this.now() / 1000), TAG)
+    await pool.publish(e)
+  }
+
+  /**
+   * Listen to ephemeral events (from other devices; your own `emit` is not echoed). Filter by
+   * space and / or type. Returns an unsubscribe function.
+   */
+  onEvent<T = unknown>(fn: (e: SpaceEvent<T>) => void, filter: { space?: string; type?: string } = {}): () => void {
+    const entry = { fn: fn as (e: SpaceEvent) => void, ...filter }
+    this.#eventListeners.add(entry)
+    this.#refreshEvents()
+    if (!this.#eventTimer) {
+      this.#eventTimer = setInterval(() => this.#refreshEvents(), 2000) // epoch keys and spaces change
+      ;(this.#eventTimer as { unref?: () => void }).unref?.()
+    }
+    return () => {
+      this.#eventListeners.delete(entry)
+      if (this.#eventListeners.size === 0) {
+        this.#eventUnsub?.()
+        this.#eventUnsub = null
+        this.#eventKey = ''
+        if (this.#eventTimer) clearInterval(this.#eventTimer)
+        this.#eventTimer = null
+      }
+    }
+  }
+
+  #spaceTags(): string[] {
+    const active = new Set(this.store.spaces().filter((s) => s.status === 'active').map((s) => s.id))
+    return [...this.keysByTag.values()].filter((k) => active.has(k.space)).map((k) => k.tag)
+  }
+
+  #refreshEvents(): void {
+    const pool = this.sync?.pool
+    if (!pool || this.closed || this.#eventListeners.size === 0) return
+    const tags = this.#spaceTags()
+    const key = tags.sort().join(',')
+    if (key === this.#eventKey) return
+    this.#eventKey = key
+    this.#eventUnsub?.()
+    this.#eventUnsub = tags.length
+      ? pool.subscribe(() => [{ kinds: [EVENT_KIND], [`#${TAG}`]: this.#spaceTags(), since: Math.floor(this.now() / 1000) - EVENT_MAX_AGE_SEC }], {
+          onEvent: (_relay, e) => this.#onEphemeral(e),
+        })
+      : null
+  }
+
+  #onEphemeral(outer: NostrEvent): void {
+    if (this.closed) return
+    const tag = outer.tags.find((t) => t[0] === TAG)?.[1]
+    const k = tag ? this.keysByTag.get(tag) : undefined
+    if (!k) return
+    const e = openEvent(outer, k.key, k.space, k.keyId, Math.floor(this.now() / 1000))
+    if (!e || e.device === this.devicePubkey || this.#seenEvents.has(e.id)) return
+    this.#seenEvents.add(e.id)
+    if (this.#seenEvents.size > 2000) this.#seenEvents.delete(this.#seenEvents.values().next().value!)
+    if (!this.roleOf(e.space, e.from) && e.from !== this.pubkey) return // members only
+    const { id: _id, ...event } = e
+    for (const l of [...this.#eventListeners]) {
+      if ((l.space && l.space !== e.space) || (l.type && l.type !== e.type)) continue
+      try {
+        l.fn(event)
+      } catch {}
+    }
+  }
+
   override async close(): Promise<void> {
+    this.#eventUnsub?.()
+    if (this.#eventTimer) clearInterval(this.#eventTimer)
     if (this.#reconcileTimer) clearInterval(this.#reconcileTimer)
     await this.#p2p?.close()
     await super.close()
