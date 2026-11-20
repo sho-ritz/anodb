@@ -1,6 +1,7 @@
 import { BACKFILL_PAGE, CURSOR_SKEW_SEC, RESIGN_AFTER_SEC } from './defaults.js'
 import { TAG, WRAP_KIND } from './protocol.js'
 import type { Filter, RelayPool } from './relay-pool.js'
+import { RelayRouter, type RouteSeed } from './relay-routing.js'
 import type { Store } from './store.js'
 import type { NostrEvent, SyncStatus } from './types.js'
 
@@ -17,6 +18,8 @@ export interface SyncHost {
   now(): number
   /** Hook for extra reconciliation once a relay finished its initial batch (NIP-77, gap repair). */
   afterCatchUp?(relay: string): Promise<void>
+  /** Secret routing seed of a subscribed tag, for automatic relay selection (null: fixed relays only). */
+  route?(tag: string): RouteSeed | null
 }
 
 interface RelayState {
@@ -35,6 +38,7 @@ export class SyncEngine {
   readonly #pool: RelayPool
   readonly #host: SyncHost
   readonly #minAcks: number
+  readonly #router: RelayRouter
   readonly #state = new Map<string, RelayState>()
   #gen = 0
   #unsub: (() => void) | null = null
@@ -43,14 +47,18 @@ export class SyncEngine {
   #timer: ReturnType<typeof setInterval> | null = null
   #closed = false
   #tagKey = ''
+  /** Extra copies still owed to automatically picked relays that were offline at delivery (best effort, in memory). */
+  readonly #owed = new Map<string, Map<string, NostrEvent>>()
 
-  constructor(store: Store, pool: RelayPool, host: SyncHost, opts: { minAcks: number; retryIntervalMs: number }) {
+  constructor(store: Store, pool: RelayPool, host: SyncHost, opts: { minAcks: number; retryIntervalMs: number; router?: RelayRouter }) {
     this.#store = store
     this.#pool = pool
     this.#host = host
     this.#minAcks = opts.minAcks
-    pool.onOpen(() => {
+    this.#router = opts.router ?? new RelayRouter(pool.relays, null, 0)
+    pool.onOpen((relay) => {
       host.statusChanged()
+      this.#payOwed(relay)
       void this.flush()
     })
     pool.onClose((relay) => {
@@ -67,6 +75,21 @@ export class SyncEngine {
     return this.#pool
   }
 
+  /** The fixed relays (`relays` option / DEFAULT_RELAYS), without the automatically picked ones. */
+  get fixedRelays(): readonly string[] {
+    return this.#router.fixed
+  }
+
+  /** Relays a tag is read from and written to: the fixed ones plus its automatically picked ones. */
+  relaysFor(tag: string): string[] {
+    return this.#router.relaysFor(tag)
+  }
+
+  /** The subset of `tags` this device reads on `relay`. */
+  tagsOn(relay: string, tags: readonly string[]): string[] {
+    return tags.filter((t) => this.#router.reads(t, relay))
+  }
+
   start(): void {
     this.refresh(true)
     this.#pool.connect()
@@ -79,6 +102,11 @@ export class SyncEngine {
     const key = [...tags].sort().join(',')
     if (!force && key === this.#tagKey) return
     this.#tagKey = key
+    if (this.#router.enabled) {
+      const keep = this.#router.plan(tags.map((tag) => ({ tag, route: this.#host.route?.(tag) ?? null })))
+      this.#pool.setRelays(keep)
+      for (const r of [...this.#state.keys()]) if (!keep.includes(r)) this.#state.delete(r)
+    }
     this.#unsub?.()
     this.#gen++
     this.#unsub = this.#pool.subscribe((relay) => this.#filtersFor(relay), {
@@ -89,7 +117,7 @@ export class SyncEngine {
   }
 
   #filtersFor(relay: string): Filter[] | null {
-    const tags = this.#host.tags()
+    const tags = this.tagsOn(relay, this.#host.tags())
     const bySince = new Map<number, string[]>()
     const sinceByTag = new Map<string, number>()
     for (const tag of tags) {
@@ -200,12 +228,15 @@ export class SyncEngine {
     if (this.#closed) return
     const connected = new Set(this.#pool.connected())
     if (connected.size === 0) return
-    const relays = this.#pool.relays
+    const fixed = this.#router.fixed
     await Promise.all(
       this.#store.outbox().map(async ({ entryId, event, resign, holdUntil, acks }) => {
         // Held while peers acknowledge it over WebRTC; released (or dequeued) by the P2P layer.
         if (holdUntil > Date.now()) return
-        const targets = relays.filter((r) => connected.has(r) && !acks.has(r))
+        const tag = tagOf(event)
+        // Tagged envelopes go to their route; untagged events (NIP-09 deletions) to every connected relay.
+        const route = tag ? this.#router.relaysFor(tag) : [...new Set([...fixed, ...connected])]
+        const targets = route.filter((r) => connected.has(r) && !acks.has(r))
         if (targets.length === 0) return
         let toSend = event
         const nowSec = Math.floor(this.#host.now() / 1000)
@@ -226,11 +257,35 @@ export class SyncEngine {
             this.#store.recordAck(entryId, relay, r.outcome, r.message)
           }
         }
-        const ok = [...acks.values()].filter((s) => s === 'ok').length
-        if (ok >= this.#minAcks || (ok > 0 && acks.size === relays.length)) this.#store.dequeue(entryId)
-        else if (acks.size === relays.length) this.#host.publishRejected(entryId)
+        // Delivery is judged on the fixed relays (phase 1: the automatic ones are extra copies), or on
+        // the route itself when there are no fixed relays.
+        const judged = fixed.length > 0 ? fixed : route
+        const answered = judged.filter((r) => acks.has(r)).length
+        const ok = judged.filter((r) => acks.get(r) === 'ok').length
+        if (ok >= Math.min(this.#minAcks, judged.length) || (ok > 0 && answered === judged.length)) {
+          this.#store.dequeue(entryId)
+          for (const r of route) if (!acks.has(r) && !judged.includes(r)) this.#owe(r, toSend)
+        } else if (answered === judged.length) this.#host.publishRejected(entryId)
       }),
     )
+  }
+
+  #owe(relay: string, event: NostrEvent): void {
+    if (this.#pool.connected().includes(relay)) {
+      void this.#pool.publish(event, [relay])
+      return
+    }
+    let m = this.#owed.get(relay)
+    if (!m) this.#owed.set(relay, (m = new Map()))
+    m.set(event.id, event)
+    if (m.size > 500) m.delete(m.keys().next().value!)
+  }
+
+  #payOwed(relay: string): void {
+    const m = this.#owed.get(relay)
+    if (!m || this.#closed) return
+    this.#owed.delete(relay)
+    for (const e of m.values()) void this.#pool.publish(e, [relay])
   }
 
   enqueue(event: NostrEvent, resign: boolean, holdUntil = 0): void {

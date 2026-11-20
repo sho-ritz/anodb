@@ -27,6 +27,8 @@ export interface StreamHeader {
   ep: string
   /** per (space, device) sequence number, starting at 1 */
   seq: number
+  /** 1: the sender reads this space on its automatically picked relays (DECISIONS 30). Optional. */
+  rp?: 1
   /** identity → device delegation */
   dlg: NostrEvent
 }
