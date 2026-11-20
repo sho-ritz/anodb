@@ -28,6 +28,13 @@ never lose sync. **This release is phase 1: nothing is removed, the picked relay
   the fixed relays only.
 - New exports: `RELAY_CANDIDATES`, `RELAY_CANDIDATES_VERSION`, `rankRelays`.
 
+### `@anodb/cli` 0.12.0
+
+- Depends on `@anodb/core` `^0.12.0` (with 0.x versions, `^0.11.0` would have kept installs on 0.11).
+- The setup wizard's relay choice now reads "Pick automatically (recommended)" / "Enter my own (turns
+  automatic selection off)". The generated code is unchanged: the default writes no `relays`
+  option, so automatic selection is on.
+
 ### Compatibility
 
 - Wire protocol stays **v2**. 0.12.0 and older versions sync with each other in the same space.
