@@ -1,0 +1,1483 @@
+{
+  "surveyedAt": "2026-11-19",
+  "criteria": "no auth/payment/restricted_writes in NIP-11; accepts kind 7303 from a fresh pubkey; serves it by #n tag on a new connection; still served ~1 min later; still served ~1 hour later",
+  "retentionChecked": "1h",
+  "count": 295,
+  "relays": [
+    {
+      "url": "wss://nostr.middling.mydns.jp",
+      "writeAckMs": 11,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://staging.yabu.me",
+      "writeAckMs": 13,
+      "software": "pfortner"
+    },
+    {
+      "url": "wss://cagliostr.compile-error.net",
+      "writeAckMs": 14,
+      "software": "https://github.com/mattn/cagliostr"
+    },
+    {
+      "url": "wss://yabu.me",
+      "writeAckMs": 16,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay02.lnfi.network",
+      "writeAckMs": 18,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://relay01.lnfi.network",
+      "writeAckMs": 18,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://x.kojira.io",
+      "writeAckMs": 19,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostx.io",
+      "writeAckMs": 19,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.fediverse.jp",
+      "writeAckMs": 21,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://nostr.compile-error.net",
+      "writeAckMs": 22,
+      "software": "https://github.com/mattn/nostr-relay"
+    },
+    {
+      "url": "wss://r.kojira.io",
+      "writeAckMs": 22,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://r.ydg.works",
+      "writeAckMs": 23,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostrdam.com",
+      "writeAckMs": 29,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://nostr-relay.cbrx.io",
+      "writeAckMs": 34,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.vrtmrz.net",
+      "writeAckMs": 39,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://n.kojira.io",
+      "writeAckMs": 45,
+      "software": "https://github.com/iqbqioza/nostrfy"
+    },
+    {
+      "url": "wss://nr1.hakodate.city",
+      "writeAckMs": 47,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.haruki7049.dev",
+      "writeAckMs": 57,
+      "software": "https://github.com/iqbqioza/nostrfy"
+    },
+    {
+      "url": "wss://purplerelay.com",
+      "writeAckMs": 79,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.riochndr.com",
+      "writeAckMs": 88,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay-jp.nostr.wirednet.jp",
+      "writeAckMs": 98,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.substation.ninja",
+      "writeAckMs": 103,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://dev.relay.stream",
+      "writeAckMs": 106,
+      "software": "https://github.com/rnostr/rnostr"
+    },
+    {
+      "url": "wss://relay.ru.ac.th",
+      "writeAckMs": 108,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relayrs.notoshi.win",
+      "writeAckMs": 113,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr-relay.zimage.com",
+      "writeAckMs": 118,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.spicyz.io",
+      "writeAckMs": 120,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.gulugulu.moe",
+      "writeAckMs": 120,
+      "software": "https://github.com/ClarkQAQ/nostr"
+    },
+    {
+      "url": "wss://relay.islandbitcoin.com",
+      "writeAckMs": 121,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay-dev.gulugulu.moe",
+      "writeAckMs": 122,
+      "software": "https://github.com/ClarkQAQ/nostr"
+    },
+    {
+      "url": "wss://nostr-dev.azuki.blue",
+      "writeAckMs": 125,
+      "software": "https://github.com/azuki774/khatru-redbean"
+    },
+    {
+      "url": "wss://dragon-orange.exe.xyz",
+      "writeAckMs": 126,
+      "software": "https://github.com/arx-ccn/fastr"
+    },
+    {
+      "url": "wss://relay.illuminodes.com",
+      "writeAckMs": 127,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.azuki.blue",
+      "writeAckMs": 129,
+      "software": "https://github.com/azuki774/khatru-redbean"
+    },
+    {
+      "url": "wss://newlay.sendsats.to",
+      "writeAckMs": 135,
+      "software": "newlay"
+    },
+    {
+      "url": "wss://relay.pacsarcade.org",
+      "writeAckMs": 150,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostrian-conquest.com",
+      "writeAckMs": 151,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.zoracle.org",
+      "writeAckMs": 152,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://syb.lol",
+      "writeAckMs": 156,
+      "software": "https://gitworkshop.dev/soapbox.pub/ditto-relay"
+    },
+    {
+      "url": "wss://relay.bowlafterbowl.com",
+      "writeAckMs": 156,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr-relay.corb.net",
+      "writeAckMs": 157,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://bitcoiner.social",
+      "writeAckMs": 157,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://airfry.utxo.one",
+      "writeAckMs": 159,
+      "software": "nostr-relay"
+    },
+    {
+      "url": "wss://nostr.bitcoiner.social",
+      "writeAckMs": 160,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.satoshisfrens.win",
+      "writeAckMs": 161,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay-us.zombi.cloudrodion.com",
+      "writeAckMs": 161,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.computingcache.com",
+      "writeAckMs": 163,
+      "software": "https://github.com/VectorPrivacy/magnitude-relay"
+    },
+    {
+      "url": "wss://fanfares.nostr1.com",
+      "writeAckMs": 163,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostr.wirednet.jp",
+      "writeAckMs": 163,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.lotek-distro.com",
+      "writeAckMs": 163,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.beginningend.com",
+      "writeAckMs": 164,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.notoshi.win",
+      "writeAckMs": 166,
+      "software": "https://github.com/rnostr/rnostr"
+    },
+    {
+      "url": "wss://greenart7c3.feeds.relay.tools",
+      "writeAckMs": 167,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://offchain.bostr.online",
+      "writeAckMs": 167,
+      "software": "cloudflare-worker-websocket-proxy"
+    },
+    {
+      "url": "wss://offchain.pub",
+      "writeAckMs": 168,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.directsponsor.net",
+      "writeAckMs": 168,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://chat.boom.money",
+      "writeAckMs": 170,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.mypathtofire.de",
+      "writeAckMs": 170,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.hazeem.xyz",
+      "writeAckMs": 172,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.btcforplebs.com",
+      "writeAckMs": 172,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.agentry.com",
+      "writeAckMs": 172,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://denimroad.feeds.relay.tools",
+      "writeAckMs": 173,
+      "software": "newlay"
+    },
+    {
+      "url": "wss://conduit-congee.fly.dev",
+      "writeAckMs": 173,
+      "software": "https://github.com/michmich112/congee"
+    },
+    {
+      "url": "wss://bbw-nostr.xyz",
+      "writeAckMs": 173,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://hasky.chat",
+      "writeAckMs": 174,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostrcity-club.fly.dev",
+      "writeAckMs": 174,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.hackshed.dev",
+      "writeAckMs": 175,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.conduit.market",
+      "writeAckMs": 175,
+      "software": "https://github.com/michmich112/congee"
+    },
+    {
+      "url": "wss://relay.398ja.xyz",
+      "writeAckMs": 175,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.malin.onl",
+      "writeAckMs": 175,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://bruh.samt.st",
+      "writeAckMs": 176,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.colombiap2p.com",
+      "writeAckMs": 176,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.tac.lol",
+      "writeAckMs": 176,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://wheat.happytavern.co",
+      "writeAckMs": 176,
+      "software": "https://github.com/0ceanslim/grain"
+    },
+    {
+      "url": "wss://nostr.islandarea.net",
+      "writeAckMs": 176,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.overmind.lol",
+      "writeAckMs": 181,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://realy.130601.xyz/wss-18646e4d-18f5-4ebb-8e38-096bb8a17aa4",
+      "writeAckMs": 181,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://dm-test-nostr-rs-42-disabled.samt.st",
+      "writeAckMs": 182,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.lightning.pub",
+      "writeAckMs": 183,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://n-e96dea.hallissy.email",
+      "writeAckMs": 184,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.nostr.black",
+      "writeAckMs": 184,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://testnet.samt.st",
+      "writeAckMs": 185,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.thewired.app",
+      "writeAckMs": 186,
+      "software": "thewired-relay"
+    },
+    {
+      "url": "wss://nostr-01.yakihonne.com",
+      "writeAckMs": 187,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr-02.yakihonne.com",
+      "writeAckMs": 188,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.shychat.lol",
+      "writeAckMs": 188,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.pro.aw",
+      "writeAckMs": 188,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr-rs-relay.dev.fedibtc.com",
+      "writeAckMs": 188,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://dm-test-strfry-generic.samt.st",
+      "writeAckMs": 188,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://schnorr.me",
+      "writeAckMs": 189,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay-can.zombi.cloudrodion.com",
+      "writeAckMs": 189,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://strfry.shock.network",
+      "writeAckMs": 189,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://spamspamspamspam.rest",
+      "writeAckMs": 189,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://dm-test-strfry-discovery.samt.st",
+      "writeAckMs": 189,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.satlantis.io",
+      "writeAckMs": 190,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://strfry.bonsai.com",
+      "writeAckMs": 191,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://groups.beginningend.com",
+      "writeAckMs": 193,
+      "software": "https://github.com/verse-pbc/groups_relay"
+    },
+    {
+      "url": "wss://btcpay.sendbitcoin.lol/nostr",
+      "writeAckMs": 193,
+      "software": "https://github.com/Kukks/NNostr"
+    },
+    {
+      "url": "wss://relay-dev.satlantis.io",
+      "writeAckMs": 194,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://dm-test-nostr-rs-42-enabled.samt.st",
+      "writeAckMs": 194,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://bridge.tagomago.me",
+      "writeAckMs": 196,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.chatbett.de",
+      "writeAckMs": 196,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.trevena.info",
+      "writeAckMs": 197,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.fundstr.me",
+      "writeAckMs": 198,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://scores.brainstorm.world",
+      "writeAckMs": 199,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.red5d.dev",
+      "writeAckMs": 199,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.cypherguide.org",
+      "writeAckMs": 201,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay1.plor.dev",
+      "writeAckMs": 202,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.nostr.blockhenge.com",
+      "writeAckMs": 210,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.earthly.city",
+      "writeAckMs": 210,
+      "software": "https://pkg.go.dev/fiatjaf.com/nostr/khatru"
+    },
+    {
+      "url": "wss://wheat.oslim.dev",
+      "writeAckMs": 212,
+      "software": "https://github.com/0ceanslim/grain"
+    },
+    {
+      "url": "wss://articles.layer3.news",
+      "writeAckMs": 212,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.cobranzas.com",
+      "writeAckMs": 212,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay2.orangesync.tech",
+      "writeAckMs": 213,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.janx.com",
+      "writeAckMs": 214,
+      "software": "https://github.com/satwise/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nip85-staging.nosfabrica.com",
+      "writeAckMs": 222,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.hjkl.zip",
+      "writeAckMs": 225,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.liberty.fans",
+      "writeAckMs": 230,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.ditto.pub",
+      "writeAckMs": 234,
+      "software": "https://gitworkshop.dev/soapbox.pub/ditto-relay"
+    },
+    {
+      "url": "wss://relay.statedmission.com",
+      "writeAckMs": 236,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.kilombino.com",
+      "writeAckMs": 241,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.bitmacro.cloud",
+      "writeAckMs": 241,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.easycryptosend.it",
+      "writeAckMs": 246,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay1.privkey.io",
+      "writeAckMs": 246,
+      "software": "https://github.com/privkeyio/wisp"
+    },
+    {
+      "url": "wss://nostr-spike-production.up.railway.app/relay",
+      "writeAckMs": 247,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.mappingbitcoin.com",
+      "writeAckMs": 248,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://strfry.throwawayaccount.com",
+      "writeAckMs": 248,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.novospes.com",
+      "writeAckMs": 249,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.merovingian.chat",
+      "writeAckMs": 250,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.getsafebox.app",
+      "writeAckMs": 250,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nearhood.co.uk",
+      "writeAckMs": 252,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.hetuniversum.nl",
+      "writeAckMs": 254,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.s-w.art",
+      "writeAckMs": 255,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://veil.contact",
+      "writeAckMs": 256,
+      "software": "https://github.com/blackdev1l/veil/backend"
+    },
+    {
+      "url": "wss://nostr.21crypto.ch",
+      "writeAckMs": 257,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://bitcoincoin.ch/nostrrelay/nwc-private",
+      "writeAckMs": 257,
+      "software": "LNbits"
+    },
+    {
+      "url": "wss://relay.bnos.space",
+      "writeAckMs": 257,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.jcera.eu",
+      "writeAckMs": 257,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.snort.social",
+      "writeAckMs": 258,
+      "software": "https://github.com/v0l/memlay"
+    },
+    {
+      "url": "wss://relay.ngengine.org",
+      "writeAckMs": 258,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.pprgb.app",
+      "writeAckMs": 258,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://2-25-5-92.sslip.io",
+      "writeAckMs": 258,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.nostrnostr.net",
+      "writeAckMs": 259,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.czas.plus",
+      "writeAckMs": 260,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.gasteazi.net",
+      "writeAckMs": 261,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.silentmode.st",
+      "writeAckMs": 261,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay2.ngengine.org",
+      "writeAckMs": 261,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.atsocy.com",
+      "writeAckMs": 264,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://strfry.moestr.online",
+      "writeAckMs": 264,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://memlay.v0l.io",
+      "writeAckMs": 266,
+      "software": "https://github.com/v0l/memlay"
+    },
+    {
+      "url": "wss://nostrrelay.taylorperron.com",
+      "writeAckMs": 266,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://relay.nostr.net",
+      "writeAckMs": 267,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostrelay.circum.space",
+      "writeAckMs": 267,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay2.angor.io",
+      "writeAckMs": 268,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.minibolt.info",
+      "writeAckMs": 268,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.artio.inf.unibe.ch",
+      "writeAckMs": 270,
+      "software": "https://github.com/SEG-UNIBE/artio-relay"
+    },
+    {
+      "url": "wss://relay.nostar.org",
+      "writeAckMs": 270,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.bitos.space",
+      "writeAckMs": 270,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.favillakey.io",
+      "writeAckMs": 270,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.sovereignservices.xyz",
+      "writeAckMs": 270,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.plebeian.market",
+      "writeAckMs": 270,
+      "software": "https://github.com/PlebeianTech/market/tree/master/deploy-simple/relay"
+    },
+    {
+      "url": "wss://relay-fra.zombi.cloudrodion.com",
+      "writeAckMs": 270,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.rblb.it",
+      "writeAckMs": 270,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://bendernostur.duckdns.org:8443",
+      "writeAckMs": 271,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.qstr.app",
+      "writeAckMs": 271,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.manneken.brussels",
+      "writeAckMs": 271,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.guggero.org",
+      "writeAckMs": 271,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.88mph.life",
+      "writeAckMs": 272,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.alex71btc.com",
+      "writeAckMs": 272,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.mad-social.net",
+      "writeAckMs": 272,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.snotr.nl:49999",
+      "writeAckMs": 273,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.hifish.org",
+      "writeAckMs": 273,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://data-space.world/relay",
+      "writeAckMs": 274,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.loveisbitcoin.com",
+      "writeAckMs": 274,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostr.dev.br",
+      "writeAckMs": 274,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://test.relays.nuts.cash",
+      "writeAckMs": 274,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://r.senx.io",
+      "writeAckMs": 274,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://20pl.top",
+      "writeAckMs": 274,
+      "software": "https://github.com/iqbqioza/nostrfy"
+    },
+    {
+      "url": "wss://relay.carlismo.mx",
+      "writeAckMs": 275,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.wisp.talk",
+      "writeAckMs": 275,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://cs-relay.nostrdev.com",
+      "writeAckMs": 275,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.rtvslawenia.com",
+      "writeAckMs": 276,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://baunilha.ie.apps.lnvps.cloud",
+      "writeAckMs": 277,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.eu.freedomrelay.dev",
+      "writeAckMs": 278,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.gorrdy.cz",
+      "writeAckMs": 278,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.satsapp.me",
+      "writeAckMs": 278,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.mitosystem.net",
+      "writeAckMs": 279,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://temp.iris.to",
+      "writeAckMs": 279,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://chat-relay.zap-work.com",
+      "writeAckMs": 279,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.sigit.io",
+      "writeAckMs": 281,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr-01.uid.ovh",
+      "writeAckMs": 281,
+      "software": "https://github.com/nogringo/nostr-relay"
+    },
+    {
+      "url": "wss://relay.nostrmap.net",
+      "writeAckMs": 281,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.paulstephenborile.com",
+      "writeAckMs": 281,
+      "software": "https://github.com/paulborile/glienicke"
+    },
+    {
+      "url": "wss://relay.xlop.cz",
+      "writeAckMs": 282,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.froth.zone",
+      "writeAckMs": 283,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.lanacoin-eternity.com",
+      "writeAckMs": 283,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.wecsats.io",
+      "writeAckMs": 284,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.quali.chat",
+      "writeAckMs": 284,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nmail.li",
+      "writeAckMs": 284,
+      "software": "https://github.com/nogringo/nostr-relay"
+    },
+    {
+      "url": "wss://relay2.0xprivacy.online",
+      "writeAckMs": 285,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://inbox.stservices.io",
+      "writeAckMs": 285,
+      "software": "https://pkg.go.dev/fiatjaf.com/nostr/khatru"
+    },
+    {
+      "url": "wss://relay.samt.st",
+      "writeAckMs": 285,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.sathoarder.com",
+      "writeAckMs": 287,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://portal-relay.pareto.space",
+      "writeAckMs": 288,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.stakey.net",
+      "writeAckMs": 288,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.hivescope.xyz",
+      "writeAckMs": 289,
+      "software": "https://github.com/rzazo24/nostr-relay-khatru"
+    },
+    {
+      "url": "wss://relay.monostr.com",
+      "writeAckMs": 290,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostria.at",
+      "writeAckMs": 291,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.olas.app",
+      "writeAckMs": 291,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostu.be",
+      "writeAckMs": 292,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostrhub.fr",
+      "writeAckMs": 292,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://testr.nymble.world",
+      "writeAckMs": 293,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.aphelion.network",
+      "writeAckMs": 293,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.budabit.club",
+      "writeAckMs": 294,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://ec1.f7z.io",
+      "writeAckMs": 294,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://vault.iris.to",
+      "writeAckMs": 294,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.lanavault.space",
+      "writeAckMs": 296,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.plantroon.com",
+      "writeAckMs": 296,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay2.veganostr.com",
+      "writeAckMs": 296,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.noeudlibre.fr",
+      "writeAckMs": 298,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay-rpi.edufeed.org",
+      "writeAckMs": 299,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr-02.uid.ovh",
+      "writeAckMs": 300,
+      "software": "https://github.com/nogringo/nostr-relay"
+    },
+    {
+      "url": "wss://relay.nostrfeed.com",
+      "writeAckMs": 301,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.flashapp.me",
+      "writeAckMs": 301,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://pipe.imwald.eu",
+      "writeAckMs": 302,
+      "software": "newlay"
+    },
+    {
+      "url": "wss://freelay.sovbit.host",
+      "writeAckMs": 303,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.veganostr.com",
+      "writeAckMs": 305,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.cyberguy.fyi",
+      "writeAckMs": 306,
+      "software": "https://github.com/arx-ccn/fastr"
+    },
+    {
+      "url": "wss://relay.grigic.org",
+      "writeAckMs": 306,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://bread.nostrsms.com",
+      "writeAckMs": 307,
+      "software": "https://github.com/0ceanslim/grain"
+    },
+    {
+      "url": "wss://nostr.azzamo.net",
+      "writeAckMs": 307,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.trepechov.com",
+      "writeAckMs": 309,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.libernet.app",
+      "writeAckMs": 310,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.twinkle.lol",
+      "writeAckMs": 311,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.sincensura.org",
+      "writeAckMs": 311,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.aidatanorge.no",
+      "writeAckMs": 312,
+      "software": "git+https://github.com/cameri/nostream.git"
+    },
+    {
+      "url": "wss://relay.primal.net/v1",
+      "writeAckMs": 312,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.edufeed.org",
+      "writeAckMs": 314,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://spurline.safebox.dev",
+      "writeAckMs": 315,
+      "software": "spurline"
+    },
+    {
+      "url": "wss://relay.shadowbip.com",
+      "writeAckMs": 318,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.carroarmato0.be",
+      "writeAckMs": 319,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.bgbitcoin.club",
+      "writeAckMs": 320,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.snowbla.de",
+      "writeAckMs": 323,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://ec2.f7z.io",
+      "writeAckMs": 323,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relayone.geektank.ai",
+      "writeAckMs": 331,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.coinos.pro",
+      "writeAckMs": 332,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.nodesmap.com",
+      "writeAckMs": 332,
+      "software": "https://github.com/rnostr/rnostr"
+    },
+    {
+      "url": "wss://paresia.zobrak.net",
+      "writeAckMs": 333,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.tail67ca90.ts.net",
+      "writeAckMs": 334,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.solomonstr.com",
+      "writeAckMs": 335,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://all.btchushbox.com/dm",
+      "writeAckMs": 339,
+      "software": "https://github.com/rnostr/rnostr"
+    },
+    {
+      "url": "wss://nostr.relay.hedwig.sh",
+      "writeAckMs": 342,
+      "software": "https://github.com/mattn/nostr-relay"
+    },
+    {
+      "url": "wss://nostr.mom",
+      "writeAckMs": 345,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://rel4ynostr.immortalist.dpdns.org",
+      "writeAckMs": 356,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.paywithflash.com",
+      "writeAckMs": 357,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr-relay.xbytez.io",
+      "writeAckMs": 361,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr-relay01.redscrypt.org:48443",
+      "writeAckMs": 376,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.planix.org",
+      "writeAckMs": 379,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.i9.eti.br",
+      "writeAckMs": 387,
+      "software": "https://github.com/rnostr/rnostr"
+    },
+    {
+      "url": "wss://nos.lol",
+      "writeAckMs": 392,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.sharegap.net",
+      "writeAckMs": 392,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.mccormick.cx",
+      "writeAckMs": 401,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.petrkr.net/strfry",
+      "writeAckMs": 404,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.primal.net",
+      "writeAckMs": 408,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.me/relay",
+      "writeAckMs": 429,
+      "software": "Ditto"
+    },
+    {
+      "url": "wss://nostr.superfriends.online",
+      "writeAckMs": 447,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.trcjr.xyz",
+      "writeAckMs": 456,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.piazza.today",
+      "writeAckMs": 465,
+      "software": "https://gitlab.com/soapbox-pub/ditto-relay"
+    },
+    {
+      "url": "wss://relay.crovaxon.de",
+      "writeAckMs": 473,
+      "software": "https://gitlab.com/soapbox-pub/ditto-relay"
+    },
+    {
+      "url": "wss://relay.zone667.com",
+      "writeAckMs": 475,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.tabordalab.com",
+      "writeAckMs": 506,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.bitcoinx.gr",
+      "writeAckMs": 509,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://public.crostr.com",
+      "writeAckMs": 523,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://lnbits.javi.space/nostrrelay/javier",
+      "writeAckMs": 526,
+      "software": "LNbits"
+    },
+    {
+      "url": "wss://relay-arg.zombi.cloudrodion.com",
+      "writeAckMs": 586,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relayone.soundhsa.com",
+      "writeAckMs": 621,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.nostr.channel",
+      "writeAckMs": 649,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay1.xfire.to",
+      "writeAckMs": 677,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.artiostr.ch",
+      "writeAckMs": 695,
+      "software": "https://github.com/SEG-UNIBE/artio-relay"
+    },
+    {
+      "url": "wss://relay.iyou.me",
+      "writeAckMs": 708,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.angor.io",
+      "writeAckMs": 848,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostrich.zonemix.tech",
+      "writeAckMs": 895,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://slick.mjex.me",
+      "writeAckMs": 946,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://nostr.mineracks.com",
+      "writeAckMs": 964,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.keykeeper.world",
+      "writeAckMs": 968,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.tapestry.ninja",
+      "writeAckMs": 969,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostr.davenov.com",
+      "writeAckMs": 1319,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://nostras.app",
+      "writeAckMs": 1362,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.getvia.xyz",
+      "writeAckMs": 1374,
+      "software": "https://github.com/fiatjaf/khatru"
+    },
+    {
+      "url": "wss://relay.twentyone.ist",
+      "writeAckMs": 1465,
+      "software": "git+https://github.com/erskingardner/wok.git"
+    },
+    {
+      "url": "wss://tapestry.brainstorm.world/relay",
+      "writeAckMs": 1774,
+      "software": "strfry+nip50-proxy"
+    },
+    {
+      "url": "wss://relay.routstr.com",
+      "writeAckMs": 2108,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://social.amanah.eblessing.co",
+      "writeAckMs": 2710,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    },
+    {
+      "url": "wss://relay.digitalhowl.ch",
+      "writeAckMs": 2778,
+      "software": "https://git.sr.ht/~gheartsfield/nostr-rs-relay"
+    },
+    {
+      "url": "wss://relay.nostr.com",
+      "writeAckMs": 4277,
+      "software": "git+https://github.com/hoytech/strfry.git"
+    }
+  ]
+}
