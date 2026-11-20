@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.14.0 — relay selection, phase 3: inboxes on picked relays, fixed relays can fall away
+
+Third phase of the compatible migration (docs/DECISIONS.md, rows 29–30). Wire protocol stays **v2**.
+
+### What changes
+
+- Inbox messages (keys, invitations) go **only to the recipient's picked relays** once the
+  recipient announced `rp` (in a shared space, an inbox message, its key package or its pairing
+  link) and this device has that candidate list. Otherwise they also go to the fixed relays, as before.
+- Answers to pairing links from 0.12+ devices go only to the link's picked relays.
+- When no tag needs them any more, the fixed relays are disconnected. They remain in use only for
+  public directory entries (key packages) and pairing links from older versions.
+
+### New option: `fixedInbox` (default `true`)
+
+- With the default, a device keeps reading its own inbox on the fixed relays, because versions
+  before 0.12 send invitations and keys only there.
+- Set `fixedInbox: false` once no app version before 0.12 is in use. A device then reads its inbox
+  on the fixed relays only while one of its spaces is still on them, or switched less than 30 days
+  ago. A device whose spaces all moved stops using the fixed relays entirely.
+- **With `fixedInbox: false`, invitations from versions before 0.12 are not received.**
+
 ## 0.13.0 — relay selection, phase 2: spaces switch to picked relays automatically
 
 Second phase of the compatible migration (docs/DECISIONS.md, rows 29–30). Wire protocol stays

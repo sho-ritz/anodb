@@ -280,6 +280,7 @@ createAnoDB({ ..., relays: ['wss://my.relay'] })            // only your relays 
 createAnoDB({ ..., relays: ['wss://my.relay'], autoRelays: true }) // yours while needed + picked
 createAnoDB({ ..., maxAutoRelays: 10 })                     // live connections for spaces; others are polled
 db.focusSpace(space)                                        // give this space live connections first
+createAnoDB({ ..., fixedInbox: false })                     // once no app version < 0.12 is in use: drop the fixed relays
 ```
 
 **Migration from the fixed relays is automatic and compatible** (`docs/DECISIONS.md`, rows 29–30,
