@@ -268,21 +268,25 @@ await db.blobs.delete(ref)                        // only from the device that u
 
 ## Relays
 
-By default anoDB writes to a few fixed relays (`DEFAULT_RELAYS`) **and**, since 0.12.0, to 5 relays
-picked for each space from a bundled candidate list (`RELAY_CANDIDATES`). The pick is derived from a
-secret (the space's epoch key, the device key for its inbox, the link secret for pairing), so every
-member lands on the same relays and outsiders cannot tell which ones.
+Each space lives on **5 relays picked from a bundled candidate list** (`RELAY_CANDIDATES`). The pick
+is derived from a secret (the space's epoch key; the device key for its inbox; the link secret for
+pairing), so every member lands on the same relays, outsiders cannot tell which ones, and each new
+epoch moves the space elsewhere. Writes fall through to ranks 6–10 when top relays are down, and
+every device checks those ranks, so nothing depends on one relay or on the writer coming back.
 
 ```ts
-createAnoDB({ ... })                                        // fixed + automatically picked relays
+createAnoDB({ ... })                                        // picked relays (fixed ones while needed)
 createAnoDB({ ..., relays: ['wss://my.relay'] })            // only your relays (no automatic pick)
-createAnoDB({ ..., relays: ['wss://my.relay'], autoRelays: true }) // yours + automatically picked
-createAnoDB({ ..., maxAutoRelays: 10 })                     // cap the extra connections (default 20)
+createAnoDB({ ..., relays: ['wss://my.relay'], autoRelays: true }) // yours while needed + picked
+createAnoDB({ ..., maxAutoRelays: 10 })                     // live connections for spaces; others are polled
+db.focusSpace(space)                                        // give this space live connections first
 ```
 
-This is **phase 1** of a compatible migration (see `docs/DECISIONS.md`, rows 29–30): the fixed relays
-are still always written and read, so older versions keep syncing. A later version switches each
-space to its picked relays automatically once all of its devices run a version that reads them.
+**Migration from the fixed relays is automatic and compatible** (`docs/DECISIONS.md`, rows 29–30,
+and `CHANGELOG.md`): a space keeps using the fixed relays (`DEFAULT_RELAYS`) as long as any of its
+devices runs a version older than 0.12.0. Once every device reads picked relays, an admin device
+rotates the key and the space moves; the fixed relays are still read for 30 days. Pairing or
+inviting an older version moves the space back at the next epoch.
 
 ## Sync health
 

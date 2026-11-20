@@ -87,6 +87,8 @@ export class Store {
     this.#ensureColumn('anodb_messages', 'inner', "TEXT NOT NULL DEFAULT ''")
     // identity whose signed change set the cell (null for cells from older versions)
     this.#ensureColumn('anodb_cells', 'by', 'TEXT')
+    // pinned relay candidate list of the epoch (JSON array); null: fixed relays (DECISIONS 30)
+    this.#ensureColumn('anodb_keys', 'relays', 'TEXT')
   }
 
   /** Add a column created by a newer version (CREATE TABLE IF NOT EXISTS does not alter tables). */
@@ -268,22 +270,46 @@ export class Store {
     this.#db.run('UPDATE anodb_spaces SET status = ? WHERE id = ?', [status, id])
   }
 
-  putKey(space: string, keyId: string, num: number, sealed: Uint8Array): void {
-    this.#db.run('INSERT OR IGNORE INTO anodb_keys (space, key_id, num, sealed, created_at) VALUES (?, ?, ?, ?, ?)', [
+  putKey(space: string, keyId: string, num: number, sealed: Uint8Array, relays: readonly string[] | null = null): void {
+    this.#db.run('INSERT OR IGNORE INTO anodb_keys (space, key_id, num, sealed, created_at, relays) VALUES (?, ?, ?, ?, ?, ?)', [
       space,
       keyId,
       num,
       sealed,
       Date.now(),
+      relays ? JSON.stringify(relays) : null,
     ])
   }
 
-  keys(): Array<{ space: string; keyId: string; num: number; sealed: Uint8Array; createdAt: number }> {
+  keys(): Array<{ space: string; keyId: string; num: number; sealed: Uint8Array; createdAt: number; relays: string[] | null }> {
     return this.#db
-      .all<{ space: string; key_id: string; num: number; sealed: Uint8Array; created_at: number }>(
-        'SELECT space, key_id, num, sealed, created_at FROM anodb_keys',
+      .all<{ space: string; key_id: string; num: number; sealed: Uint8Array; created_at: number; relays: string | null }>(
+        'SELECT space, key_id, num, sealed, created_at, relays FROM anodb_keys',
       )
-      .map((r) => ({ space: r.space, keyId: r.key_id, num: r.num, sealed: new Uint8Array(r.sealed), createdAt: r.created_at }))
+      .map((r) => ({
+        space: r.space,
+        keyId: r.key_id,
+        num: r.num,
+        sealed: new Uint8Array(r.sealed),
+        createdAt: r.created_at,
+        relays: r.relays ? (JSON.parse(r.relays) as string[]) : null,
+      }))
+  }
+
+  /** Every known device pubkey (any identity). */
+  allDevices(): string[] {
+    return this.#db.all<{ device: string }>('SELECT device FROM anodb_devices').map((r) => r.device)
+  }
+
+  /** Inner created_at (s) and local receive time (ms) of one stored message. */
+  messageTimes(space: string, device: string, seq: number): { createdAt: number; receivedAt: number } | undefined {
+    const r = this.#db.all<{ inner: string; received_at: number }>('SELECT inner, received_at FROM anodb_messages WHERE space = ? AND device = ? AND seq = ?', [space, device, seq])[0]
+    if (!r) return undefined
+    let createdAt = Math.floor(r.received_at / 1000)
+    try {
+      createdAt = (JSON.parse(r.inner) as { created_at: number }).created_at
+    } catch {}
+    return { createdAt, receivedAt: r.received_at }
   }
 
   // ---- message log ---------------------------------------------------------------
@@ -337,10 +363,10 @@ export class Store {
     this.#db.run('INSERT OR IGNORE INTO anodb_prune (event_id, salt, tag, created_at) VALUES (?, ?, ?, ?)', [eventId, salt, tag, createdAt])
   }
 
-  prunable(tags: readonly string[], before: number): Array<{ eventId: string; salt: string }> {
+  prunable(tags: readonly string[], before: number): Array<{ eventId: string; salt: string; tag: string }> {
     if (tags.length === 0) return []
-    return this.#db.all<{ eventId: string; salt: string }>(
-      `SELECT event_id AS eventId, salt FROM anodb_prune WHERE created_at < ? AND tag IN (${tags.map(() => '?').join(',')})`,
+    return this.#db.all<{ eventId: string; salt: string; tag: string }>(
+      `SELECT event_id AS eventId, salt, tag FROM anodb_prune WHERE created_at < ? AND tag IN (${tags.map(() => '?').join(',')})`,
       [before, ...tags],
     )
   }

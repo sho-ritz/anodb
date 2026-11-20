@@ -52,7 +52,7 @@ A NIP-01 event signed by the **device** key, never published unencrypted. `conte
 ```
 
 - `seq` starts at 1 and increases by one per (space, device). Gaps reveal missing messages.
-- `rp` (optional, `1`): the sending device reads this space on its automatically picked relays (§6.1). Receivers that do not know the field ignore it.
+- `rp` (optional): the sending device reads picked relays and names its candidate list (§6.1). Receivers that do not know the field ignore it.
 - A receiver MUST check: inner signature; `dlg` delegates to the inner pubkey; `sp`/`ep` match
   the key that decrypted the envelope; payload shape.
 
@@ -180,21 +180,30 @@ throwaway key, fresh `created_at`, same content).
 Optional pruning: envelope key = `sha256("anodb/v2/prune/" + hex(deviceSk) + "/" + salt)`; after a
 snapshot the author publishes NIP-09 kind 5 `["e", id], ["k", "7303"]` for its older envelopes.
 
-### 6.1 Relay routing (informative; migration phase 1)
+### 6.1 Relay routing (DECISIONS 29/30)
 
 Each routing tag has a secret **seed**: the epoch key (hex) for a space tag, the device pubkey for
-an inbox tag, the link secret for a pairing tag. Candidates (a versioned list bundled with the
-implementation) are ranked by rendezvous hashing:
+an inbox tag, the link secret for a pairing tag. A candidate list is ranked by rendezvous hashing:
 
 ```
 k     = sha256hex("anodb/v2/relays/" + seed)
-score = sha256hex(k + "/" + relayUrl)      // highest first
+score = sha256hex(k + "/" + relayUrl)      // highest first; URLs normalized (no trailing "/")
 ```
 
-The top 5 are the tag's **picked relays**. In phase 1 every envelope is still written to and read
-from the fixed relays; envelopes of tags the device subscribes to are also written to and read from
-their picked relays, and delivery is judged on the fixed relays only. Later phases (DECISIONS 30)
-switch a space to its picked relays once every active device sends `rp: 1`.
+- **Picked relays** of a tag: the top 10. Readers follow the top 5 and periodically check ranks
+  6–10; whoever finds an envelope only there republishes it unchanged to the top 5. A writer sends
+  to the first 5 reachable relays in rank order and keeps the envelope until 5 accepted it.
+- **Epoch relay mode.** A key grant (`key` / `invite` inbox message, pairing `spaces[]`) may carry
+  `rl: [relayUrl…]`, the pinned candidate list of that epoch. With `rl`, the epoch's envelopes live
+  on its picked relays only. Without it (and in every version before 0.12), they live on the fixed
+  relays; devices that know picked relays also put extra copies there.
+- **`rp`** (stream header, inbox payload, key package content `rp: {device: id}`, pairing URI
+  parameter `r`): the sender reads picked relays and routes its own inbox with candidate list `id`
+  (a bundled version number, or the first 8 hex of `sha256` over the sorted, newline-joined URLs of
+  a custom list). A manager issues an epoch with `rl` only when every active device of the space
+  announced `rp`, and issues one without `rl` otherwise.
+- Inbox and pairing envelopes go to the fixed relays, plus the sender's picked relays for that tag.
+- NIP-09 deletions of envelopes carry the envelope's `n` tag so they reach the same relays.
 
 ## 7. Public tables
 
