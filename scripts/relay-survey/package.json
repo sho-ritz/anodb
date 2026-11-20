@@ -8,7 +8,11 @@
     "daily": "node survey.mjs daily && node survey.mjs select"
   },
   "dependencies": {
+    "https-proxy-agent": "^7.0.6",
     "nostr-tools": "^2.26.0",
     "ws": "^8.22.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

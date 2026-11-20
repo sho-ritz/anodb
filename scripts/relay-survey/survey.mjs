@@ -9,13 +9,22 @@
 //
 // Output goes to ./data (relative to this file).
 import fs from 'node:fs'
+import https from 'node:https'
 import path from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { HttpsProxyAgent } from 'https-proxy-agent'
 import WebSocket from 'ws'
 import { finalizeEvent, generateSecretKey } from 'nostr-tools/pure'
 
-const CRITERIA_VERSION = 1
+// Egress proxy (HTTPS_PROXY / HTTP_PROXY). TLS stays end-to-end with the relay (CONNECT tunnel).
+// There is deliberately no fallback to a direct connection, and the URL (which may carry
+// credentials) is never logged or written to data/.
+const PROXY_URL = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || ''
+const AGENT = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined
+const VIA_PROXY = !!AGENT
+
+const CRITERIA_VERSION = 2
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 const DATA = process.env.SURVEY_DATA ?? path.join(DIR, 'data')
 const TARGET = 100
@@ -29,6 +38,7 @@ const MIN_UPTIME_SAMPLES = 7
 const MAX_PER_OPERATOR = 2
 const MAX_SOFTWARE_SHARE = 0.7
 const MAX_REGION_SHARE = 0.4
+const MIN_VALID_REACHABLE_RATIO = 0.8 // a daily run below this is not used for uptime (B2)
 
 // ---------------------------------------------------------------- utilities
 
@@ -108,13 +118,18 @@ function softwareOf(info) {
 
 // ---------------------------------------------------------------- websocket
 
-function connect(url, ms = 9000) {
+/** Connect, retrying once over the same route (a flaky egress should not count as relay downtime). */
+async function connect(url, ms = 9000) {
+  return (await connectOnce(url, ms)) ?? (await connectOnce(url, ms))
+}
+
+function connectOnce(url, ms) {
   return new Promise((resolve) => {
     const msgs = []
     const waiters = new Set()
     let ws
     try {
-      ws = new WebSocket(url, { handshakeTimeout: ms })
+      ws = new WebSocket(url, { handshakeTimeout: ms, ...(AGENT ? { agent: AGENT } : {}) })
     } catch {
       return resolve(null)
     }
@@ -247,12 +262,52 @@ async function cmdCollect() {
     console.error(`  ${s}: monitors ${a}, relay lists ${b}, unique ${weight.size}`)
   }
   const urls = [...weight.entries()].sort((x, y) => y[1] - x[1])
+  if (urls.length === 0) {
+    console.error('collect: no source answered — kept the previous urls.json (check the network / proxy)')
+    process.exit(1)
+  }
   writeJson(file('urls.json'), urls)
   writeJson(file('geo.json'), geo)
   console.log(`collect: ${urls.length} unique URLs (${urls.filter((u) => u[1] >= 3).length} seen by monitors)`)
 }
 
 // ---------------------------------------------------------------- nip11
+
+/** NIP-11 over node:https so the same proxy agent applies (no reliance on fetch's env-proxy support). */
+function getNip11(url, ms = 10_000) {
+  return new Promise((resolve) => {
+    let req
+    const done = (v) => {
+      clearTimeout(t)
+      req?.destroy()
+      resolve(v)
+    }
+    const t = setTimeout(() => done(null), ms)
+    try {
+      req = https.get(url.replace(/^wss:/, 'https:'), { headers: { Accept: 'application/nostr+json' }, ...(AGENT ? { agent: AGENT } : {}) }, (res) => {
+        if (res.statusCode !== 200) return done(null)
+        let body = ''
+        res.setEncoding('utf8')
+        res.on('data', (c) => {
+          body += c
+          if (body.length > 512 * 1024) done(null)
+        })
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(body)
+            done(j && typeof j === 'object' ? j : null)
+          } catch {
+            done(null)
+          }
+        })
+        res.on('error', () => done(null))
+      })
+      req.on('error', () => done(null))
+    } catch {
+      done(null)
+    }
+  })
+}
 
 async function cmdNip11() {
   const urls = readJson(file('urls.json'), [])
@@ -261,21 +316,14 @@ async function cmdNip11() {
   const res = await runPool(
     urls,
     25,
-    async (url) => {
-      const ac = new AbortController()
-      const t = setTimeout(() => ac.abort(), 10_000)
-      try {
-        const r = await fetch(url.replace(/^wss:/, 'https:'), { headers: { Accept: 'application/nostr+json' }, signal: ac.signal })
-        return { url, info: await r.json() }
-      } catch {
-        return { url, info: null }
-      } finally {
-        clearTimeout(t)
-      }
-    },
+    async (url) => ({ url, info: (await getNip11(url)) ?? (await getNip11(url)) }),
     'nip11',
   )
   const ok = res.filter((r) => r.info && typeof r.info === 'object')
+  if (ok.length === 0) {
+    console.error('nip11: no relay answered — kept the previous nip11.json (check the network / proxy)')
+    process.exit(1)
+  }
   writeJson(file('nip11.json'), ok)
   console.log(`nip11: ${ok.length} of ${urls.length} answered`)
 }
@@ -419,7 +467,7 @@ async function cmdCheck(args) {
   console.error(`check: ${infos.length} relays${burst ? ' (with burst)' : ''}`)
   const res = await runPool(infos, 20, (x) => checkRelay(x.url, x.info, { burst }), 'check')
   const results = res.map((x) => x.r ?? x)
-  writeJson(file('checks', `${today()}.json`), { criteriaVersion: CRITERIA_VERSION, burst, results })
+  writeJson(file('checks', `${today()}.json`), { criteriaVersion: CRITERIA_VERSION, burst, viaProxy: VIA_PROXY, results })
   const probes = readJson(file('probes.json'), [])
   for (const x of res) if (x.probe) probes.push(x.probe)
   writeJson(file('probes.json'), probes)
@@ -460,8 +508,13 @@ async function cmdDaily() {
     },
     'daily',
   )
-  writeJson(file('daily', `${today()}.json`), res)
   const up = res.filter((r) => r.reachable).length
+  const reachableRatio = res.length ? up / res.length : 0
+  // A run where most relays look down says more about this machine's network than about the
+  // relays: keep it for retention (unreachable relays already count as "unknown") but not for B2.
+  const valid = res.length > 0 && reachableRatio >= MIN_VALID_REACHABLE_RATIO
+  writeJson(file('daily', `${today()}.json`), { viaProxy: VIA_PROXY, valid, reachableRatio: Math.round(reachableRatio * 1000) / 1000, results: res })
+  if (!valid) console.log(`daily: only ${Math.round(reachableRatio * 100)}% reachable — run marked invalid for uptime (B2)`)
   const lost = res.filter((r) => r.probes?.some((p) => p.kept === false)).length
   console.log(`daily: ${up} of ${res.length} reachable; ${lost} relays lost at least one probe`)
 }
@@ -484,8 +537,16 @@ function cmdSelect(args) {
     }
   }
   const dailyFiles = datedFiles('daily')
-  const recent = dailyFiles.slice(-UPTIME_DAYS).map((f) => readJson(file('daily', f), []))
-  const all = dailyFiles.map((f) => readJson(file('daily', f), []))
+  // Daily files: { viaProxy, valid, reachableRatio, results } (older files: a bare array).
+  const days = dailyFiles.map((f) => {
+    const d = readJson(file('daily', f), [])
+    return Array.isArray(d) ? { valid: true, results: d } : { valid: d.valid !== false, results: d.results ?? [] }
+  })
+  const all = days.map((d) => d.results)
+  const recent = days
+    .filter((d) => d.valid)
+    .slice(-UPTIME_DAYS)
+    .map((d) => d.results)
   const geo = readJson(file('geo.json'), {})
 
   const rows = []
@@ -574,6 +635,8 @@ function cmdSelect(args) {
     selected: selected.length,
     skippedByRule: tally(skipped, 'rule'),
     dailyRuns: dailyFiles.length,
+    dailyRunsInvalid: days.filter((d) => !d.valid).length,
+    viaProxy: VIA_PROXY,
   }
   writeJson(file('pool', `${today()}.json`), { ...summary, relays: selected, reserves })
   fs.writeFileSync(file('pool', `${today()}.txt`), selected.map((s) => s.url).join('\n') + '\n')
