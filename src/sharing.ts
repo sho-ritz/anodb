@@ -421,6 +421,11 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return tags
   }
 
+  protected override routeSeed(tag: string): ReturnType<AnoDBCore<S>['routeSeed']> {
+    if (this.#pairing && tag === secretTag(this.#pairing.secret)) return { seed: this.#pairing.secret, prio: 0 }
+    return super.routeSeed(tag)
+  }
+
   #sendInbox(device: string, body: Record<string, unknown>): void {
     const inner = signWith(this.deviceSk, {
       kind: MESSAGE_KIND,

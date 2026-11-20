@@ -56,7 +56,8 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     this.#p2p = new P2PSync(
       {
         appId: this.appId,
-        relays: () => this.sync?.pool.relays ?? [],
+        // Signaling stays on the fixed relays (every peer knows them).
+        relays: () => [...(this.sync?.fixedRelays ?? [])],
         deviceSk: this.deviceSk,
         devicePubkey: this.devicePubkey,
         rooms: () =>
@@ -127,7 +128,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     try {
       let supported = false
       if (!this.#negUnsupported.has(relay)) {
-        const tags = this.subscriptionTags()
+        const tags = this.sync!.tagsOn(relay, this.subscriptionTags())
         const res = tags.length ? await pool.negentropy(relay, { kinds: [WRAP_KIND], [`#${TAG}`]: tags }, this.store.rawIndex(tags)) : null
         if (!res) this.#negUnsupported.add(relay)
         else {
@@ -182,10 +183,12 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     const pool = this.sync?.pool
     if (!pool) return
     this.#lastRepair = this.now()
-    const tags = this.subscriptionTags()
-    if (tags.length === 0) return
+    const all = this.subscriptionTags()
+    if (all.length === 0) return
     await Promise.all(
       pool.connected().map(async (relay) => {
+        const tags = this.sync!.tagsOn(relay, all)
+        if (tags.length === 0) return
         let until: number | undefined
         for (let page = 0; page < 1000; page++) {
           const f: Filter = { kinds: [WRAP_KIND], [`#${TAG}`]: tags, limit: BACKFILL_PAGE }
@@ -258,7 +261,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     if (!pool) return
     const k = this.currentKey(space)
     const e = sealEvent(this.deviceSk, { v: 2, sp: space, ep: k.keyId, type, d: data, dlg: this.delegation }, k.tag, k.key, Math.floor(this.now() / 1000), TAG)
-    await pool.publish(e)
+    await pool.publish(e, this.sync!.relaysFor(k.tag))
   }
 
   /**
@@ -306,7 +309,10 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     this.#eventKey = key
     this.#eventUnsub?.()
     this.#eventUnsub = tags.length
-      ? pool.subscribe(() => [{ kinds: [EVENT_KIND], [`#${TAG}`]: this.#spaceTags(), since: Math.floor(this.now() / 1000) - EVENT_MAX_AGE_SEC }], {
+      ? pool.subscribe((relay) => {
+          const on = this.sync!.tagsOn(relay, this.#spaceTags())
+          return on.length ? [{ kinds: [EVENT_KIND], [`#${TAG}`]: on, since: Math.floor(this.now() / 1000) - EVENT_MAX_AGE_SEC }] : null
+        }, {
           onEvent: (_relay, e) => this.#onEphemeral(e),
         })
       : null

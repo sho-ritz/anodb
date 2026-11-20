@@ -1,0 +1,1832 @@
+[
+  {
+    "url": "wss://nostr.bitcoiner.social",
+    "id": "193ae14ba4906fc624e6d7ce5abbb679c154a4b2ab4123986321d60d85af7cf0",
+    "tag": "bb80dc672fba32f4f69cb7101ca9414d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.ditto.pub",
+    "id": "0cda095c3e86d391f6b5860699385c23049ccff050b933a807c01da0d85e1c62",
+    "tag": "451b6b3d8103dbc7372792a623e30ed0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-01.yakihonne.com",
+    "id": "67934f6558d92b360c1893033e90e8ca654b2ceaf6be0fab89a958df3c506c84",
+    "tag": "2d4dbb0a903ad08449ec054b6e3ed086",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.computingcache.com",
+    "id": "9970de31f3afbb682423336d003a00f114d387331141235b65b7f113b6673e16",
+    "tag": "a48dd1f1b4bf129c0f1e63b98d947a6d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-02.yakihonne.com",
+    "id": "486a7b9065c1a38def724c2486e07ff3d7820a9c064558ac12868c16b71987e0",
+    "tag": "62ee12ea29e2679e57e6a5ef8cf8d287",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.snort.social",
+    "id": "59684e0e7a9159c401773620e23c992b1a4ab001d8fa6bdeaadbac21ed270bd3",
+    "tag": "07ee595a1e65c028238f2abb228face3",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrfeed.com",
+    "id": "242181b12dc53b93bed633fe1b467d488aaa60f2b42df5ddf2aa82dcac9645ea",
+    "tag": "8eb8f0d89780cd3be0e4c95f551bb8cc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.mom",
+    "id": "ce1b16c312be0ec0a997f3474ec1a3cc9b7d8e4ce5176db5d94cfb2fdfb43ca2",
+    "tag": "d57fe36a355d1507b77b97a412da3669",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nos.lol",
+    "id": "09b8f42fcb09d37fbebad8d2d76233178f77c99b64823a9d43131f08993f9da5",
+    "tag": "e3df1c487bc323978c3f860e0eb5807a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.primal.net",
+    "id": "bcb088ad6aac98a1633537935895467571d1c507811e907e37b2c8e769f488b9",
+    "tag": "28fae2065f4b655aee41f93038dbf790",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://n-e96dea.hallissy.email",
+    "id": "eb115c82ea2619c159834848c3c5d19bf9889c91249d70b54e587d191d383e73",
+    "tag": "c44fe1948b08c674c06e4e1bebca0785",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.net",
+    "id": "d6eea9462c2f12028edb5caa4c27379aabb9b85a77c56d05a99277979f112afe",
+    "tag": "e95e0dd373cb71298e16c7dcbfcaba97",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.superfriends.online",
+    "id": "de57ba463bf05b2b24c078594200e11018aa652a3143cb37922cb9146d7c38ed",
+    "tag": "9f782619a84a6d802770c30d8f6be5fd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bread.nostrsms.com",
+    "id": "4710fd686f7018a81315b96712148ac3a9c77897bac19afd3d75653a56b39049",
+    "tag": "3a99f5fce161f6f7c2c1c7b84dcd794a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.ngengine.org",
+    "id": "8bc82a54b9fddeaae1c9888a1fced5b6021a42cdca12dac7e130d6b352db1222",
+    "tag": "6673293b79aa90d99b7745a7429a78bd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.88mph.life",
+    "id": "eeefd403b9de89d061670bb2eab84a6702361cefd79931e438f456d5fd33b2aa",
+    "tag": "8dd6addbf3f1f6b52731f61910d1cd28",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.lanavault.space",
+    "id": "3faee5949e1c4432d716dc75d1a0fb81b71be5757c2e36473c34f15c6c2aa391",
+    "tag": "d2b8e6f37209524995c20393e4ee39c4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relayrs.notoshi.win",
+    "id": "681d7a50011728f5b10ca4e95df41d3c63fe0235a8eaaf2bd6340cf2cca0f9d9",
+    "tag": "56c7aea8ed6c4db5082107e818e6e4a7",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.merovingian.chat",
+    "id": "f8f579d1806aa0fe2174e0645cb1b70e2f17b4567fabe50e0e5471912fafa19d",
+    "tag": "012d7f3bad29996041257a7ccdf4736a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://paresia.zobrak.net",
+    "id": "1ec67048ba5d178684828012ebc6ee444c0680c9261c7115ff979aaaedceb0ec",
+    "tag": "1d6fd4221d84d9048ce900eee580dbd2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://scores.brainstorm.world",
+    "id": "80f7182d1f59787e05baba11b66266ede6e70c5bd35e1acdf3b4fa390eefd5c7",
+    "tag": "0c68405cf741b0baf74cf52b143129c4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.azuki.blue",
+    "id": "1f4f703ef270390df82b12a0e6f2dc77d3b810dc8c07b86ef3132a52f0f1c59a",
+    "tag": "95e9c5cfac883c2c2f7b4a8fbffdbb15",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.data.haus",
+    "id": "46ddb54f5b937ddabd42475cc452ea4ec3028ce677061691e4899a32dabdf5c3",
+    "tag": "16ba282556189f02aba31d465940a820",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostu.be",
+    "id": "40c4d59a351aeb4e1f1337024b2cff226705f476c7a6f48e20d63850d0bf357d",
+    "tag": "357168c896197fad1aa898209a7220fd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.twentyone.ist",
+    "id": "39439d5c2ce92614fbba1401d9ed137e7cc49c4ab5ee6a20b81c80cceffd49b9",
+    "tag": "8853fee4f5856e2985df678ad289de31",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.shadowbip.com",
+    "id": "e2ec286a97203a1d60215900fe136f13d8ba25bf381a6be2fa246776ac0bf674",
+    "tag": "ec4e66fba64979bfd12ac99994d13725",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.hetuniversum.nl",
+    "id": "9b1df778de406c078f0ef85ac7aae27f13b1a34addb6599b3ce34df7c91c877a",
+    "tag": "1d23578c318cc88c66ebda08565188a6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.thewired.app",
+    "id": "abe99f03a099e8fa6eb745c611ab05ad0787a7dda97f7c59f332f642b3f7455d",
+    "tag": "3ff15bd94aa8a203d68d1b6aa93f79dc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.monostr.com",
+    "id": "9015425b45b8a1704d05084551962623f8f3d520c6379b8d5407d96e24cd1a53",
+    "tag": "0ac8615e5a7734ffd515152ae698201a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.s-w.art",
+    "id": "429bcd4145222a32642f87bdb7ed4a037f7e540ec16600e8cbf2c1b6b39723af",
+    "tag": "14f2d36461567b47ddacc4499fc9b575",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bendernostur.duckdns.org:8443",
+    "id": "49f4121e51a35cbc3d06547523ace6226c7eadc3d149890ac29bcbd7e74d3a97",
+    "tag": "6c8f7c8f96fb7a12864369ecd206f5e9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://data-space.world/relay",
+    "id": "1f91d29181473a8b51692746346eccbef9da7559d7f4d75842bec3d5bdbe03f9",
+    "tag": "a9d6b95219473e481d002c7920587b6c",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.hivescope.xyz",
+    "id": "ed5e01c6f57a88dc37c1dc51b09bd577d1f9e762cafca7ca7373bf7ad0946d5f",
+    "tag": "d301e6b52ad568108d094f19c636fd80",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay2.0xprivacy.online",
+    "id": "129006a3f6038b56b07de06c59d6b483f8c84f92f13448f5604aa6a86c628d58",
+    "tag": "a63f998530f022df9f23351cc4ed263d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bruh.samt.st",
+    "id": "7cd3a47b24d5fa0c7b9a9f05d60a73574c97dfc96049ca5a99b7920fe8ada7a7",
+    "tag": "a2da9abe0c760afa5ac1103199bebb36",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://groups.beginningend.com",
+    "id": "458bb65704d21f2df28ec75990acf191b6c5762efecabaff9e7fc25e77fb8792",
+    "tag": "d46cda4dc65d7fc79855aecd04eabef8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.pprgb.app",
+    "id": "8d2067ac4cf4446c862a0173d1db10c69ddfd489dc274a172d65f0ccfb4ceac4",
+    "tag": "4e6166679140be5ab25fa3bdfb37f37e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.shychat.lol",
+    "id": "da23781ff4f927440f1779bf3095401063ecfc1d4108bd2f6629956d6ac8dbe9",
+    "tag": "cb62933936dd4220c26e82c96de7a265",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.noeudlibre.fr",
+    "id": "162c48b8db97f3b269733d9103f13a481cd3c93877a0e2fa413563375cd27b83",
+    "tag": "1794d018c1b328489d1a3d6445e39da4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.red5d.dev",
+    "id": "9e538e2264eaa75e7906400bbdeaaa0f702ca51eab5f5b4dc67a48927e2d0b8c",
+    "tag": "90370a3d9a67debbeb73b07ca47b3b89",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://baunilha.ie.apps.lnvps.cloud",
+    "id": "f9f08f964a3a274a71228b899b03fbbb94e8c544865de11601d2362dacbe6d18",
+    "tag": "7b912f65abe83d774f678ec61e0d98b8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.carlismo.mx",
+    "id": "0b0d6aaf995d71f47fdc08c66cf3ce04f437396d759d60e62fddbd6149463eea",
+    "tag": "d3edf0e7155be3ef9ca6a999a96072c2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://yabu.me",
+    "id": "05ddfab0e8540994a3202001d2910ffcd7b7a89e86be4fb9c5891ac3de7e122c",
+    "tag": "8bfc6135f2b8ac68fe2282c6dc560d4f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.haruki7049.dev",
+    "id": "d1a92fadd14a7a1a7ca4a07e5bf354695c780c69db0a9ce89a7937e70fed5088",
+    "tag": "0e0dc44705bdff2605ccd9cd2513f0eb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.notoshi.win",
+    "id": "5c278dea55f991e4ca714ae97815fbcb8a25b9fbaa0d15b2090d0919f1eb73f1",
+    "tag": "42c0c748877a0a08cc256825a9047bcf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.middling.mydns.jp",
+    "id": "70c90b2524e6219d962947e15f1640e9afddd7d7b53e1db020f165b7b1fb9050",
+    "tag": "1e3e479f4f448cca8434e8c18b8c7d0e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.substation.ninja",
+    "id": "cfa85a01b614f13b06c7ed4ac07f952f6772fc116b5b60c14c9ccdf9dae64937",
+    "tag": "fdc942ab39d0b0f8f635a3c6187e07ec",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://denimroad.feeds.relay.tools",
+    "id": "44a93fa747adc0b7636c9c20ae4000744742fd062c48e45d4cca5d5ad0f43656",
+    "tag": "653923a5424d7ae486276264944a3cfb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dev.relay.stream",
+    "id": "993aceb6648cdb19dea619f71e82158583048d8dcd2e5dfe247b538f64a78fc6",
+    "tag": "efc8601d7d0bd60f4f0ade5f26763378",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.twinkle.lol",
+    "id": "687653b824e418dee3cf92cc0366e1dd2e4248572f1feac503aa63715050493f",
+    "tag": "fbf8854e5b24dfd6549396fd915dac3b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.com",
+    "id": "27c7a7db0f84e625e6d5bf0af282974890001e0577e7d0e715c54ec74c165242",
+    "tag": "eb8c939975cc6361a564cf44fb3e60be",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.artio.inf.unibe.ch",
+    "id": "8b4493c6fee8e11371dfb451030ed86f8243e5620807803ab86146c51df97652",
+    "tag": "ea66d8155a285b42d35855957beabecf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.sincensura.org",
+    "id": "8ade60267c097d3f182b2fcd997af018992dfef5515a5a88245dad90e43e6641",
+    "tag": "0e0921b15680390f623ae15ff69582b2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.riochndr.com",
+    "id": "72896013ebcb9892c47c63637e7f5fdf379c76f7b8574dd93d9d1366643e013a",
+    "tag": "20fcb44087bd7b4aa11fc048bf773f75",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.atsocy.com",
+    "id": "bdf18484ce527d934990525f8dcd0e827937890ab7fad4b11c2120044d3be794",
+    "tag": "c042a7b072829ccc0a6598a0fd6ed248",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.black",
+    "id": "44fec5ddf4c80067e3fb4a25273f8cf7de4d8bd27b64970060e73c7cd963ea1f",
+    "tag": "1e201f94194c96b3515a14384622a1ed",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.tail67ca90.ts.net",
+    "id": "98e73b82d1d66fc2cb991f7627cddc385c8c3f1b44d4a6a1d29bded79ce1047e",
+    "tag": "a1ffc2a07ffb34a38535044867d19852",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://hasky.chat",
+    "id": "bb6917c5b9bfb8b9405cae5512b1c19cd81df7e2627f7e79b6ead2a17d36b7ac",
+    "tag": "8e31b20d445983f285fa499ee12e20b2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://spurline.safebox.dev",
+    "id": "e35c5a5df0514f45408dda77f6ac4fab8044ff2e2ac72a89f45af374ab672541",
+    "tag": "31e2e29a833e9ae0b579cfde7ee12119",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://wheat.oslim.dev",
+    "id": "d5ee20a7e1b03d017a20703028676667f3c1cd886bb84beaa38418817cdcc963",
+    "tag": "435c05e5b6e4a0d99b02367bb5de9736",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://newlay.sendsats.to",
+    "id": "c2de428af9a1ab3beadbfff9d06fbad2ae0acb23e8241a648e424db28788dea1",
+    "tag": "4c822bee65e4df7dfc93161445dfb8f3",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay02.lnfi.network",
+    "id": "a8c156f483b01853dd9bce42f4c8e1376db5434ff6914f13450f4d1d25b5fe1f",
+    "tag": "c602dd16209bf4638d4cc0b71af300c4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://conduit-congee.fly.dev",
+    "id": "9ac661fb77fe38e54cf8de730e2dcc6e35f84ba5138f231419f8237e68a3b9c5",
+    "tag": "10648c0aebf8cc10d8adc2341131e1bf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.trevena.info",
+    "id": "a2253036029dee02ac1af6190ba7875af45b701765dc96acc3ff6e20300f05d3",
+    "tag": "e63209593ad00708d8d79464695c7fdb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.hackshed.dev",
+    "id": "5b1fa8204385de46d5c26ef291190cc0cc7a20910d49e9ea39ec630a90d6a742",
+    "tag": "4dbf66fe44e62ebc60289e138a267ce7",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.gasteazi.net",
+    "id": "ea83242748c2c4bfb1f0fab674b5d4ed4796670465860198adf44d69f00dda27",
+    "tag": "a8bc3048da735730ec8fb30907140e75",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.eu.freedomrelay.dev",
+    "id": "509e5ee6a0e0cf4f925bab8a294d5da94fd23b5c66e4f1ec74397e2e1b3da1fc",
+    "tag": "ff3ca12d7193ce03bb7ea27d316ac45f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.tabordalab.com",
+    "id": "63be29c812506e03030246e3bd47c1748476aa63f763eb18d2eeaf7a680441cc",
+    "tag": "1771291a21f077443b60c2a9d85a62f6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.xlop.cz",
+    "id": "431930fce6ce4a67045d65f743a46f6f4f0f19ab559266894b9c80c2c9c25de8",
+    "tag": "2a3b11276d2a0e96f316868e55c9affa",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://greenart7c3.feeds.relay.tools",
+    "id": "d4fc486cce3bb4c12e2a0987634fe10b123e08c8e41be6f6b043ae5459163787",
+    "tag": "949e6ccc6d821a464c605170eab6b2ae",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.silentmode.st",
+    "id": "d7faeed9a0754596221c6787b92c57d4326dcf8b0de70c5ee18c74cab2f7526d",
+    "tag": "2d6c573a9268d20853629bfb926ace04",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.crovaxon.de",
+    "id": "a7eb41783cf23f334f3d103fbb14a7b0369cc058eea86ed799b736ffd0c6d335",
+    "tag": "6a78fc536c049a3a2759578651a9bc35",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.kilombino.com",
+    "id": "0a754eb747945cf1c3941238417c2749c016cddeb4826b4a066cfd4c305bc80c",
+    "tag": "4e5ce6a25c52f9d554ab96b7146f9bc5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://x.kojira.io",
+    "id": "dd3b8500af0df4065d405497d784e8956ea3dda1314ca7680cd9740f7ddb9bf7",
+    "tag": "fe061c2ace9d81f5be848ef75b666eaf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://offchain.pub",
+    "id": "bd32d889a69f9bb7fd9d645330e45470d2c4442addb0d43e5b317c661df2f488",
+    "tag": "b3c06caaa49482953db6d0d9c9a87699",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.i9.eti.br",
+    "id": "324c71ee0c6b8c27297a710692500e880cf5741e74a889f2af6d24b2313c6c5f",
+    "tag": "ccf82b36dea40a6d6ed33af74a60fc62",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostar.org",
+    "id": "5b857290112231ab3c4125978ab5b055b2aa130db696c78965baf9a5d99b6566",
+    "tag": "4e5459e6e62e9469416d1dd1840ef2ad",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://veil.contact",
+    "id": "320f582cb3715f4f1a084a3d72c4d60bcedadf21da2135ec9a06119429fab642",
+    "tag": "bc4118484e2e0760a10e563990070709",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.getsafebox.app",
+    "id": "2cc63f8f0e94b8f6f1bc377c463531c73074a2d2968e99566042bcaa3406c83c",
+    "tag": "6622908da43ac5dcf50b7500c9206ae9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.pornstr.net",
+    "id": "624476ee918b06146f9480ae34f875a1fc5ab67eb08cf91599edbc09cf743b04",
+    "tag": "cb5908e40acb3676a94682cb2ee7ec8e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.froth.zone",
+    "id": "0c593731245952abd453eacc7007ab98b45cac75e1583c63f46f68b05597f54e",
+    "tag": "da3b33e698c202083ebc4f56d6335cb9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.pro.aw",
+    "id": "447df97055d0831118312e81ed0f40f60c3bf0658aa35b34e2ccaf90ab5ac630",
+    "tag": "57adb2fa0e1f224590a9054c347106e6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrian-conquest.com",
+    "id": "62cdb89e9029a3cbc421e0016d731a6cdc30c159aaa33af9a768d99fdbb5bef8",
+    "tag": "6c379ae9af5dabd458c97e67d9ba0bfc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.spicyz.io",
+    "id": "6d10c0ed4aa961719d30e4d51848f246b1410c3515e6308f9d7ec40f6b80d666",
+    "tag": "5c7492d9fb645cd555af341612b5361a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostrelay.circum.space",
+    "id": "a03dc331cfa1cfdfecb70ad316173542ca050ed00517cd34cc6b161c7876d1c5",
+    "tag": "68cd93f183070b1a2d5800f58076f3f9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrhub.fr",
+    "id": "53f2d4ed669b006503cc065bf6f6e4a7c30bbbaccdb1d0cb00b2fb7994c733c8",
+    "tag": "95179f046a85b732dcee281e0a5809d8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://slick.mjex.me",
+    "id": "20dd0ff5b74eb780032042c065e44f8df9b204dc62fa807997e450abd6d0a342",
+    "tag": "4d8155a23719a9ebef0daa35dd3551ad",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.mitosystem.net",
+    "id": "5a3ea3a053b04545c92e5f319e723a5e33e5ecfac497393aa5adad333ec36827",
+    "tag": "3db3cfe827a4d41d20252caf6626e7f4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.bitmacro.cloud",
+    "id": "07b757bded2ba2c7793d89160f0c1d05cc5bc7220ed146ca851ce5e05b9131a2",
+    "tag": "8314ee6db246795cfb71fdb679fc9f8a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nip85-staging.nosfabrica.com",
+    "id": "f8495c73e32c391bff866583c62cfbb8bbcfb4afc6e43318b91dbe7bb00fc0af",
+    "tag": "8659f7172563e7fcfba0d9d1c39bb1c9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.hazeem.xyz",
+    "id": "f53397b6aff5dda0d7ebe1d98353b7d835cf9db4bc1e6c4dac29482ccaba2772",
+    "tag": "18a47805c97fec53cef171acf65208b3",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.alex71btc.com",
+    "id": "9e3fe4a387bd67282aef5ceccf7b8f4b0f4d9f848f18406ffacbfa6ddda0660d",
+    "tag": "df170f81baef06c08ed234f08b982366",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.budabit.club",
+    "id": "d1854d345293bce52e502f8c230e2161f495bc4e665fc81d49241f0d0c953a30",
+    "tag": "8ae66d312b257743b602cdec361a5b74",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.iyou.me",
+    "id": "a98b566c13097807026e7007787785be43169e400d01df541a092cdac9311898",
+    "tag": "e68518826cbe90d76688d98d3e8b4578",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.zoracle.org",
+    "id": "cd0b71dd33c1a1dd2ffb93341ddbf8bb5875b0aa42b5901480b6e9a71f37ba96",
+    "tag": "cd13c2c5b87d60a04b0ae09a595a94dd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.novospes.com",
+    "id": "4ac08813fc6188eeb7b62292986f7e9891402408393c46a08131406c2d74e149",
+    "tag": "a34cd9fde407749c9a9880361b8f712d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay01.lnfi.network",
+    "id": "4ee16b8f8c477960673faf41d53f0764113129632c1da23f6dc44527786e8d68",
+    "tag": "bb9c460fbb15800b192ed2eefef49c0a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://staging.yabu.me",
+    "id": "268089451b63c5f09520318e5d9c87502bff001319a5ce2260d7f5f912c36e3c",
+    "tag": "8f5ecc03a6f553a7b0680788cbdcf04d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.gorrdy.cz",
+    "id": "c626385ca808298112e2ce9cf29964a4e4e0e32274e10c2455933ce9bb52dba0",
+    "tag": "98b8f7ef6df31072efe1f94f1f2628f8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostrich.zonemix.tech",
+    "id": "ac37eda75186cdec1d2ff0eb1d1bfc82bee9f1eec99555973969a7d2794ab68a",
+    "tag": "536469dcebc9a664799dece351e9d068",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://inbox.stservices.io",
+    "id": "916e550367817e8de7172a7b82f65d865ec28319d8488073a0e677d3d8f59f5b",
+    "tag": "3d8e506294bd8f2bffef88ed8221b1f5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.trepechov.com",
+    "id": "63a35cdb7a572cfa68dfe522d0f40a97c25296f03465a0546ebf36e4e4af7333",
+    "tag": "cbb62dd6ec7d08805ebadd4447b7e4f2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://offchain.bostr.online",
+    "id": "b3b86fe0691cc6630184275c15aaa8badca15395247b040eb68f21ed1ca96610",
+    "tag": "7b6db2359bf2904386af8a44fbca8f5a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.bitos.space",
+    "id": "e829f08942c1272b50ffdbbb05beda2408a709a9f05a06bcc8308fc0680e364f",
+    "tag": "62288a58f71784e9f743e311c46074ef",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrnostr.net",
+    "id": "b20a0c451a9fb521af42548e40789887379bc7d63bbd6a9854f027f8008f2496",
+    "tag": "1a3795b321cb088fbd9b1455032518b4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dragon-orange.exe.xyz",
+    "id": "f1c174a939e5533781d4e1d3cebc91d62e53614d2cd25d1c608f6d87e11e4373",
+    "tag": "6d874d3a1aec5966719cfd3333ad3676",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.beginningend.com",
+    "id": "71609166a782ddfce0764ab69ecd3fb7d02a595e9d2d9b6f732b89bd02a81fb3",
+    "tag": "9b559fe4a69669d5178fc15238b70867",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bbw-nostr.xyz",
+    "id": "aaaa375140e9fe70bbbf4cc317f23c1681c666fa50f9c572796f35de1b346fe6",
+    "tag": "404c5f7e2f7a41866f66daf5303af33d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://strfry.moestr.online",
+    "id": "673e3b35db7d493137bd3a25848c51f88b09aa4f1fcd0d96b86046641715b1b4",
+    "tag": "0085b431cd91bd1c0a5408cb94913f38",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.colombiap2p.com",
+    "id": "e3575a8cc7c56a6c7e755e2824d738f6914c0f6bb985488c8ac6f7ac65246a54",
+    "tag": "0142a657eb7a65a86e3ede0437099011",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.snowbla.de",
+    "id": "5eeb66d4b4d6c138b9b8b8399a32010f6d74746031d6425c03a6b878bd7c1dd3",
+    "tag": "788e2d2391a449f8e15f356314a56f8c",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.pacsarcade.org",
+    "id": "c3843152a3504e8ef33c16efbd3a040ed9f43e96b5f5cc0cc895223eb6932b4a",
+    "tag": "2998d894dcee7414e994ca61b1307970",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.loveisbitcoin.com",
+    "id": "22d9508b16b4b5a656582be352038fdb6058b56d691baa54966c495a9ea27c46",
+    "tag": "3e9903bce551fa6c6d00dc514b33adda",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://fanfares.nostr1.com",
+    "id": "316c61694180751f1d4877e5d9595b1f8531d67079a096f1ae11d8bba5ccb54e",
+    "tag": "a3c68c56400edff94f1a53d0e47f3b56",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.czas.plus",
+    "id": "4af9b0ead3c31d6df452797e73da8f5290c88d14cb4adcdb792160b365953ca3",
+    "tag": "11b0c08e190a37438738ffc1e58f8f13",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostria.at",
+    "id": "aa6e3379e995a44cb8a03d8590970ba1e41b9c3a590d628ade8ab81e2b45573f",
+    "tag": "c13daca814ffeaa4ea1ccd73e50beb29",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostx.io",
+    "id": "975cde4bc0a68958b8327c77e3d09c48e414362e27883a86d9840c5af951c6e0",
+    "tag": "2a9a7b8aab6994c41489a5f31214f472",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.qstr.app",
+    "id": "ac06660d6f4f9255e461608167485c4bcdf84f6832fe33a2b04f7d8d9f5d714e",
+    "tag": "21024f3d845e2882e1bf6926a189057d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.fundstr.me",
+    "id": "e0ad02d995af936a06a25334b42ac7ce0de9bca79c140366d74b2ca5e2d22fda",
+    "tag": "4d5df12c492084d77b51ca34f8e941b0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.21crypto.ch",
+    "id": "d7132461fe4dffb92b0aad72b01e307e7d68bab5bafca7058b70d49ef13ab8f8",
+    "tag": "34e8ab5974e5b4ff96719afdebc678d1",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.snotr.nl:49999",
+    "id": "0cb08e52432a8dfcdfe37ac95ce1b5b4a868ab9fe4d0c76ea11ef7b57aa6ca58",
+    "tag": "96d5f30ce3554aa8080bbb7dfe9d85af",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.blockhenge.com",
+    "id": "007418889352641bbb3445584dffb387f532665de409ade58e9bea572db076e2",
+    "tag": "cf7349f01df86f6e25adae247bf1ecd6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.artiostr.ch",
+    "id": "e680774253346b6f113f80090e090f7ef8918aad7a1dee5c7ab0f500b732706e",
+    "tag": "4299a5096dd6ea8011742b64f2142555",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-relay.zimage.com",
+    "id": "0b7792556c465e76c5def8c802a12c06f170f2cc6237950446fcdb55e0f4a1b8",
+    "tag": "3745a52083989fc9296f80bc555885c2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.paywithflash.com",
+    "id": "97ea960d79e2526448acd0fbf8d59c089c94291758caab2ddcd83ebd319b3fe0",
+    "tag": "87a3df3119aa0f03e69f2e0cf9a7f512",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.conduit.market",
+    "id": "5fc21b01244fe4af03ceba5a1fc6d852eaafcd71826ac725c5445ca1e1ce8398",
+    "tag": "e3233a11a7336d9affa2a009c368adab",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.easycryptosend.it",
+    "id": "0fd24002a557d36fe70c046e8ff759aff30c594a724481ab12d057abde1fcb4e",
+    "tag": "2fe3529c19375feffbdb5838d8591b51",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrops.com",
+    "id": "5c1e5da2c7f1e61a229f2e7ded80de177bb2c3c471b8c3b20e17d04f8f54be8f",
+    "tag": "7cdcbb468c673b1f00cb462958f20ca5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostras.app",
+    "id": "633b4072956ba4e968882ec7aab266897bc2089b446bd398788d6efe0e53e7c7",
+    "tag": "4b64d6f0bd23ec41525564a91bd64e10",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.statedmission.com",
+    "id": "8cf6133576c7450ab8b6bc458bb1593b441aa5e6adeaf51afc4e523cd50e161f",
+    "tag": "d8ccd42cc9e76766e57a2cc2e91d459a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-relay.cbrx.io",
+    "id": "fec0cd261b5b53ad80c48b112da787772667a8956a8b9a38e2e3868ce4101ab5",
+    "tag": "51f29334d1e42e49401b433ebc497f74",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://n.kojira.io",
+    "id": "f305fcf2d3408573f1e1dd6c68d8ee7fd6709d2debf597f949080530111795a7",
+    "tag": "959ff893d471b1db0dd7433a0fd0b578",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://ephemeral.snowflare.cc",
+    "id": "59cf2f717607bb0ecb8e9687dfcd4e5d96d329f1a9a3a36ff3a1ece5ceba20a0",
+    "tag": "43dc4c8c5978508ea20fcb46985fb407",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.mccormick.cx",
+    "id": "fb9ab0780448bee89a483d25ab12384d99dd342815538879be02b6c19b30a3f9",
+    "tag": "8902f97fc0b7e8fd04bd4353218d96e2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-arg.zombi.cloudrodion.com",
+    "id": "36fe3001bd440f89c18d784a7347b8026b9bd6de5129a6edc8b78f3dba1d7df5",
+    "tag": "f7c98b88b224c9fb345871f6b8d53029",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://schnorr.me",
+    "id": "8cec043e835a1614218eef61fcf5639fea4c3be5386922d372c8930796b506ba",
+    "tag": "8fd22df5d2d7346754091efba4aa8c93",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://temp.iris.to",
+    "id": "95f65fef5d8e4b27f2c3f82871c03f8d594d64ed75a5b0cc7d875240ae25f657",
+    "tag": "aa4d4ae91a2b902af1fbecc6a4826527",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.edufeed.org",
+    "id": "b933f78ef4baa28d2f6f6eff1a59fc7097e524903c6605ab3f8b7bf4210c064c",
+    "tag": "addb04cd1f72d6892cc4636c96180531",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.ru.ac.th",
+    "id": "11e0411597a2b0ba65b765c62f812cc541e9cda211084d85a4d64ba5d768fe6f",
+    "tag": "513248708b8567931e5bcf3176b4dbe5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.favillakey.io",
+    "id": "6cc15610f673c8e0bd9da35a14eb8fc164956199806e70a5ee0d8a7d24c56744",
+    "tag": "fc0598fa1df6c6ba2cc6c471fa5dc524",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.aidatanorge.no",
+    "id": "796f769f15a5dc5ace4844237a3eefe5305f44ec2778ceb60aea1956ebd3722a",
+    "tag": "28ea23260c6a36b73c5b59c09e9956e0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://chat.boom.money",
+    "id": "c7fa3b9a57a9e9cfd50b5906dd40a6b5777f492e55eed444550e53ab779e1ab1",
+    "tag": "7b30d7f361ee9acf86ba3b39ead09a32",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://articles.layer3.news",
+    "id": "83a1b1731e5b993847ec82f88ec1a705d7fd730b6b85781a7fc34518dda2a740",
+    "tag": "32ef91f83f95cd540eade9879e11bb6c",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://memlay.v0l.io",
+    "id": "eaa9bfc158a6b0dbfb65d7061b35577128f5aaa9a694069739e491deb670066f",
+    "tag": "91aa81b5e2dda27a4a9ac4c70a2aa7b6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.azzamo.net",
+    "id": "e87cbbcc8929a9a7ab3d168863453dcb349238de97d4c3533a54600c762873b8",
+    "tag": "18663a6aba6da84a643d542e49ec28d0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nearhood.co.uk",
+    "id": "bed52901e02c9020ae35d7e50a464ee3e99e16259359c7c5b9d9a689c61566c8",
+    "tag": "b60cba0869cc030ac86945f50e3fc5fd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://strfry.bonsai.com",
+    "id": "288e17e4ca41802df86eac0578dab85178a2c721f1c2accb4a263f52008bf788",
+    "tag": "fa736b9bd6cce1011966beaab42b10f6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nr1.hakodate.city",
+    "id": "28bf8e21c23674d8c6cbda9523d64fa126ac5d1507e99b8107cf530e6778ba56",
+    "tag": "713555c2590eae453548974c5ad1b880",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.sigit.io",
+    "id": "24fec1f3dfbcd0d8ca0aa3e1a61b906cdd831a21cffd8f4c9e04caf63b201f14",
+    "tag": "6776e797c350fefde72741ed40914669",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://freelay.sovbit.host",
+    "id": "66cdd54f5c996a9caa7465bc234b647899f716c6b0117cdf3dea07f5744bbcdb",
+    "tag": "bf12303cfc5567a8b8b5a212ca6d7f6a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://public.crostr.com",
+    "id": "c53e674fdd61ab37c1a27e1c561b0a099b0a101edfa63ee1d1ae0e2d7d203562",
+    "tag": "82e900762eeebe537a50444fec01acda",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-rpi.edufeed.org",
+    "id": "633e849eb430da29949c1f3b099b928a0ac31fde7c9b86bce4027b4acd42fc2e",
+    "tag": "f255cffcd287986394a0c47497f7d530",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://purplerelay.com",
+    "id": "596f29f81d7b09d933ac755a3baa990ed9efc16ceee55d92bafd58a4d04ffc15",
+    "tag": "c1de6e1835717c51f4a874dca7fc59f3",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-can.zombi.cloudrodion.com",
+    "id": "6a5a08cf3e872f13693d02f8a7447770692b2a77e86fa386328edd9b38588a67",
+    "tag": "05b681da0682f7aaadeef48a9c21d5e5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.christiansass.de",
+    "id": "1b1ed993386d8182a29b90a3e3e2581c12230c90f1e75fe285094cd7a2c9c676",
+    "tag": "6cd6ee0eda1aa11c52a645760f027ec0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay2.ngengine.org",
+    "id": "bfb4763ed2a449310c017fd4f459285c51603c04b24e534d4bdd3cc6e384f923",
+    "tag": "4975204126b96abceab4493c37a2cb72",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://social.amanah.eblessing.co",
+    "id": "8d3098e5a7db73e2ee362ab18395aac16b1bef1c59b4b5604d24fcace4af00fe",
+    "tag": "5b78ba640e7f413a8e418bed34494e1f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.tapestry.ninja",
+    "id": "c9b7773e88851cc17931e03ca5020dfe954bbcebe8b5e7060ebe0f2fd2c68346",
+    "tag": "c2becd261d2d3abfc5922901ed779dfc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://chat-relay.zap-work.com",
+    "id": "da19640b46bf40729c78e10d7c81b15864de5ad2a58611c350b8abf3a86265b2",
+    "tag": "e66aca20ffdd5384c2a05359b4b6fa2e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.rtvslawenia.com",
+    "id": "19fe469ec786decee1501fcf8d425f7387e56d021a4c1b3711bff55857804fce",
+    "tag": "3067e9f25702e26053c9d6aca5a274bb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.btcforplebs.com",
+    "id": "697dafd8a90a79a2097991e9a40f6823496767dd4d984b5cad8bb4a989885963",
+    "tag": "f0618755f0bf1818d6414407f9b416c6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.solomonstr.com",
+    "id": "8cc65b563a809a52cb0e038014cf3d481227414d1b22fc693fbaf98e4e69bac6",
+    "tag": "37c736a8ed109c78f8a1eef44deb1e18",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.hjkl.zip",
+    "id": "56ec1723982ea5d55f60e9a7b931c4d3ea8a6b96652fcc87026c70518ba1209d",
+    "tag": "ba47e89c22c2c56cf8353582d985b1f7",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://syb.lol",
+    "id": "1cc1343dbc5f870cf75a01bbff28e1789d333d2751d8effe04c8a053bb1858bd",
+    "tag": "f079571e76a170e9be11402052a51c09",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay1.plor.dev",
+    "id": "c45167ad1721820a964b6dfd16bec6d3c672983c257385f39ce7de2e367307ab",
+    "tag": "5747fbb8052fff31f9bd1c832ef11bbb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.gulugulu.moe",
+    "id": "95d3e6ac9dd9e2c17fb474173d10b80c2f98a647e7ec8f09775165fac8d131ef",
+    "tag": "f5d5dace6f889e4a07c3367a92e25c4b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.tac.lol",
+    "id": "c6603765c28edbe8f3dd2a6b02309107a51f0f5974f9951fa7971d622d83a5dd",
+    "tag": "8c1deebf07ece17bbe0df909e3dd7ffe",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.wirednet.jp",
+    "id": "36f0374832973b08b4e58f03ca54a0026036547afb9ac8efb65f8d92e0ce604d",
+    "tag": "b8dc63d07db2bba1e360a573cd8b11c1",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.veganostr.com",
+    "id": "b6557de788c4b52e02d94e385b823f7a16c0a5857f9e7a2bbb3caeb9ac5bb30e",
+    "tag": "d2109e9ddc6a4ad3e0fee69bb3ceb0c2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.398ja.xyz",
+    "id": "e0a45729794923ac4b7843a1632b52a552a25bfc9767ca2378c6702901f2049e",
+    "tag": "ef02612f09f5ec3128654c53fbc009c1",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.keykeeper.world",
+    "id": "55f764010e8c4e323f1c0f90d91f4ee71208515877f25713bbcd8ddd1f11430d",
+    "tag": "73ca2b7f189f45e31f448204583f941a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.dev.br",
+    "id": "6a661afc48a81f22362e71ff523ba13a1812da0fcb02c5c110269469b14a62f6",
+    "tag": "556568ec87d2f250ce56fc16f23bf68a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.sovereignservices.xyz",
+    "id": "261ffb3552006bdc2d3fa8d4e2f708518f3bd6284b59312b3e7aa058ec979aa5",
+    "tag": "43d8483aafaaa73a97fa7955b4a21b19",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.digitalhowl.ch",
+    "id": "35932c175fdaf39d58456420f03a77c2376e3f00c907c14d87bbf72c784f6956",
+    "tag": "0da261d3c6bfa4f16105c08436a90bf6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.bgbitcoin.club",
+    "id": "6c6a604e0de0ce6d04fe0834a9a70c72197252a7096296d1a84b4e583e2159c8",
+    "tag": "e0305c9a08ae93abdf0912cc03cb6c5d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.plebeian.market",
+    "id": "e8e06fbd374d475fa43c98171a101abc54277d53b004e702e24cfc7ac35cb219",
+    "tag": "b9f9df4c0382152bcea5813476db16f7",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.liberty.fans",
+    "id": "80b8d3f2fa6b0485c654a718cf8cf08627a106ec2a9af61f8c5dd806d96019fd",
+    "tag": "7580bc931ada4d46a55d814fa51a6a5e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://portal-relay.pareto.space",
+    "id": "c82ddc9ab71564514831ce527db6a93878e42e16122f3ca6b226f934e3d4120e",
+    "tag": "aa8fdbdd9057a13f2462552970772841",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.coinos.pro",
+    "id": "ec1bd0c379523161821e4691ae27e96467f43245606029e7cd7b90598a7be832",
+    "tag": "168a3b9e531dbc83a8f91d47b693c119",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.libernet.app",
+    "id": "179c3705a1f0855361b64a8f186ec15e2091e10c93d60268f84dc475db000562",
+    "tag": "ae46383786f50199e77169019e104840",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostrrelay.taylorperron.com",
+    "id": "17006b25c0f29f02cbe2d182a70cce4c7ad05896eecb0cd75546a8a73f13cf7b",
+    "tag": "e1a429ccc45255739a36bfdd6d91aaab",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://testr.nymble.world",
+    "id": "cae70cbdb9827f84530b1cbe9b80651ff00c85f907db80643e7c83048b6ae7c4",
+    "tag": "6da50319149b75bd26075bc6dc398798",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.earthly.city",
+    "id": "2ed9db25b0da9dc5857094ba2cf7208f48a0b642da9a0da947ad25b388b5be94",
+    "tag": "499c86f340b530e171452782c002431e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrdam.com",
+    "id": "235afe04df1c6c067ff84fbdfbf79c12dbb043915b0192f01fb9da2c8e04d690",
+    "tag": "de8e2f92a800b9b6241b864b24113934",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.olas.app",
+    "id": "29fd89f236914979eccf1c59a40d247ca8b8e5be7f94532d6718b4a0eab6a2f5",
+    "tag": "aa47f5f655e19bddad972e7c1570e13e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-fra.zombi.cloudrodion.com",
+    "id": "bc832a78925a0a2d0b3ff1c7774c3e95fd66c81ec7f60fa902e4bdcd2c33ff3c",
+    "tag": "3d8de0d3f38c1017fd2c46f54b6975bf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.lotek-distro.com",
+    "id": "4a5b3ab8775d80e1d4fd93a75269f8f0845113abae95c9ecb06cb3b686a4ee5d",
+    "tag": "c06a6f3702311d24369e1f2240cadf83",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-dev.gulugulu.moe",
+    "id": "f2865c83d4dab34ae2115530382ddda0d7cb5d44d1ebece7bc62557a4f682d7c",
+    "tag": "b532a665c2cafdc4afea4762cdeb5a5e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay2.angor.io",
+    "id": "7e7497a07887bfebf84f221d8e5e384434b32a291908e1808b7fcccba539f96c",
+    "tag": "efc38bb8be0dbd8d4cd6beb9bffaca4c",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://wheat.happytavern.co",
+    "id": "2ee5d4c0616c5fa8aed1ebbff849444c365687fa686cb47e82861dbdd58aa80d",
+    "tag": "e6a8073d18da3549799f26d541d492d4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.rblb.it",
+    "id": "ab313df350b50e52b5c7daf490078df00ccb3e909209aecff319a65567c7f575",
+    "tag": "a343611bd504a026493d9af3f896a711",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.routstr.com",
+    "id": "0282f4ec82f67dd8db4866d7ee1706ba453b7c49fbcb937e5c683dde68211051",
+    "tag": "125a46e46b09ba7f0ee60de6f7ecfe9c",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://test.relays.nuts.cash",
+    "id": "e4a5822b5bc238683a10b6b125b4ea0c0be3d80453a05db584548f639ae11a41",
+    "tag": "01bc59990fd37996e386848274c37725",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-relay.corb.net",
+    "id": "817e527477654d3f411e09aafa563947747a89646749abeef8db74f25310319b",
+    "tag": "604fdf367cd3d5e0fd2f712b149bc226",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.lightning.pub",
+    "id": "b76cb8bbd5d5b85a186a1c56885557a810bbe1a610c14a8c637737c185e4fe62",
+    "tag": "eb00680626a0a62353648f7aaf7ecd84",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bitcoincoin.ch/nostrrelay/nwc-private",
+    "id": "886f11f5a0b6e78752f7d3e69314c3f33298ee6481c76ff614f0bb914d3c8600",
+    "tag": "7a8b70a4cc3a2e23079e3e3d137b7b25",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-02.uid.ovh",
+    "id": "2abd80e082fa78b37f21758fc6de0bc6427e6e48f7fa2515548f7b9b67433696",
+    "tag": "c1da3f3f77b50ec57b46b33344f0e223",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.satlantis.io",
+    "id": "f784376ce6822502da7ce565e37082c4497394b9c92e63e5b381215a00d8a125",
+    "tag": "12aab7f5290a1c507e0c38fd244bdc5a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://strfry.shock.network",
+    "id": "63a7aa96aec84a56037cdb1ac2e75620d57889aa85fd720226e1fbd5b70d0c57",
+    "tag": "e07da1d99eb6ebda14321b75b3323306",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bridge.tagomago.me",
+    "id": "b25dce5df84e3b887f6e7bee7091287c5707c5f6531c5e463f0fcfa08c0a7055",
+    "tag": "3081808248ff97bdbd1023088f2cac03",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.angor.io",
+    "id": "a580ae6aa5a85f30ebe58c43f87dd5d66b66fdcc090b07a6b1ad14b65dedbfa2",
+    "tag": "d9a0a98610fd062aef5b43ec38dddec9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay1.xfire.to",
+    "id": "d48c053f6e51558f41e09a5192f9740521cd1b05147a6b24adf241375128c024",
+    "tag": "c87902d3f7f2142d0eec707adafdd70f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.cypherguide.org",
+    "id": "bd255722ea8d3a26dac24c130e2c54d560adcf6902984f0a05b4c3d304eb09f0",
+    "tag": "98f4eb2b7c35a870afd880ebb287b9c3",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.flashapp.me",
+    "id": "555dd656762ed1e5caef180b165c4a39fc575e1dfd0cee8478c385d650b407c3",
+    "tag": "8f6bed4d209e065f5408f1c64ef5edeb",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://ec1.f7z.io",
+    "id": "d46c7adab4013679b2e3f0abde77026dcc127aa9d3394941ef126c0ac3ad9e5d",
+    "tag": "22078dca6e081cadf5549ee502e15223",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.planix.org",
+    "id": "64736ec09629d3855b2ebfe1156c541e49626f76fb34d46a93f11fb3f3f7b8ae",
+    "tag": "8399563040799d740136077af4f9bbf0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-rs-relay.dev.fedibtc.com",
+    "id": "3dd7d5b95246093cadd625222da9549afb5e30fc08ab380fa06e654a6b0ffb4f",
+    "tag": "8ceef5e087cfc3529c021cbc67ebb334",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay1.privkey.io",
+    "id": "2eef34842e86bb65973e73657682eb07228097f276518af784c1942b8d4ae081",
+    "tag": "652b082ebaff7778d6f5d6ac4f6be8df",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.islandarea.net",
+    "id": "0fdee72e03e3ef12efbdab6dc6eda70ae69c0cae0f1b6e7f8a4f84b6e35ec364",
+    "tag": "1ee0f9897a43b521bbe2a8beecbce2a0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.stakey.net",
+    "id": "99012d963b037a71f6d6ad472442173a292b8bb7e2d9766c68d0531f9fd5d7f5",
+    "tag": "0ec8ee308c95d7b332cf5c4888f40337",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.trcjr.xyz",
+    "id": "20acd2edcb75d6dc243d85c6a00e6a309a5de3b1170228122b45a77745a1e5fd",
+    "tag": "f90a2b2701b9b225d591f83a49b3f4be",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.plantroon.com",
+    "id": "3a884d4d8dfccc7f460084425c55d5c9888a193c4934b9174b0ebeed98c5e4f7",
+    "tag": "7394a325f29fe2ebbed611c46363016d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.manneken.brussels",
+    "id": "2af8b54291a8b35ab1bef7a0a3074d1c3dfdcda4621760f1196517a35de4f15d",
+    "tag": "47d38c80015e487d7965857e107e6b8b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.satsapp.me",
+    "id": "abd613ad68ea962ab3d82193b7bd9185d8aec16ae9dee883a13fb12edef87137",
+    "tag": "bba196c57a5180c1408a2dd83cfcc590",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://ec2.f7z.io",
+    "id": "0f3e14f0141cd8a841dbfa287aeb481f2cbd080524eca32bcc5510325a7af77e",
+    "tag": "469bf062badde0f2a010987bbb2b8ca4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.davenov.com",
+    "id": "34d08ee437b9ebab4115c69333a2cb889e8dc09b094d97c365a9fdec208669ad",
+    "tag": "5f726a6e082c4ed1fc23009212fe9a46",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.lanacoin-eternity.com",
+    "id": "a0404655dc37e115c9e8a0233370058bdfff614734a52d73a9f176d86e6bba61",
+    "tag": "913ee1c6fb0076b86184841d668756de",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.mappingbitcoin.com",
+    "id": "8fa2733412542ff16b458217016e00002483ea94ab7e46db9004b8e531eb97b4",
+    "tag": "ca6d809345ae5faa9e6754c058f46436",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-dev.azuki.blue",
+    "id": "f3bc8e6f240ab7d6b1fc727f38f0d3625fe49ff07d4afb1bbaf633dabbe85045",
+    "tag": "8de7bdb8e21a18858e9b971b01223486",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://cdn.satellite.earth",
+    "id": "d2297c13cd98577794ed5c9c8cf018c397fdc43d01a2c4bff98820064bf4219c",
+    "tag": "377f43a8e34297b098f024bbebdff166",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.islandbitcoin.com",
+    "id": "c7978a8847c0989ec6d9b802879141dfa84cdf7cd7b994fae66a5673dc581e13",
+    "tag": "1290cfff7c14419a7e151f297fcd7be2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.nodesmap.com",
+    "id": "b74027afa306fe891b5407b6872e44c8a0d49021fdd44fb2519531026540d880",
+    "tag": "a77916efad904a3646dcf37e44fa1e23",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.wecsats.io",
+    "id": "0f8eabd9a1a54b33417bdcb0876fceb5c91b9c1461d15348ec22eea5dc4d8a22",
+    "tag": "b6efb3dba40482d59ed7f5e3f088538a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.cyberguy.fyi",
+    "id": "726a70de195454d368b82d1103961cae3428b559a665a4b5f9d046ce470986b8",
+    "tag": "b20e5950110a5dfb21baab6f9af19c52",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.carlos-cdb.top",
+    "id": "cb643ac44f84d59b77da7483b521ddd5ccc99e9a31f9f020c570b3c564615ab5",
+    "tag": "8ed1bc3856b4f7f234e61df0b75bddbc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.vrtmrz.net",
+    "id": "64b41611e2408c971a4574985be5d03234f26831f347e3e9b199f30fa3d405e2",
+    "tag": "2249c3f55f2140ffb936ac34140d5c7a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relayone.geektank.ai",
+    "id": "f5bbe237213d97e005cf597e26385c4539b286c1606581e083093e9773affbdf",
+    "tag": "53f117f7baabf3f30ee7b51ab3967725",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostrcity-club.fly.dev",
+    "id": "d7b48a150dc85b481f29657086ca220e9a14ef6810826b0c085b41962455ff71",
+    "tag": "b728ca788b60154381664aa67eaa3964",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.samt.st",
+    "id": "0251c9dd6037eb63ae283edef05c49c826f93e7c3836e017005b3bf5b657f5c2",
+    "tag": "155a40a414d87c74a790388a56ee07f5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.sathoarder.com",
+    "id": "a21ac9d137f4c9e4b2435d5d6b6571040ed1b06465012bb2aa9e9b43be31a29e",
+    "tag": "084927b0d0a26774736d9cd75659a001",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.quali.chat",
+    "id": "244b812c869bcf62550e8fa712a5ac9732022b44dc5e26999f55efabc4542b9a",
+    "tag": "62addc5053b75250c5f0e3f86c942a9e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.overmind.lol",
+    "id": "b378f75840c21b76f1b9e98df08f9d844945cbde6d72be6f9a67380947f15a98",
+    "tag": "f1b5e134a3a337236db1552c6df44e88",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.agentry.com",
+    "id": "ed5621e3160f2701e426e6d6195f0039cec6e97062d228291c519b3894631ecf",
+    "tag": "576070934a4bd1427376a1460399111a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.zone667.com",
+    "id": "f31cdcd001e6945dfc2ca89da71f3756c3220b8095cb014ed73ffdad5fa64a1b",
+    "tag": "25a742867e10389bb69c8ee6fa42e8bd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-01.uid.ovh",
+    "id": "66bf3524587bb7fdeda63787db4d84a0e43801f9bb04067af3ddd344d5783f9a",
+    "tag": "ffecf98aa3ce7230989098f55c3adaaa",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dm-test-strfry-generic.samt.st",
+    "id": "84ec1bb91c2275612155cbbc6f64e48448185ba0abd36ab80c5331c0dd92645b",
+    "tag": "b9722750e8707dd94e3ba2bc977d29ca",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-dev.satlantis.io",
+    "id": "d365033ffeeb60a0b5e0b2b7be2cbbb69ac63b250be986dccd78ab9749adcba1",
+    "tag": "b0299192b2b8f7575e1d5efa195a9d2e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.directsponsor.net",
+    "id": "e502a5ea6825c9df957e5bca9477543c40fe0d3a3b4bb408bc6a68f3081230af",
+    "tag": "471e5dd6c971731d0c575558c2d9379d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.me/relay",
+    "id": "7544341ea579dcefe60d7a1d8201b095f5262a12078c5c4e02e26ba27e428f9c",
+    "tag": "3a0a9b3ef08bbedd3a2a5c42f17beeab",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.wisp.talk",
+    "id": "61ac0dcf7b6c089e8ac2a1d112b6653f183e9bf899af1ba42b02965944ce8766",
+    "tag": "05acc6d3e26f25205dfe91bfce2c4224",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://vault.iris.to",
+    "id": "227577bbd50dc861eb85d4c8c56a6f7c354f7ec80804fae5ca2c21a857b60f9b",
+    "tag": "7d347c6187d992c7255040e0125e97d5",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://bitcoiner.social",
+    "id": "45af5e76acd25bdd89a64c6b5b9172d09877c19e194bc21ae9dc2e3230ffb4cd",
+    "tag": "ebed2cd77e325541e1d1292ed675162f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.mineracks.com",
+    "id": "fe5f51bc977ae05386d90ce674975e92be8fded658813364a18498329c4869aa",
+    "tag": "8c45f7249bec92d16ea10a06eaa70a8b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay2.veganostr.com",
+    "id": "07c9d6e2464c18f191c88bb2984de3a50cf46081049489ac139f545927fcc409",
+    "tag": "9faf125a45fb706b523755b3d84bbdcc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-relay.xbytez.io",
+    "id": "8158816599ab2d543b69f609c8c35160e03aa28bc2a1dfc0acdbe5b43ae6c168",
+    "tag": "13e3880a7eaf51c3a1e2c3bc3809218d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.minibolt.info",
+    "id": "433a40b253de830651975212a7b3c8875dd9d9a10be3cb7130796560d1ae35a5",
+    "tag": "088fb89f1fc866e5cb276c7a58906ab8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.hifish.org",
+    "id": "5e95ffbb68b3709c41eff5e67a716d2ee763f44d48412ac7e45088e78652d669",
+    "tag": "0bc008e76a9779d3c54fb49f416579a8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.mad-social.net",
+    "id": "03ccbb061eccc93c1f39f9883dbd3ee47e361c03fd318b451b38a39d089a55f4",
+    "tag": "be518eafa3d9c79d086ca8e884125cec",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.janx.com",
+    "id": "2424d39ad33c8c0dfafa64b9490428eab6bde78756b1a0c33c3cf2310276ad2c",
+    "tag": "7a6ff71cb4e5e2a5760279c520c30781",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostrmap.net",
+    "id": "00c47a8723ef33bb135c2a7f5100c6beff357a7e63a3d38281f4daf477f29fcd",
+    "tag": "87fc112cb1cd05d42714a4bf53cbec49",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.piazza.today",
+    "id": "73be0ca28f46dd3f672c23bb94748fa94afcdc9457fffd0fb75f6033b3140827",
+    "tag": "5cbc7d87166b1d55582aba57dd0ece39",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://pipe.imwald.eu",
+    "id": "3312fbbd632607b27d3e07c2561ab5353eb4f1f5f20d7ca1776b07e6870feb05",
+    "tag": "88938265114ecaed1f19deb022b9b196",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.grigic.org",
+    "id": "0aeb8e485f06c4ffd72d6592a96be3516f096e855453d7d75ecc73a9827223da",
+    "tag": "446a28dbd8513a5c1c946b6d5230af53",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.carroarmato0.be",
+    "id": "52dc3bfe648fd6ef383ce61455e5cd8ccb160d7f5c6d0bd13bff26813b555d13",
+    "tag": "8423a34ba9edadd607dc73a95056c275",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://2-25-5-92.sslip.io",
+    "id": "433ee5056466f7231bf15176a93b2c7230f1751666353937fc8eda28efc644e2",
+    "tag": "43f2222975bcfd4848a421da28b6462e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nmail.li",
+    "id": "6d5b63d80fa406c15a2e52787b66fce226b0d829f08a8dd97b42189490fe66c3",
+    "tag": "c9627ccf182cbfe82fe2651da0e98d08",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.guggero.org",
+    "id": "1c4ffb4604f2bc1e8e68c998f5c7eff2aff40319e975906d25f2bad97e0ee972",
+    "tag": "6e021b9e3cd3fd1d088956235ca2f267",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.sharegap.net",
+    "id": "752082028decadf4d00c8b3fa71a8265ffff2dd19887e94469ef5757492f9f55",
+    "tag": "e125f23e1f9cb0fd487b1c1d74d0123b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.paulstephenborile.com",
+    "id": "aa05e8f3f22278a8eebbc212702db4b473b52e661d117f044ca1c9533dc661e1",
+    "tag": "28c055e4abf656043084fc8adaf07627",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nr.yay.so",
+    "id": "a7db0be522a08e0a19131cefff56d7137b55fb11819de6f4cad033e394ac5d7b",
+    "tag": "19c0a3b4a23fcbed3c8c123b073edd73",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://realy.130601.xyz/wss-18646e4d-18f5-4ebb-8e38-096bb8a17aa4",
+    "id": "96f7d3bd5b2fec0d841b0c9da0f9e984f3c9ff1e1f2fc578b5b3ed5309af9241",
+    "tag": "a2b81858a22785e13fae0dc2cd15022e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dm-test-nostr-rs-42-enabled.samt.st",
+    "id": "27f228a5aa65b4e1c5bcc9e54487efde91066e8f3a6751d521d8172a310e723c",
+    "tag": "0166e55187fc83c910c04ee874c42e88",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://spamspamspamspam.rest",
+    "id": "8fa5618590c5ee4552244e74d2632fd81470d07915893a40f379e456474baa1f",
+    "tag": "582f93d42351d2f8adfe41c0a81309d2",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://cs-relay.nostrdev.com",
+    "id": "810af8f9a7321c8a95bf7acd2ebda635f4f271d3cee56033f5d079b0ea26a295",
+    "tag": "366aa2f680855a8ee3e17b6aae4aa545",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.aphelion.network",
+    "id": "9d5cdfc86443202cdf2af30e01fb3904fc96f415b0fa0a65f9855359ac23b900",
+    "tag": "d3ded9cf256f734bee069230d3c7630e",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relayone.soundhsa.com",
+    "id": "cee4b249907572125f3185a0bc72452677cfd474e0558d64a6dd2039a0971236",
+    "tag": "1f044c4cd0eea7b21889908275028ed0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-relay01.redscrypt.org:48443",
+    "id": "dbbfc5f00112f4b66917748705fbea163723ae49c3962b89621d0d3c8cb680f6",
+    "tag": "43d768497ec642da6e7b6679611a1860",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.getvia.xyz",
+    "id": "f60834b49f6b335a72f7a9f42e98cad31c49e2abbc74173e3e6cfd07aee31e8f",
+    "tag": "793a1ce6139f29290676cf72c54b6834",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.mypathtofire.de",
+    "id": "961b139aeae56ae280aada8964c75f639587ad6def27741d9ce1d4b6ec8cad8f",
+    "tag": "646ae673089cc80eb087cf878065187f",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay2.orangesync.tech",
+    "id": "cd81f1553c78a863c7a411a1cb2e3765e6fb322f30ff56e8a5b22ed9719209a0",
+    "tag": "3887b29c76d12c4532b83de9c1eaf4ef",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.0x7e.xyz",
+    "id": "b277d88c6e739e55bd2c699a97697e63f45b07c966e0b749f7e3d0ca46ec7066",
+    "tag": "bc92a763f979fe2a097d5569ed5cc4d0",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.bnos.space",
+    "id": "53c21f8769075c9fbb7316ccd0effb10c47aab2d6f2532e763276a54f022ec05",
+    "tag": "d2f5c73a13bede56caa23cb8cfa531d6",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dm-test-nostr-rs-42-disabled.samt.st",
+    "id": "9b413821909e12b0a3806d58bee24c81ad4cfb84f369700835b02364dbb020d2",
+    "tag": "6e2307c2cfb5690d764443fa53550e6a",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://lnbits.javi.space/nostrrelay/javier",
+    "id": "6f27e15269806f3961a940f6082970336afd1d3733fed666d045c4dc15bddd4f",
+    "tag": "a7a6b3740e419e354edf5c6d3db65c95",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.bowlafterbowl.com",
+    "id": "6237045044efacbf76d5669a99ba7ed85902b2d6db4dc3aa3fdb18e890078246",
+    "tag": "b2418af4f4f93d878169b31a5ac989bf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.compile-error.net",
+    "id": "598a5ca75f0c15f60158bb02fc18be3df65d3a8fbb3925a27a48086fca9601ea",
+    "tag": "ccb8d737d83863b1be6d85586c341439",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://airfry.utxo.one",
+    "id": "b9aaeea1603c7d61be6ef50549823d62ff54a971affbc0a1e8e82020ddacbaf5",
+    "tag": "a4c44d44772fd291020642ee3cf4a6ca",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.satoshisfrens.win",
+    "id": "eb220f9d8804bbab94b4387bbde5ea0975b825e6d0168365602c5f81b904ce1e",
+    "tag": "b1b3e0d31af1daa705d487fa8984dd76",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.relay.hedwig.sh",
+    "id": "25d0f4962f6e9fcd446e365ce4162f4c684cbfa0228c6db2cec5499585920bee",
+    "tag": "fff00523273f51f7c74e6ad415c13d78",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.nostr.channel",
+    "id": "ad24a7ec13aa5dc0afadadf64dced75e816d5a112f831fe8003ceb87e1704703",
+    "tag": "85dd8960ac39705a218d36cdd6d30b2b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://testnet.samt.st",
+    "id": "9099db2d0bf5f71937df770bdeffbbeded613e9b50083688b6433098a8f93aa4",
+    "tag": "84a87b2789732acf592f2c8e29048107",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr-spike-production.up.railway.app/relay",
+    "id": "ee9fcaed5cd374ba32c55717fb6be84828443ab30901ecef0d8786b2627ae908",
+    "tag": "a71c8871b95ab2089aa099da0fd705bf",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.jcera.eu",
+    "id": "3292618c501f7a512398fac323e1fd582b6c7a5f128a3c235bade9e5dc5aafee",
+    "tag": "97c51b00fc6a3f3446714d101b79bca4",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.petrkr.net/strfry",
+    "id": "61eee0ffae42bb3ab6e93bcc936fcb99371f219453a3a729974e55bbeb6259fe",
+    "tag": "fa4c34a6ccb228ee75dc6299f64c4e16",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.chatbett.de",
+    "id": "41953166b6d70b75134858af78d40aa135352d4e73e2ceb9aad7895d125d7198",
+    "tag": "b747ede345ab3b60bb79321d6fbc05ae",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://r.ydg.works",
+    "id": "c23d41fbe678ebb87d4565582630cb36bc2f9f3f3b054443246a62ca9e215797",
+    "tag": "584c939939befda9c366a4ffc9a6ca09",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://r.senx.io",
+    "id": "6f73cbcea34e3f0281a980b4957c225c5213dc403ca7ac4aa590035da7349122",
+    "tag": "dc241c9bf98af1b502aa679bc60af4fd",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.illuminodes.com",
+    "id": "8999cf11c22e0d1f16ca44a6565773a5c02b2ed0e37566e5cb7f5150de3523c8",
+    "tag": "4bdcc18c57a1e6e49ba5f2908ba1ee26",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://dm-test-strfry-discovery.samt.st",
+    "id": "0b2a2c0bea782979e3378670ea74236e3bc6857f146c67353125fee3e3c0f43a",
+    "tag": "86037d7b3ab1cd55cfc3d74795023d05",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.malin.onl",
+    "id": "66f03586be7ee8d53c2fac9ba92de594faa0f2c0ccc1f3b3708dd464779d431f",
+    "tag": "1c48c14bdbdec5f6fd39cc9d4f7f3ad7",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.debate.report",
+    "id": "69f12329c1361f7e86cc723da5d1996ae4671a05d7db85246095e1d549ad033c",
+    "tag": "eb742ecea3a23e499399571b0e5d2410",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://strfry.throwawayaccount.com",
+    "id": "f679b7c270fa142bf510f27883c02541ab4c98fdbf952083b644dd2821db4349",
+    "tag": "a409cd42e7856b26486e71f483c7f368",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.cobranzas.com",
+    "id": "15b5c31cc5ecde4c289d2a7065e3d645bab39a10a0739ea945ec1d89a226d5bc",
+    "tag": "90a2b131543bbf1d5c5304f911e7c6ae",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://r.kojira.io",
+    "id": "d2f9ec451490e3b08860d78c6abcd48f75c83679495cc5b80ad7a69eeaabc4e3",
+    "tag": "73396a6d0ded3567a0c4fd48c079a238",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-jp.nostr.wirednet.jp",
+    "id": "bf1fd9b36ede2d8ef96fc8d83b854765f1ca1336ec4163275bf6b08dc44a5fd2",
+    "tag": "7357322f6bc87b144e30e00ace253c4d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://tapestry.brainstorm.world/relay",
+    "id": "777362688e3d838e451193dcdec4a4872f1b1f32cc6321b07c626991c688a2b6",
+    "tag": "04cc95bf42141ecfe77dc1598b48a208",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://cagliostr.compile-error.net",
+    "id": "74ef92bfb9b4e21b171026f145612ca22fec9971f1788c9968e1dded2c2458d5",
+    "tag": "3a1766ee7e02cd201ddc2b08e1e8c248",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://btcpay.sendbitcoin.lol/nostr",
+    "id": "8a35e7745c6423545c6f3f79a4bce1eedda83a5360edccbe6199f499eca38533",
+    "tag": "146ca3e4e142c8d32a69f4af863b672d",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.fediverse.jp",
+    "id": "72aea3cb9bc2ca1597f3ab80fb313b89c2eefe8a22128916f8842d8021f7f398",
+    "tag": "30d19eff5b7f7a39814cf05fdab08bf9",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://rel4ynostr.immortalist.dpdns.org",
+    "id": "9de417e0387c87ffa4988488ff0d35004257969973512bf93659e16bf42ef259",
+    "tag": "89c5341adb939859d27fa94f72741efc",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay-us.zombi.cloudrodion.com",
+    "id": "85758988ed79345293560876279fa60c401af8c7924f22aa208521dd69e217fc",
+    "tag": "095f623bf78a9abc01f750808accbf23",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://nostr.bitcoinx.gr",
+    "id": "b0997e520a843f21e758df8f63b367245e679749fa5bdcca3dac532eb79d7308",
+    "tag": "f282195fb7c5fbf448cac549711546f8",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://relay.primal.net/v1",
+    "id": "6777116ebcc7a7db35ce26bcb3c338337a6990f528ec39cefcb6e141f2512ff8",
+    "tag": "5a2fc0223a9c5170d7fb6a857994c907",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://all.btchushbox.com/dm",
+    "id": "b0b41fcbfe5d217d83269f5f5ad661353792c73431d81199e88d378126ae3141",
+    "tag": "a11b6752986a3573c0290e8e3ef0c68b",
+    "writtenAt": 1795101000000
+  },
+  {
+    "url": "wss://20pl.top",
+    "id": "8913ddfc70741f33bf2894cc1db56370e70193ec4f405ebfbf788361a1655c38",
+    "tag": "6e59313beeab096557e4be6a620dc7dd",
+    "writtenAt": 1795101000000
+  }
+]

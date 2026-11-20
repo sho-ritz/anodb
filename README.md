@@ -266,6 +266,24 @@ await db.blobs.delete(ref)                        // only from the device that u
 - Downloads are verified against the sha256, so a server cannot alter a file; other servers are tried on failure.
 - Default servers: `DEFAULT_BLOB_SERVERS` (public servers that accept encrypted uploads). **Most public Blossom servers only accept images/video and reject ciphertext**, and none guarantee retention — use `blobServers` to add your own or paid servers.
 
+## Relays
+
+By default anoDB writes to a few fixed relays (`DEFAULT_RELAYS`) **and**, since 0.12.0, to 5 relays
+picked for each space from a bundled candidate list (`RELAY_CANDIDATES`). The pick is derived from a
+secret (the space's epoch key, the device key for its inbox, the link secret for pairing), so every
+member lands on the same relays and outsiders cannot tell which ones.
+
+```ts
+createAnoDB({ ... })                                        // fixed + automatically picked relays
+createAnoDB({ ..., relays: ['wss://my.relay'] })            // only your relays (no automatic pick)
+createAnoDB({ ..., relays: ['wss://my.relay'], autoRelays: true }) // yours + automatically picked
+createAnoDB({ ..., maxAutoRelays: 10 })                     // cap the extra connections (default 20)
+```
+
+This is **phase 1** of a compatible migration (see `docs/DECISIONS.md`, rows 29–30): the fixed relays
+are still always written and read, so older versions keep syncing. A later version switches each
+space to its picked relays automatically once all of its devices run a version that reads them.
+
 ## Sync health
 
 ```ts

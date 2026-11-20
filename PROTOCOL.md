@@ -52,6 +52,7 @@ A NIP-01 event signed by the **device** key, never published unencrypted. `conte
 ```
 
 - `seq` starts at 1 and increases by one per (space, device). Gaps reveal missing messages.
+- `rp` (optional, `1`): the sending device reads this space on its automatically picked relays (§6.1). Receivers that do not know the field ignore it.
 - A receiver MUST check: inner signature; `dlg` delegates to the inner pubkey; `sp`/`ep` match
   the key that decrypted the envelope; payload shape.
 
@@ -178,6 +179,22 @@ throwaway key, fresh `created_at`, same content).
 
 Optional pruning: envelope key = `sha256("anodb/v2/prune/" + hex(deviceSk) + "/" + salt)`; after a
 snapshot the author publishes NIP-09 kind 5 `["e", id], ["k", "7303"]` for its older envelopes.
+
+### 6.1 Relay routing (informative; migration phase 1)
+
+Each routing tag has a secret **seed**: the epoch key (hex) for a space tag, the device pubkey for
+an inbox tag, the link secret for a pairing tag. Candidates (a versioned list bundled with the
+implementation) are ranked by rendezvous hashing:
+
+```
+k     = sha256hex("anodb/v2/relays/" + seed)
+score = sha256hex(k + "/" + relayUrl)      // highest first
+```
+
+The top 5 are the tag's **picked relays**. In phase 1 every envelope is still written to and read
+from the fixed relays; envelopes of tags the device subscribes to are also written to and read from
+their picked relays, and delivery is judged on the fixed relays only. Later phases (DECISIONS 30)
+switch a space to its picked relays once every active device sends `rp: 1`.
 
 ## 7. Public tables
 

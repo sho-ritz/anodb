@@ -226,6 +226,7 @@ export class RelayPool {
   readonly #openListeners = new Set<Listener>()
   readonly #closeListeners = new Set<Listener>()
   #closed = false
+  #started = false
 
   constructor(urls: readonly string[], opts: RelayPoolOptions = {}) {
     const impl = opts.WebSocket ?? (globalThis.WebSocket as WebSocketCtor | undefined)
@@ -250,7 +251,29 @@ export class RelayPool {
   }
 
   connect(): void {
+    this.#started = true
     for (const c of this.#conns.values()) c.connect()
+  }
+
+  /**
+   * Replace the set of persistent relays: new ones are connected (once the pool has started) and
+   * subscribed to every live subscription, dropped ones are closed.
+   */
+  setRelays(urls: readonly string[]): void {
+    if (this.#closed) return
+    const want = new Set(urls.map(normalizeRelayUrl))
+    for (const [url, c] of this.#conns) {
+      if (want.has(url)) continue
+      this.#conns.delete(url)
+      c.close()
+      for (const fn of this.#closeListeners) fn(url)
+    }
+    for (const url of want) {
+      if (this.#conns.has(url)) continue
+      const c = new RelayConnection(this, url, true)
+      this.#conns.set(url, c)
+      if (this.#started) c.connect()
+    }
   }
 
   onOpen(fn: Listener): () => void {
