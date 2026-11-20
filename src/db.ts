@@ -20,6 +20,8 @@ import {
   verifySignedEvent,
 } from './crypto.js'
 import { DEFAULT_RELAYS } from './defaults.js'
+import { RELAY_CANDIDATES } from './relay-candidates.js'
+import { RelayRouter, type RouteSeed } from './relay-routing.js'
 import { Clock } from './hlc.js'
 import { createDelegation, isEvent, verifyDelegation } from './identity.js'
 import { type Role, spaceIdFor } from './membership.js'
@@ -61,6 +63,17 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   /** `'wrap'` (default): envelopes are signed by throwaway keys. `'none'`: signed by the device key. */
   metadataProtection?: 'wrap' | 'none'
   relays?: readonly string[]
+  /**
+   * Also route each space, this device's inbox and pairing links to relays picked automatically
+   * from `relayCandidates`, keyed by a secret (epoch key / device pubkey / link secret). Migration
+   * phase 1: the fixed relays are still always written and read; the picked ones hold extra copies.
+   * Default: true unless `relays` is given.
+   */
+  autoRelays?: boolean
+  /** Candidate pool for `autoRelays`. Default: the bundled, versioned list (`RELAY_CANDIDATES`). */
+  relayCandidates?: readonly string[]
+  /** At most this many extra connections for `autoRelays` (tags beyond it stay fixed-only). Default 20. */
+  maxAutoRelays?: number
   /** A write leaves the outbox after this many relays accepted it. Default: min(2, relays.length). */
   minAcks?: number
   retryIntervalMs?: number
@@ -234,6 +247,8 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected readonly opts: AnoDBOptions<S>
   protected readonly kysely: Kysely<KyselyDatabase<S>>
   protected personal = ''
+  /** Whether automatic relay selection is on (migration phase 1, DECISIONS 30). */
+  protected readonly autoRelays: boolean
   readonly #changeListeners = new Set<ChangeListener>()
   readonly #errorListeners = new Set<ErrorListener>()
   readonly #statusListeners = new Set<StatusListener>()
@@ -262,11 +277,15 @@ export class AnoDBCore<S extends SchemaDefinition> {
     }
     this.clock = new Clock(nodeId, this.store.getMeta('hlc'), this.now)
     const relays = i.opts.relays ?? DEFAULT_RELAYS
-    const pool = relays.length > 0 ? new RelayPool(relays, i.opts.relayOptions) : null
+    const auto = i.opts.autoRelays ?? i.opts.relays === undefined
+    const router = new RelayRouter(relays, auto ? (i.opts.relayCandidates ?? RELAY_CANDIDATES) : null, i.opts.maxAutoRelays ?? 20)
+    this.autoRelays = router.enabled
+    const pool = relays.length > 0 || router.enabled ? new RelayPool(relays, i.opts.relayOptions) : null
     this.sync = pool
       ? new SyncEngine(this.store, pool, this.syncHost(), {
-          minAcks: Math.max(1, Math.min(i.opts.minAcks ?? 2, relays.length)),
+          minAcks: Math.max(1, Math.min(i.opts.minAcks ?? 2, Math.max(1, relays.length))),
           retryIntervalMs: i.opts.retryIntervalMs ?? 30_000,
+          router,
         })
       : null
     this.kysely = createKysely<S>(this.executor(), this.schema)
@@ -522,7 +541,9 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Sign, store, wrap and enqueue a stream message. Must run inside `store.transaction`. */
   protected sendToSpace(space: string, type: StreamPayload['t'], body: Record<string, unknown>, key = this.currentKey(space)): { seq: number; msgId: string } {
     const seq = this.store.nextSeq(space)
-    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, dlg: this.delegation, ...body }
+    // `rp: 1`: this device reads the space on its automatically picked relays (lets phase 2 know
+    // when every device can follow the switch; older versions ignore the field).
+    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, ...(this.autoRelays ? { rp: 1 } : {}), dlg: this.delegation, ...body }
     const content = JSON.stringify(payload)
     const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
     const innerJson = JSON.stringify(inner)
@@ -599,7 +620,16 @@ export class AnoDBCore<S extends SchemaDefinition> {
       publishRejected: (id) => this.error('publish-rejected', `every relay rejected event ${id}; call db.flush() to retry`, id),
       now: () => this.now(),
       afterCatchUp: (relay) => this.afterCatchUp(relay),
+      route: (tag) => this.routeSeed(tag),
     }
+  }
+
+  /** Secret seed that picks a subscribed tag's automatic relays (DECISIONS 29 ②). */
+  protected routeSeed(tag: string): RouteSeed | null {
+    const k = this.keysByTag.get(tag)
+    if (k) return { seed: bytesToHex(k.key), prio: this.keysBySpace.get(k.space)?.[0] === k ? 1 : 2 }
+    if (tag === inboxTag(this.devicePubkey)) return { seed: this.devicePubkey, prio: 0 }
+    return null
   }
 
   protected async afterCatchUp(_relay: string): Promise<void> {}
