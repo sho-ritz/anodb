@@ -202,7 +202,8 @@ score = sha256hex(k + "/" + relayUrl)      // highest first; URLs normalized (no
   (a bundled version number, or the first 8 hex of `sha256` over the sorted, newline-joined URLs of
   a custom list). A manager issues an epoch with `rl` only when every active device of the space
   announced `rp`, and issues one without `rl` otherwise.
-- Inbox and pairing envelopes go to the fixed relays, plus the sender's picked relays for that tag.
+- Inbox envelopes go to the recipient's picked relays (its `rp` list) only when its `rp` is known;
+  otherwise to the fixed relays plus the sender's picked relays for that inbox.
 - NIP-09 deletions of envelopes carry the envelope's `n` tag so they reach the same relays.
 
 ## 7. Public tables

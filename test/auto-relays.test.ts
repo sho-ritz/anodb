@@ -120,6 +120,19 @@ describe('migration (DECISIONS 30)', { timeout: 20_000 }, () => {
     expect(I(a).sync.relaysFor(current(a).tag)).not.toContain(f.url)
   })
 
+  it('phase 3 end state (fixedInbox: false): devices that all read picked relays never touch the fixed relay', async () => {
+    const { f, fresh } = await setup(8, { fixedInbox: false })
+    const a = await device()(fresh)
+    const { db: b } = await pair(a, fresh)
+    await a.insertInto('todo').values({ title: 'from A' }).execute()
+    await until(async () => (await titles(b)).includes('from A'), 5000, 'B receives')
+    await I(a).rotateKey(I(a).personal) // key delivery to B's inbox
+    await until(() => current(b).tag === current(a).tag, 5000, 'B gets the key on its picked relays')
+    // Spaces, inbox and the pairing link all went to picked relays only.
+    expect(allWraps(f)).toHaveLength(0)
+    expect(I(a).sync.pool.relays).not.toContain(f.url)
+  })
+
   it('by default the inbox is still read on the fixed relays (invitations from older versions)', async () => {
     const { f, fresh, older } = await setup()
     const a = await device()(fresh)

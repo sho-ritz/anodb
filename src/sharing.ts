@@ -109,6 +109,8 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   readonly #membership = new Map<string, Membership>()
   readonly #inviteListeners = new Set<(i: Invitation) => void>()
   #pairing: { secret: string; resolve: () => void; promise: Promise<void> } | null = null
+  /** Pairing secrets this device answers (approver side): tag → seed and the new device's list. */
+  readonly #secretRoutes = new Map<string, { secret: string; list: readonly string[] | null }>()
   #switchTimer: ReturnType<typeof setInterval> | null = null
   readonly #switching = new Set<string>()
 
@@ -503,6 +505,12 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     if (!this.autoRelays) return null
     // New device: read the pairing link on the fixed relays too (the approver may be an older version).
     if (this.#pairing && tag === secretTag(this.#pairing.secret)) return { prio: 0, fixed: true, auto: { seed: this.#pairing.secret, list: this.router.candidates }, primary: false }
+    const s = this.#secretRoutes.get(tag)
+    if (s) {
+      return s.list
+        ? { prio: 9, fixed: false, auto: { seed: s.secret, list: s.list }, primary: true }
+        : { prio: 9, fixed: true, auto: { seed: s.secret, list: this.router.candidates }, primary: false }
+    }
     return super.tagRoute(tag)
   }
 
@@ -741,6 +749,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
             ...(k.relays ? { rl: [...k.relays] } : {}),
           })
         }
+        this.#secretRoutes.set(secretTag(secret), { secret, list: this.listFor(rp) })
         this.#sendSecret(secret, { t: 'pair', delegation, spaces })
         // The new device catches up from a fresh snapshot of each space (not the full history).
         for (const s of spaces) this.snapshot(s.sp)

@@ -76,6 +76,12 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   maxAutoRelays?: number
   /** Days a previous epoch's relays are still read after a new epoch began (picked relays). Default 7. */
   relayGraceDays?: number
+  /**
+   * Keep reading this device's inbox on the fixed relays, where versions before 0.12 send
+   * invitations and keys. Default true; set false once no app version before 0.12 is in use, so a
+   * device whose spaces all moved to picked relays drops the fixed relays entirely (phase 3).
+   */
+  fixedInbox?: boolean
   /** How often spaces beyond the live connection budget are polled. Default 3 min. */
   relayPollIntervalMs?: number
   /** How often ranks 6–10 of each space are checked for envelopes their writer could only place there. Default 10 min. */
@@ -651,6 +657,13 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   // ---- relay routing (DECISIONS 29/30) ---------------------------------------------------------
 
+  /** Candidate list a device routes its inbox with (from its `rp`), if this device has it. */
+  protected listFor(id: string | undefined): readonly string[] | null {
+    if (id === undefined || id === '') return null
+    if (this.relayListId !== null && String(this.relayListId) === id) return this.router.candidates
+    return /^\d+$/.test(id) ? (RELAY_CANDIDATE_VERSIONS[Number(id)] ?? null) : null
+  }
+
   /** `rp` a device announced (its candidate list id), if any. */
   protected deviceRp(device: string): string | undefined {
     if (device === this.devicePubkey) return this.relayListId === null ? undefined : String(this.relayListId)
@@ -668,6 +681,35 @@ export class AnoDBCore<S extends SchemaDefinition> {
     this.sync?.refresh()
   }
 
+  /**
+   * Whether this device still reads its inbox on the fixed relays: while one of its spaces is on
+   * the fixed relays or switched less than FIXED_READ_DAYS ago (senders that do not know its `rp`
+   * write there).
+   */
+  protected inboxNeedsFixed(): boolean {
+    if (this.router.fixed.length === 0) return false
+    if (this.opts.fixedInbox ?? true) return true
+    const now = Date.now()
+    for (const s of this.store.spaces()) {
+      if (s.status !== 'active') continue
+      const keys = this.keysBySpace.get(s.id) ?? []
+      if (!keys[0]?.relays) return true
+      const switched = this.#switchedAt(keys)
+      if (switched !== null && now < switched + FIXED_READ_DAYS * DAY_MS) return true
+    }
+    return false
+  }
+
+  /**
+   * When the space last switched to picked relays (keys newest first): created_at of the oldest key
+   * of the newest run of picked-relay keys, if an older fixed-relay key exists. null: never switched.
+   */
+  #switchedAt(keys: readonly EpochKey[]): number | null {
+    let j = -1
+    while (j + 1 < keys.length && keys[j + 1]!.relays) j++
+    return j >= 0 && j + 1 < keys.length ? keys[j]!.createdAt : null
+  }
+
   /** How a tag uses relays. */
   protected tagRoute(tag: string): TagRoute | null {
     if (!this.autoRelays) return null
@@ -679,14 +721,20 @@ export class AnoDBCore<S extends SchemaDefinition> {
       const seed = bytesToHex(k.key)
       return k.relays ? { prio, fixed: false, auto: { seed, list: k.relays }, primary: true } : { prio, fixed: true, auto: { seed, list }, primary: false }
     }
-    // Inboxes stay on the fixed relays (senders may not know picked relays); picked ones get copies.
-    if (tag === inboxTag(this.devicePubkey)) return { prio: 0, fixed: true, auto: { seed: this.devicePubkey, list }, primary: false }
+    if (tag === inboxTag(this.devicePubkey)) {
+      const fixed = this.inboxNeedsFixed()
+      return { prio: 0, fixed, auto: { seed: this.devicePubkey, list }, primary: !fixed }
+    }
     let device = this.#inboxDevices.get(tag)
     if (!device) {
       device = this.store.allDevices().find((d) => inboxTag(d) === tag)
       if (device) this.#inboxDevices.set(tag, device)
     }
-    if (device) return { prio: 9, fixed: true, auto: { seed: device, list }, primary: false }
+    if (device) {
+      // Phase 3: a device that announced its candidate list gets its inbox on its picked relays only.
+      const theirs = this.listFor(this.deviceRp(device))
+      return theirs ? { prio: 9, fixed: false, auto: { seed: device, list: theirs }, primary: true } : { prio: 9, fixed: true, auto: { seed: device, list }, primary: false }
+    }
     return null
   }
 
