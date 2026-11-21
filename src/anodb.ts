@@ -1,4 +1,5 @@
 import { bytesToHex, hexToBytes, randomHex, sha256Hex, signWith } from './crypto.js'
+import { CURSOR_SKEW_SEC } from './defaults.js'
 import { type AnoDBOptions, prepare } from './db.js'
 import { EVENT_KIND, EVENT_MAX_AGE_SEC, type SpaceEvent, openEvent, sealEvent } from './events.js'
 import { TAG, WRAP_KIND } from './protocol.js'
@@ -21,6 +22,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   readonly #negUnsupported = new Set<string>()
   #reconcileTimer: ReturnType<typeof setInterval> | null = null
   #lastRepair = 0
+  #lastGapQuery = 0
   #reconciling = new Set<string>()
   #p2p: P2PSync | null = null
   readonly #eventListeners = new Set<{ fn: (e: SpaceEvent) => void; space?: string; type?: string }>()
@@ -151,6 +153,11 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
           await Promise.all(uploads.map((e) => pool.publish(e, [relay])))
         }
       }
+      const gaps = this.syncHealth().gaps
+      if (gaps.length > 0 && this.now() - this.#lastGapQuery > 60_000) {
+        this.#lastGapQuery = this.now()
+        await this.#queryGaps(gaps)
+      }
       if (this.syncHealth().gaps.length > 0 && this.now() - this.#lastRepair > 10 * 60_000) await this.repair()
       return supported
     } finally {
@@ -178,17 +185,40 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     return { gaps, nip77 }
   }
 
-  /** Deep re-fetch of every stream from every connected relay (ignores cursors). */
+  /**
+   * Layer 3 on picked relays: ask every relay that may hold a space (top 10, or the fixed relays)
+   * for the time range between the neighbours of each sequence gap (DECISIONS 29 ⑤).
+   */
+  async #queryGaps(gaps: SyncGap[]): Promise<void> {
+    const sync = this.sync
+    if (!sync) return
+    for (const g of gaps.slice(0, 20)) {
+      const lo = Math.min(...g.missing)
+      const hi = Math.max(...g.missing)
+      const q = (sql: string) => this.store.driver.all<{ s: number | null }>(sql, [g.space, g.device])[0]?.s ?? null
+      const prev = q(`SELECT MAX(seq) AS s FROM anodb_messages WHERE space = ? AND device = ? AND seq < ${lo}`)
+      const next = q(`SELECT MIN(seq) AS s FROM anodb_messages WHERE space = ? AND device = ? AND seq > ${hi}`)
+      const pt = prev === null ? undefined : this.store.messageTimes(g.space, g.device, prev)
+      const nt = next === null ? undefined : this.store.messageTimes(g.space, g.device, next)
+      const since = pt ? pt.createdAt - CURSOR_SKEW_SEC : 0
+      const until = nt ? Math.max(nt.createdAt, Math.floor(nt.receivedAt / 1000)) + CURSOR_SKEW_SEC : Math.floor(this.now() / 1000) + CURSOR_SKEW_SEC
+      const tags = (this.keysBySpace.get(g.space) ?? []).map((k) => k.tag)
+      if (tags.length) await sync.queryRange(tags, since, until)
+    }
+  }
+
+  /** Deep re-fetch of every stream (retired epochs included) from every relay that may hold it (ignores cursors). */
   async repair(): Promise<void> {
-    const pool = this.sync?.pool
-    if (!pool) return
+    const sync = this.sync
+    if (!sync) return
+    const pool = sync.pool
     this.#lastRepair = this.now()
-    const all = this.subscriptionTags()
-    if (all.length === 0) return
+    const byRelay = new Map<string, string[]>()
+    for (const tag of new Set([...this.allSpaceTags(), ...this.subscriptionTags()])) {
+      for (const r of sync.relaysFor(tag)) byRelay.set(r, [...(byRelay.get(r) ?? []), tag])
+    }
     await Promise.all(
-      pool.connected().map(async (relay) => {
-        const tags = this.sync!.tagsOn(relay, all)
-        if (tags.length === 0) return
+      [...byRelay].map(async ([relay, tags]) => {
         let until: number | undefined
         for (let page = 0; page < 1000; page++) {
           const f: Filter = { kinds: [WRAP_KIND], [`#${TAG}`]: tags, limit: BACKFILL_PAGE }
@@ -237,7 +267,8 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
       const del = signWith(this.#pruneKey(p.salt), {
         kind: 5,
         created_at: Math.floor(this.now() / 1000),
-        tags: [['e', p.eventId], ['k', String(WRAP_KIND)]],
+        // `n`: routes the deletion to the relays of the envelope's tag (signed by the same key, so it links nothing new).
+        tags: [['e', p.eventId], ['k', String(WRAP_KIND)], [TAG, p.tag]],
         content: '',
       })
       this.store.enqueue(del, false)
@@ -261,7 +292,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     if (!pool) return
     const k = this.currentKey(space)
     const e = sealEvent(this.deviceSk, { v: 2, sp: space, ep: k.keyId, type, d: data, dlg: this.delegation }, k.tag, k.key, Math.floor(this.now() / 1000), TAG)
-    await pool.publish(e, this.sync!.relaysFor(k.tag))
+    await pool.publish(e, this.sync!.liveRelaysFor(k.tag))
   }
 
   /**

@@ -32,6 +32,7 @@ import {
 import { type Change, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, parseInboxPayload, parseStreamPayload } from './protocol.js'
 import { changeAllowed } from './policy.js'
 import { SYS_DELETED } from './schema.js'
+import { normalizeRelayUrl } from './relay-pool.js'
 import type { IngestResult } from './sync.js'
 import type { NostrEvent, SchemaDefinition } from './types.js'
 
@@ -73,6 +74,23 @@ interface KeyGrant {
   num: number
   key: string
   ops: string[]
+  /** Pinned relay candidate list of this epoch (DECISIONS 30). Absent: fixed relays. Older versions ignore it. */
+  rl?: string[]
+}
+
+/** A pinned candidate list from a grant: wss/ws URLs only, bounded. */
+function parseRelayList(rl: unknown): string[] | null {
+  if (!Array.isArray(rl) || rl.length === 0 || rl.length > 1000) return null
+  const out: string[] = []
+  for (const u of rl) {
+    if (typeof u !== 'string' || u.length > 300) return null
+    try {
+      out.push(normalizeRelayUrl(u))
+    } catch {
+      return null
+    }
+  }
+  return [...new Set(out)]
 }
 
 /**
@@ -91,12 +109,66 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   readonly #membership = new Map<string, Membership>()
   readonly #inviteListeners = new Set<(i: Invitation) => void>()
   #pairing: { secret: string; resolve: () => void; promise: Promise<void> } | null = null
+  #switchTimer: ReturnType<typeof setInterval> | null = null
+  readonly #switching = new Set<string>()
 
   protected override async afterInit(): Promise<void> {
     this.store.putDevice(this.devicePubkey, this.pubkey, JSON.stringify(this.delegation), delegationName(this.delegation))
     const secret = this.store.getMeta('pairing_secret')
     if (secret) this.#armPairing(secret)
     await this.#rotateStaleKeys()
+    await this.#checkRelayModes()
+    if (this.autoRelays) {
+      this.#switchTimer = setInterval(() => void this.#checkRelayModes().catch(() => {}), 5 * 60_000)
+      ;(this.#switchTimer as { unref?: () => void }).unref?.()
+    }
+  }
+
+  // ---- switching spaces to picked relays (DECISIONS 30, phase 2) ---------------------------
+
+  override async close(): Promise<void> {
+    if (this.#switchTimer) clearInterval(this.#switchTimer)
+    this.#switchTimer = null
+    await super.close()
+  }
+
+  /** Whether every active device of every member announced that it reads picked relays (`rp`). */
+  #allDevicesFollow(space: string, extra: ReadonlySet<string> = new Set()): boolean {
+    const m = this.membership(space)
+    for (const identity of new Set([...m.roles.keys(), ...extra])) {
+      for (const d of this.store.devices(identity)) {
+        if (d.revoked || m.revokedDevices.has(d.device)) continue
+        if (this.deviceRp(d.device) === undefined) return false
+      }
+    }
+    return true
+  }
+
+  /** Relay mode of a new epoch: this device's candidate list once every device can follow, else fixed relays. */
+  #relaysForNewEpoch(space: string, invitees: ReadonlySet<string>): string[] | null {
+    if (!this.autoRelays) return null
+    return this.#allDevicesFollow(space, invitees) ? [...this.router.candidates] : null
+  }
+
+  /**
+   * Admin devices switch a space at a new epoch as soon as every device of it follows picked relays,
+   * and switch it back if a device that cannot follow appears (e.g. an older app version was paired).
+   */
+  async #checkRelayModes(): Promise<void> {
+    if (!this.autoRelays || this.closed) return
+    for (const s of this.store.spaces()) {
+      if (s.status !== 'active' || this.#switching.has(s.id)) continue
+      const k = this.keysBySpace.get(s.id)?.[0]
+      if (!k || !mayManage(this.membership(s.id), this.pubkey)) continue
+      const follow = this.#allDevicesFollow(s.id)
+      if (follow === !!k.relays) continue
+      this.#switching.add(s.id)
+      try {
+        await this.rotateKey(s.id)
+      } finally {
+        this.#switching.delete(s.id)
+      }
+    }
   }
 
   // ---- authorization -------------------------------------------------------------
@@ -246,10 +318,11 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     if (!s) throw new Error(`anoDB: unknown space ${space}`)
     if (!mayManage(m, this.pubkey)) throw new Error('anoDB: only owners and admins can rotate keys')
     const key = randomBytes(32)
-    const ek = await this.storeKey(space, key, this.currentKey(space).num + 1)
+    const relays = this.#relaysForNewEpoch(space, invitees)
+    const ek = await this.storeKey(space, key, this.currentKey(space).num + 1, relays)
     await this.gate.idle()
     const ops = this.store.inners(space, 'op')
-    const grant: KeyGrant = { sp: space, name: s.name, personal: s.personal, num: ek.num, key: bytesToHex(key), ops }
+    const grant: KeyGrant = { sp: space, name: s.name, personal: s.personal, num: ek.num, key: bytesToHex(key), ops, ...(relays ? { rl: relays } : {}) }
     this.store.transaction(() => {
       for (const [identity] of m.roles) {
         for (const d of this.store.devices(identity)) {
@@ -380,6 +453,10 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   protected override afterRemoteMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['afterRemoteMessage']>[3]): void {
     this.store.putDevice(device, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
+    if (p.rp !== undefined && this.autoRelays) {
+      const k = this.keysBySpace.get(space)?.[0]
+      if (k && !k.relays && mayManage(this.membership(space), this.pubkey)) queueMicrotask(() => void this.#checkRelayModes().catch(() => {}))
+    }
     if (p.t !== 'op') return
     const m = this.membership(space)
     const s = this.store.spaces().find((x) => x.id === space)
@@ -406,6 +483,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     if (!p || p.sp !== space || p.t !== 'op') return false
     const identity = verifyDelegation(p.dlg, inner.pubkey)
     if (!identity) return false
+    if (p.rp !== undefined) this.noteRp(inner.pubkey, p.rp)
     if (this.store.hasMessage(space, inner.pubkey, p.seq)) return true
     this.store.putMessage({ space, device: inner.pubkey, seq: p.seq, identity, type: 'op', payload: inner.content }, inner.id, innerJson)
     this.store.putDevice(inner.pubkey, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
@@ -421,9 +499,11 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return tags
   }
 
-  protected override routeSeed(tag: string): ReturnType<AnoDBCore<S>['routeSeed']> {
-    if (this.#pairing && tag === secretTag(this.#pairing.secret)) return { seed: this.#pairing.secret, prio: 0 }
-    return super.routeSeed(tag)
+  protected override tagRoute(tag: string): ReturnType<AnoDBCore<S>['tagRoute']> {
+    if (!this.autoRelays) return null
+    // New device: read the pairing link on the fixed relays too (the approver may be an older version).
+    if (this.#pairing && tag === secretTag(this.#pairing.secret)) return { prio: 0, fixed: true, auto: { seed: this.#pairing.secret, list: this.router.candidates }, primary: false }
+    return super.tagRoute(tag)
   }
 
   #sendInbox(device: string, body: Record<string, unknown>): void {
@@ -431,7 +511,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       kind: MESSAGE_KIND,
       created_at: Math.floor(this.now() / 1000),
       tags: [],
-      content: JSON.stringify({ v: 2, dlg: this.delegation, ...body }),
+      content: JSON.stringify({ v: 2, ...(this.relayListId !== null ? { rp: this.relayListId } : {}), dlg: this.delegation, ...body }),
     })
     const outer = this.wrapToDevice(JSON.stringify(inner), device)
     this.sync?.enqueue(outer, false)
@@ -489,6 +569,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   #onInbox(sender: string, senderDevice: string, p: Record<string, unknown>): void {
     if (p.t !== 'key' && p.t !== 'invite') return
     const g = p as unknown as KeyGrant & { role?: Role }
+    if (p.rp !== undefined) this.noteRp(senderDevice, p.rp)
     if (typeof g.sp !== 'string' || typeof g.key !== 'string' || !/^[0-9a-f]{64}$/.test(g.key) || !Array.isArray(g.ops)) return
     // Validate against the ops carried in the grant (plus what we know).
     const before = this.store.opRecords(g.sp).length
@@ -513,7 +594,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   async #acceptKey(g: KeyGrant, forward: boolean): Promise<void> {
     const added = !this.keysByTag.has(spaceTag(hexToBytes(g.key)))
-    await this.storeKey(g.sp, hexToBytes(g.key), g.num)
+    await this.storeKey(g.sp, hexToBytes(g.key), g.num, parseRelayList(g.rl))
     if (!added) return
     this.sync?.refresh()
     // Share with my other devices (they may not be known to the sender).
@@ -545,7 +626,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const inv = this.store.invitesIn().find((i) => i.space === space)
     if (!inv) throw new Error('anoDB: no such invitation')
     const g = JSON.parse(inv.payload) as KeyGrant
-    await this.storeKey(g.sp, hexToBytes(g.key), g.num)
+    await this.storeKey(g.sp, hexToBytes(g.key), g.num, parseRelayList(g.rl))
     await this.gate.idle()
     this.store.transaction(() => {
       this.store.upsertSpace(g.sp, g.name, false)
@@ -571,18 +652,28 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   async publishKeyPackage(): Promise<NostrEvent> {
     const signer = this.requireIdentitySigner()
     const delegations = this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
-    const ev = await createKeyPackage(signer, delegations, this.now())
+    const rp: Record<string, string> = {}
+    for (const d of this.store.devices(this.pubkey)) {
+      const id = !d.revoked ? this.deviceRp(d.device) : undefined
+      if (id !== undefined) rp[d.device] = id
+    }
+    const ev = await createKeyPackage(signer, delegations, this.now(), rp)
     this.enqueuePlain(ev)
     return ev
   }
 
   async #fetchKeyPackage(identity: string): Promise<Array<{ device: string; delegation: NostrEvent }>> {
     if (!this.sync) return []
-    const events = (await this.sync.pool.query([{ kinds: [KEY_PACKAGE_KIND], authors: [identity] }], { timeoutMs: 5000 })).filter(
+    // Key packages are public directory entries: they live on the fixed relays.
+    const relays = [...new Set([...this.sync.fixedRelays, ...this.sync.pool.relays])]
+    const events = (await this.sync.pool.query([{ kinds: [KEY_PACKAGE_KIND], authors: [identity] }], { relays, timeoutMs: 5000 })).filter(
       (e) => e.pubkey === identity && verifySignedEvent(e),
     )
     const newest = events.sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? -1 : 1))[0]
-    return newest ? parseKeyPackage(newest) : []
+    if (!newest) return []
+    const devices = parseKeyPackage(newest)
+    for (const d of devices) if (d.rp !== undefined) this.noteRp(d.device, d.rp)
+    return devices
   }
 
   // ---- devices: pairing & revocation -----------------------------------------------------------
@@ -600,7 +691,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     this.store.setMeta('pairing_secret', secret)
     this.#armPairing(secret)
     return {
-      uri: `anodb://pair?app=${encodeURIComponent(this.appId)}&d=${this.devicePubkey}&s=${secret}`,
+      uri: `anodb://pair?app=${encodeURIComponent(this.appId)}&d=${this.devicePubkey}&s=${secret}${this.relayListId !== null ? `&r=${encodeURIComponent(String(this.relayListId))}` : ''}`,
       code: pairingCode(this.devicePubkey, secret),
       done: this.#pairing!.promise,
     }
@@ -622,6 +713,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       throw new Error('anoDB: invalid pairing code')
     }
     if (u.searchParams.get('app') !== this.appId) throw new Error('anoDB: pairing code is for another app')
+    const rp = u.searchParams.get('r') ?? undefined
     return {
       device,
       code: pairingCode(device, secret),
@@ -630,11 +722,24 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
         const delegation = await createDelegation(signer, device, name, this.now())
         await this.gate.idle()
         this.store.putDevice(device, this.pubkey, JSON.stringify(delegation), name)
+        if (rp !== undefined) this.noteRp(device, rp)
+        // A device that cannot follow picked relays (older version): spaces on them go back to the
+        // fixed relays first, so the grant already carries the fixed-relay epoch (an inbox key would
+        // reach the new device before it adopted this identity, and be ignored).
+        else await this.#checkRelayModes()
         const spaces: KeyGrant[] = []
         for (const s of this.store.spaces()) {
           if (s.status !== 'active') continue
           const k = this.currentKey(s.id)
-          spaces.push({ sp: s.id, name: s.name, personal: s.personal, num: k.num, key: bytesToHex(k.key), ops: this.store.inners(s.id, 'op') })
+          spaces.push({
+            sp: s.id,
+            name: s.name,
+            personal: s.personal,
+            num: k.num,
+            key: bytesToHex(k.key),
+            ops: this.store.inners(s.id, 'op'),
+            ...(k.relays ? { rl: [...k.relays] } : {}),
+          })
         }
         this.#sendSecret(secret, { t: 'pair', delegation, spaces })
         // The new device catches up from a fresh snapshot of each space (not the full history).
@@ -659,7 +764,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     for (const g of grants) {
       const sealed = await this.keyStore.seal(hexToBytes(g.key))
       this.store.transaction(() => {
-        this.store.putKey(g.sp, keyId(hexToBytes(g.key)), g.num, sealed)
+        this.store.putKey(g.sp, keyId(hexToBytes(g.key)), g.num, sealed, parseRelayList(g.rl))
         this.store.upsertSpace(g.sp, g.name, g.personal)
         for (const o of g.ops) if (typeof o === 'string') this.#importInner(g.sp, o)
       })

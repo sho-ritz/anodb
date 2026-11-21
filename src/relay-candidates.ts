@@ -8,12 +8,11 @@
  * 2026-11-19 survey. Not yet applied: the 7-day/30-day retention checks (A7/B1), the 14-run uptime
  * check (B2), or the operator/software/region caps (C1–C3). Version 2 keeps every relay that passes, under those caps (at least 20).
  *
- * Not used yet: anoDB still connects to DEFAULT_RELAYS / the `relays` option until auto-selection
- * is implemented.
+ * Every released version stays here: devices name the list they route their inbox with (`rp`), so
+ * a newer device must still be able to resolve an older id. Spaces pin a copy of the list in their
+ * key grants, so they do not depend on this table.
  */
-export const RELAY_CANDIDATES_VERSION = 1
-
-export const RELAY_CANDIDATES: readonly string[] = [
+const V1: readonly string[] = [
   'wss://2-25-5-92.sslip.io',
   'wss://20pl.top',
   'wss://airfry.utxo.one',
@@ -352,3 +351,8 @@ export const RELAY_CANDIDATES: readonly string[] = [
   'wss://x.kojira.io',
   'wss://yabu.me',
 ]
+
+/** Every bundled candidate list by version. Never edit or remove a released version; add a new one. */
+export const RELAY_CANDIDATE_VERSIONS: Readonly<Record<number, readonly string[]>> = { 1: V1 }
+export const RELAY_CANDIDATES_VERSION = 1
+export const RELAY_CANDIDATES: readonly string[] = RELAY_CANDIDATE_VERSIONS[RELAY_CANDIDATES_VERSION]!

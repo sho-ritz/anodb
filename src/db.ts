@@ -20,8 +20,8 @@ import {
   verifySignedEvent,
 } from './crypto.js'
 import { DEFAULT_RELAYS } from './defaults.js'
-import { RELAY_CANDIDATES } from './relay-candidates.js'
-import { RelayRouter, type RouteSeed } from './relay-routing.js'
+import { RELAY_CANDIDATES, RELAY_CANDIDATE_VERSIONS } from './relay-candidates.js'
+import { RelayRouter, type TagRoute, candidateListId } from './relay-routing.js'
 import { Clock } from './hlc.js'
 import { createDelegation, isEvent, verifyDelegation } from './identity.js'
 import { type Role, spaceIdFor } from './membership.js'
@@ -64,16 +64,22 @@ export interface AnoDBOptions<S extends SchemaDefinition> {
   metadataProtection?: 'wrap' | 'none'
   relays?: readonly string[]
   /**
-   * Also route each space, this device's inbox and pairing links to relays picked automatically
-   * from `relayCandidates`, keyed by a secret (epoch key / device pubkey / link secret). Migration
-   * phase 1: the fixed relays are still always written and read; the picked ones hold extra copies.
-   * Default: true unless `relays` is given.
+   * Route each space, this device's inbox and pairing links to relays picked automatically from
+   * `relayCandidates`, keyed by a secret (epoch key / device pubkey / link secret). A space keeps
+   * using the fixed relays too until every active device of it reads the picked ones; then it
+   * switches at a new epoch (DECISIONS 30). Default: true unless `relays` is given.
    */
   autoRelays?: boolean
   /** Candidate pool for `autoRelays`. Default: the bundled, versioned list (`RELAY_CANDIDATES`). */
   relayCandidates?: readonly string[]
-  /** At most this many extra connections for `autoRelays` (tags beyond it stay fixed-only). Default 20. */
+  /** At most this many extra live connections for spaces (own inbox and pairing are always live); other spaces are polled. Default 10. */
   maxAutoRelays?: number
+  /** Days a previous epoch's relays are still read after a new epoch began (picked relays). Default 7. */
+  relayGraceDays?: number
+  /** How often spaces beyond the live connection budget are polled. Default 3 min. */
+  relayPollIntervalMs?: number
+  /** How often ranks 6–10 of each space are checked for envelopes their writer could only place there. Default 10 min. */
+  relayCheckIntervalMs?: number
   /** A write leaves the outbox after this many relays accepted it. Default: min(2, relays.length). */
   minAcks?: number
   retryIntervalMs?: number
@@ -122,7 +128,13 @@ export interface EpochKey {
   key: Uint8Array
   tag: string
   createdAt: number
+  /** Pinned relay candidate list of this epoch: its data lives on picked relays only. null: fixed relays (+ picked copies). */
+  relays?: readonly string[] | null
 }
+
+/** After a space switched to picked relays, its earlier fixed-relay epochs are still read this long. */
+export const FIXED_READ_DAYS = 30
+const DAY_MS = 24 * 3600_000
 
 export interface SpaceInfo {
   id: string
@@ -247,8 +259,14 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected readonly opts: AnoDBOptions<S>
   protected readonly kysely: Kysely<KyselyDatabase<S>>
   protected personal = ''
-  /** Whether automatic relay selection is on (migration phase 1, DECISIONS 30). */
+  /** Whether automatic relay selection is on (DECISIONS 30). */
   protected readonly autoRelays: boolean
+  protected readonly router: RelayRouter
+  /** Id of this device's candidate list, sent as `rp` (null: automatic selection off). */
+  protected readonly relayListId: number | string | null
+  /** Inbox tag → device, for routing envelopes to other devices' inboxes. */
+  readonly #inboxDevices = new Map<string, string>()
+  #focus: string | null = null
   readonly #changeListeners = new Set<ChangeListener>()
   readonly #errorListeners = new Set<ErrorListener>()
   readonly #statusListeners = new Set<StatusListener>()
@@ -278,14 +296,18 @@ export class AnoDBCore<S extends SchemaDefinition> {
     this.clock = new Clock(nodeId, this.store.getMeta('hlc'), this.now)
     const relays = i.opts.relays ?? DEFAULT_RELAYS
     const auto = i.opts.autoRelays ?? i.opts.relays === undefined
-    const router = new RelayRouter(relays, auto ? (i.opts.relayCandidates ?? RELAY_CANDIDATES) : null, i.opts.maxAutoRelays ?? 20)
+    const router = new RelayRouter(relays, auto ? (i.opts.relayCandidates ?? RELAY_CANDIDATES) : null, i.opts.maxAutoRelays ?? 10)
     this.autoRelays = router.enabled
+    this.router = router
+    this.relayListId = router.enabled ? candidateListId(router.candidates, RELAY_CANDIDATE_VERSIONS) : null
     const pool = relays.length > 0 || router.enabled ? new RelayPool(relays, i.opts.relayOptions) : null
     this.sync = pool
       ? new SyncEngine(this.store, pool, this.syncHost(), {
           minAcks: Math.max(1, Math.min(i.opts.minAcks ?? 2, Math.max(1, relays.length))),
           retryIntervalMs: i.opts.retryIntervalMs ?? 30_000,
           router,
+          ...(i.opts.relayPollIntervalMs ? { pollIntervalMs: i.opts.relayPollIntervalMs } : {}),
+          ...(i.opts.relayCheckIntervalMs ? { checkIntervalMs: i.opts.relayCheckIntervalMs } : {}),
         })
       : null
     this.kysely = createKysely<S>(this.executor(), this.schema)
@@ -491,7 +513,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected async loadKeys(): Promise<void> {
     for (const k of this.store.keys()) {
       const key = await this.keyStore.open(k.sealed)
-      this.addKey({ space: k.space, keyId: k.keyId, num: k.num, key, tag: spaceTag(key), createdAt: k.createdAt })
+      this.addKey({ space: k.space, keyId: k.keyId, num: k.num, key, tag: spaceTag(key), createdAt: k.createdAt, relays: k.relays })
     }
   }
 
@@ -505,12 +527,12 @@ export class AnoDBCore<S extends SchemaDefinition> {
     return true
   }
 
-  protected async storeKey(space: string, key: Uint8Array, num: number): Promise<EpochKey> {
-    const k: EpochKey = { space, keyId: keyId(key), num, key, tag: spaceTag(key), createdAt: Date.now() }
+  protected async storeKey(space: string, key: Uint8Array, num: number, relays: readonly string[] | null = null): Promise<EpochKey> {
+    const k: EpochKey = { space, keyId: keyId(key), num, key, tag: spaceTag(key), createdAt: Date.now(), relays }
     if (this.keysByTag.has(k.tag)) return this.keysByTag.get(k.tag)!
     const sealed = await this.keyStore.seal(key)
     await this.gate.idle()
-    this.store.putKey(space, k.keyId, num, sealed)
+    this.store.putKey(space, k.keyId, num, sealed, relays)
     this.addKey(k)
     return k
   }
@@ -526,7 +548,9 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected async createSpaceInternal(name: string, personal: boolean): Promise<string> {
     const nonce = randomHex(16)
     const id = spaceIdFor(this.pubkey, nonce)
-    await this.storeKey(id, randomBytes(32), 1)
+    // Only this identity's devices are in a new space: on picked relays from the start if they all read them.
+    const follow = this.autoRelays && this.store.devices(this.pubkey).every((d) => d.revoked || this.deviceRp(d.device) !== undefined)
+    await this.storeKey(id, randomBytes(32), 1, follow ? [...this.router.candidates] : null)
     await this.gate.idle()
     this.store.transaction(() => {
       this.store.upsertSpace(id, name, personal)
@@ -541,9 +565,9 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Sign, store, wrap and enqueue a stream message. Must run inside `store.transaction`. */
   protected sendToSpace(space: string, type: StreamPayload['t'], body: Record<string, unknown>, key = this.currentKey(space)): { seq: number; msgId: string } {
     const seq = this.store.nextSeq(space)
-    // `rp: 1`: this device reads the space on its automatically picked relays (lets phase 2 know
-    // when every device can follow the switch; older versions ignore the field).
-    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, ...(this.autoRelays ? { rp: 1 } : {}), dlg: this.delegation, ...body }
+    // `rp`: this device reads picked relays, and routes its inbox with this candidate list (lets an
+    // admin know when every device can follow the switch; older versions ignore the field).
+    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, ...(this.relayListId !== null ? { rp: this.relayListId } : {}), dlg: this.delegation, ...body }
     const content = JSON.stringify(payload)
     const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
     const innerJson = JSON.stringify(inner)
@@ -584,6 +608,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Envelope to another device's inbox (pairwise NIP-44 with a throwaway key). */
   protected wrapToDevice(innerJson: string, devicePk: string): NostrEvent {
     const eph = this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
+    this.#inboxDevices.set(inboxTag(devicePk), devicePk)
     return this.wrap(innerJson, inboxTag(devicePk), conversationKey(eph, devicePk), eph)
   }
 
@@ -620,15 +645,48 @@ export class AnoDBCore<S extends SchemaDefinition> {
       publishRejected: (id) => this.error('publish-rejected', `every relay rejected event ${id}; call db.flush() to retry`, id),
       now: () => this.now(),
       afterCatchUp: (relay) => this.afterCatchUp(relay),
-      route: (tag) => this.routeSeed(tag),
+      route: (tag) => this.tagRoute(tag),
     }
   }
 
-  /** Secret seed that picks a subscribed tag's automatic relays (DECISIONS 29 ②). */
-  protected routeSeed(tag: string): RouteSeed | null {
+  // ---- relay routing (DECISIONS 29/30) ---------------------------------------------------------
+
+  /** `rp` a device announced (its candidate list id), if any. */
+  protected deviceRp(device: string): string | undefined {
+    if (device === this.devicePubkey) return this.relayListId === null ? undefined : String(this.relayListId)
+    return this.store.getMeta(`rp:${device}`)
+  }
+
+  protected noteRp(device: string, id: unknown): void {
+    if ((typeof id !== 'number' && typeof id !== 'string') || String(id).length > 16 || device === this.devicePubkey) return
+    if (this.store.getMeta(`rp:${device}`) !== String(id)) this.store.setMeta(`rp:${device}`, String(id))
+  }
+
+  /** Read this space's picked relays over live connections first (others are polled). */
+  focusSpace(space: string | null): void {
+    this.#focus = space
+    this.sync?.refresh()
+  }
+
+  /** How a tag uses relays. */
+  protected tagRoute(tag: string): TagRoute | null {
+    if (!this.autoRelays) return null
+    const list = this.router.candidates
     const k = this.keysByTag.get(tag)
-    if (k) return { seed: bytesToHex(k.key), prio: this.keysBySpace.get(k.space)?.[0] === k ? 1 : 2 }
-    if (tag === inboxTag(this.devicePubkey)) return { seed: this.devicePubkey, prio: 0 }
+    if (k) {
+      const current = this.keysBySpace.get(k.space)?.[0] === k
+      const prio = current ? (k.space === this.#focus || (this.#focus === null && k.space === this.personal) ? 1 : 2) : 3
+      const seed = bytesToHex(k.key)
+      return k.relays ? { prio, fixed: false, auto: { seed, list: k.relays }, primary: true } : { prio, fixed: true, auto: { seed, list }, primary: false }
+    }
+    // Inboxes stay on the fixed relays (senders may not know picked relays); picked ones get copies.
+    if (tag === inboxTag(this.devicePubkey)) return { prio: 0, fixed: true, auto: { seed: this.devicePubkey, list }, primary: false }
+    let device = this.#inboxDevices.get(tag)
+    if (!device) {
+      device = this.store.allDevices().find((d) => inboxTag(d) === tag)
+      if (device) this.#inboxDevices.set(tag, device)
+    }
+    if (device) return { prio: 9, fixed: true, auto: { seed: device, list }, primary: false }
     return null
   }
 
@@ -640,7 +698,34 @@ export class AnoDBCore<S extends SchemaDefinition> {
     return signWith(this.envelopeKey(tag), { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
   }
 
+  /**
+   * Live tags of the active spaces. The current epoch always; an earlier epoch on picked relays for
+   * `relayGraceDays` after the next one began; an earlier fixed-relay epoch for FIXED_READ_DAYS
+   * after the space switched (forever while it never did). Older ones only in `repair()`.
+   */
   protected subscriptionTags(): string[] {
+    const graceMs = (this.opts.relayGraceDays ?? 7) * DAY_MS
+    const now = Date.now()
+    const tags: string[] = []
+    for (const s of this.store.spaces()) {
+      if (s.status !== 'active') continue
+      const keys = this.keysBySpace.get(s.id) ?? []
+      keys.forEach((k, i) => {
+        if (i === 0) return tags.push(k.tag)
+        if (k.relays) {
+          if (now < keys[i - 1]!.createdAt + graceMs) tags.push(k.tag)
+          return
+        }
+        let switched: number | null = null
+        for (let j = i - 1; j >= 0 && switched === null; j--) if (keys[j]!.relays) switched = keys[j]!.createdAt
+        if (switched === null || now < switched + FIXED_READ_DAYS * DAY_MS) tags.push(k.tag)
+      })
+    }
+    return tags
+  }
+
+  /** Every tag of the active spaces, including retired epochs (for `repair()`). */
+  protected allSpaceTags(): string[] {
     const active = new Set(this.store.spaces().filter((s) => s.status === 'active').map((s) => s.id))
     return [...this.keysByTag.values()].filter((k) => active.has(k.space)).map((k) => k.tag)
   }
@@ -690,6 +775,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
       this.error('invalid-event', 'message has no valid delegation', outer.id)
       return 'invalid'
     }
+    if (payload.rp !== undefined) this.noteRp(inner.pubkey, payload.rp)
     let result = 'seen' as IngestResult
     const msgId = inner.id
     const device = inner.pubkey

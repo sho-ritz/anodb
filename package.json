@@ -1,6 +1,6 @@
 {
   "name": "@anodb/core",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Absolutely No DB \u2014 a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
   "type": "module",
   "license": "MIT",

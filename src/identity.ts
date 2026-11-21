@@ -49,25 +49,28 @@ export function delegationName(ev: NostrEvent): string {
   }
 }
 
-export async function createKeyPackage(signer: Signer, delegations: NostrEvent[], now: number): Promise<NostrEvent> {
+/** `rp`: device → candidate list id, for devices that read picked relays (DECISIONS 30; older parsers ignore it). */
+export async function createKeyPackage(signer: Signer, delegations: NostrEvent[], now: number, rp: Record<string, string> = {}): Promise<NostrEvent> {
   return signer.signEvent({
     kind: KEY_PACKAGE_KIND,
     created_at: Math.floor(now / 1000),
     tags: delegations.map((d) => ['device', d.tags.find((t) => t[0] === 'device')![1]!]),
-    content: JSON.stringify({ v: 2, delegations }),
+    content: JSON.stringify({ v: 2, delegations, ...(Object.keys(rp).length ? { rp } : {}) }),
   })
 }
 
 /** Verified device pubkeys (with their delegations) from a key package. */
-export function parseKeyPackage(ev: NostrEvent): Array<{ device: string; delegation: NostrEvent }> {
+export function parseKeyPackage(ev: NostrEvent): Array<{ device: string; delegation: NostrEvent; rp?: string }> {
   if (ev.kind !== KEY_PACKAGE_KIND || !verifySignedEvent(ev)) return []
   try {
-    const { delegations } = JSON.parse(ev.content) as { delegations?: unknown[] }
-    const out: Array<{ device: string; delegation: NostrEvent }> = []
+    const { delegations, rp } = JSON.parse(ev.content) as { delegations?: unknown[]; rp?: Record<string, unknown> }
+    const out: Array<{ device: string; delegation: NostrEvent; rp?: string }> = []
     for (const d of delegations ?? []) {
       if (!isEvent(d)) continue
       const device = d.tags.find((t) => t[0] === 'device')?.[1]
-      if (device && verifyDelegation(d, device) === ev.pubkey) out.push({ device, delegation: d })
+      if (!device || verifyDelegation(d, device) !== ev.pubkey) continue
+      const id = rp && typeof rp === 'object' ? rp[device] : undefined
+      out.push(typeof id === 'string' || typeof id === 'number' ? { device, delegation: d, rp: String(id) } : { device, delegation: d })
     }
     return out
   } catch {

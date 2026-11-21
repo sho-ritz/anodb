@@ -62,6 +62,11 @@ class RelayConnection {
     return this.#open
   }
 
+  /** Not connected and at least one attempt already failed. */
+  get isDown(): boolean {
+    return !this.#open && this.#attempt > 0
+  }
+
   connect(): void {
     if (this.#closed || this.#ws) return
     let ws: WebSocket
@@ -297,11 +302,38 @@ export class RelayPool {
     }
   }
 
-  /** Publish to the given (default: all connected) pool relays. */
+  /**
+   * Publish to the given relays (default: every pool relay; unconnected ones answer 'disconnected').
+   * Relays outside the pool are connected temporarily, like `query`.
+   */
   async publish(event: NostrEvent, relays?: readonly string[]): Promise<Map<string, PublishResult>> {
-    const targets = (relays ?? this.relays).map((r) => this.#conns.get(r)).filter((c) => c !== undefined)
-    const results = await Promise.all(targets.map((c) => c.publish(event, this.publishTimeoutMs)))
-    return new Map(targets.map((c, i) => [c.url, results[i]!]))
+    const urls = [...new Set((relays ?? this.relays).map(normalizeRelayUrl))]
+    const results = await Promise.all(
+      urls.map(async (url): Promise<[string, PublishResult]> => {
+        const conn = this.#conns.get(url)
+        if (conn) return [url, await conn.publish(event, this.publishTimeoutMs)]
+        if (this.#closed) return [url, { outcome: 'disconnected', message: 'pool closed' }]
+        const temp = new RelayConnection(this, url, false)
+        temp.connect()
+        try {
+          if (!(await temp.waitOpen(this.connectTimeoutMs))) return [url, { outcome: 'disconnected', message: 'could not connect' }]
+          return [url, await temp.publish(event, this.publishTimeoutMs)]
+        } finally {
+          temp.close()
+        }
+      }),
+    )
+    return new Map(results)
+  }
+
+  /** Whether `relay` is one of the persistent relays. */
+  has(relay: string): boolean {
+    return this.#conns.has(relay)
+  }
+
+  /** A persistent relay that is not connected and already failed to connect at least once. */
+  isDown(relay: string): boolean {
+    return this.#conns.get(relay)?.isDown ?? false
   }
 
   /**

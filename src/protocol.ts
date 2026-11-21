@@ -27,8 +27,11 @@ export interface StreamHeader {
   ep: string
   /** per (space, device) sequence number, starting at 1 */
   seq: number
-  /** 1: the sender reads this space on its automatically picked relays (DECISIONS 30). Optional. */
-  rp?: 1
+  /**
+   * The sender reads picked relays; the value names the candidate list it routes its inbox with
+   * (bundled version number, or 8 hex of a custom list's hash). DECISIONS 30. Optional.
+   */
+  rp?: number | string
   /** identity → device delegation */
   dlg: NostrEvent
 }
