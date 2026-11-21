@@ -6,7 +6,7 @@
  * Contents: the 337 relays that answered in every daily check run between 2026-11-20 16:14 and
  * 2026-11-21 00:35 JST (4 runs). Each one had already passed the write tests (A1–A5) in the
  * 2026-11-19 survey. Not yet applied: the 7-day/30-day retention checks (A7/B1), the 14-run uptime
- * check (B2), or the operator/software/region caps (C1–C3). Version 2 will be cut down to ~100.
+ * check (B2), or the operator/software/region caps (C1–C3). Version 2 keeps every relay that passes, under those caps (at least 20).
  *
  * Every released version stays here: devices name the list they route their inbox with (`rp`), so
  * a newer device must still be able to resolve an older id. Spaces pin a copy of the list in their

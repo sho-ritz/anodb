@@ -82,7 +82,8 @@ describe('relay routing', () => {
   })
 
   it('names candidate lists: bundled version number, or a hash for custom lists', () => {
-    expect(RELAY_CANDIDATES.length).toBeGreaterThanOrEqual(100)
+    expect(RELAY_CANDIDATES.length).toBeGreaterThanOrEqual(20)
+    expect(new Set(RELAY_CANDIDATES).size).toBe(RELAY_CANDIDATES.length)
     expect(candidateListId(RELAY_CANDIDATES, RELAY_CANDIDATE_VERSIONS)).toBe(1)
     expect(candidateListId([...RELAY_CANDIDATES].reverse(), RELAY_CANDIDATE_VERSIONS)).toBe(1)
     expect(candidateListId(['wss://a.example', 'wss://b.example'], RELAY_CANDIDATE_VERSIONS)).toMatch(/^[0-9a-f]{8}$/)
