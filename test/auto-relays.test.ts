@@ -29,7 +29,7 @@ describe('automatic relay selection, migration phase 1 (DECISIONS 29/30)', () =>
   })
 
   it('bundles a versioned candidate list', () => {
-    expect(RELAY_CANDIDATES.length).toBeGreaterThanOrEqual(100)
+    expect(RELAY_CANDIDATES.length).toBeGreaterThanOrEqual(20)
     expect(new Set(RELAY_CANDIDATES).size).toBe(RELAY_CANDIDATES.length)
   })
 

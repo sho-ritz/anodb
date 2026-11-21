@@ -27,7 +27,7 @@ const VIA_PROXY = !!AGENT
 const CRITERIA_VERSION = 2
 const DIR = path.dirname(fileURLToPath(import.meta.url))
 const DATA = process.env.SURVEY_DATA ?? path.join(DIR, 'data')
-const TARGET = 100
+const MIN_SELECTED = 20 // below this the operator/software/region spread is too thin (DECISIONS 29)
 // anoDB's largest envelope: 60 KiB plaintext → NIP-44 padding to 65,536 + 67 bytes → base64 87,472 chars.
 const BIG_CONTENT_BYTES = 65_603 // base64 → 87,472 characters, the same as anoDB's largest envelope
 const MIN_MESSAGE_BYTES = 90_112 // 88 KiB: room for that content plus the event JSON
@@ -608,18 +608,46 @@ function cmdSelect(args) {
   }
 
   const eligible = rows.filter((x) => x.status === 'pass' || (allowProvisional && x.status === 'provisional')).sort((a, b) => b.score - a.score || (a.writeMs ?? 1e9) - (b.writeMs ?? 1e9))
-  const selected = []
+  // Every relay that passes is taken; there is no fixed target. C1 caps operators while walking the
+  // list by score. C2/C3 are shares of the final list: for a list size n each software / region may
+  // hold floor(share × n) relays. The largest n whose capped walk still yields n or more relays
+  // wins, and the whole capped walk for that n is the list (its size m ≥ n keeps every share).
   const skipped = []
-  const count = (key, v) => selected.filter((s) => s[key] === v).length
+  const perOperator = {}
+  const pool = []
   for (const x of eligible) {
-    if (selected.length >= TARGET) break
-    if (count('operator', x.operator) >= MAX_PER_OPERATOR) skipped.push({ url: x.url, rule: 'C1' })
-    else if (x.software !== 'unknown' && count('software', x.software) + 1 > MAX_SOFTWARE_SHARE * TARGET) skipped.push({ url: x.url, rule: 'C2' })
-    else if (x.region !== 'unknown' && count('region', x.region) + 1 > MAX_REGION_SHARE * TARGET) skipped.push({ url: x.url, rule: 'C3' })
-    else selected.push(x)
+    if ((perOperator[x.operator] ?? 0) >= MAX_PER_OPERATOR) skipped.push({ url: x.url, rule: 'C1' })
+    else {
+      perOperator[x.operator] = (perOperator[x.operator] ?? 0) + 1
+      pool.push(x)
+    }
   }
-  const chosen = new Set(selected.map((s) => s.url))
-  const reserves = eligible.filter((x) => !chosen.has(x.url) && !skipped.some((s) => s.url === x.url)).slice(0, 30)
+  const capped = (n) => {
+    const caps = { software: Math.floor(MAX_SOFTWARE_SHARE * n), region: Math.floor(MAX_REGION_SHARE * n) }
+    const counts = { software: {}, region: {} }
+    const taken = []
+    const dropped = []
+    for (const x of pool) {
+      const rule = ['software', 'region'].find((k) => x[k] !== 'unknown' && (counts[k][x[k]] ?? 0) >= caps[k])
+      if (rule) {
+        dropped.push({ url: x.url, rule: rule === 'software' ? 'C2' : 'C3' })
+        continue
+      }
+      for (const k of ['software', 'region']) if (x[k] !== 'unknown') counts[k][x[k]] = (counts[k][x[k]] ?? 0) + 1
+      taken.push(x)
+    }
+    return { taken, dropped }
+  }
+  let best = { taken: [], dropped: pool.map((x) => ({ url: x.url, rule: 'C2/C3' })) }
+  for (let n = pool.length; n > 0; n--) {
+    const r = capped(n)
+    if (r.taken.length >= n) {
+      best = r
+      break
+    }
+  }
+  const selected = best.taken
+  skipped.push(...best.dropped)
 
   const tally = (xs, k) => xs.reduce((m, x) => ((m[x[k]] = (m[x[k]] ?? 0) + 1), m), {})
   const failBy = {}
@@ -627,7 +655,7 @@ function cmdSelect(args) {
   const summary = {
     generatedAt: new Date().toISOString(),
     criteriaVersion: CRITERIA_VERSION,
-    target: TARGET,
+    minSelected: MIN_SELECTED,
     includesProvisional: allowProvisional,
     relaysEvaluated: rows.length,
     status: tally(rows, 'status'),
@@ -638,11 +666,11 @@ function cmdSelect(args) {
     dailyRunsInvalid: days.filter((d) => !d.valid).length,
     viaProxy: VIA_PROXY,
   }
-  writeJson(file('pool', `${today()}.json`), { ...summary, relays: selected, reserves })
+  writeJson(file('pool', `${today()}.json`), { ...summary, relays: selected, skipped })
   fs.writeFileSync(file('pool', `${today()}.txt`), selected.map((s) => s.url).join('\n') + '\n')
   writeJson(file('evaluation.json'), rows)
   console.log(JSON.stringify(summary, null, 2))
-  if (selected.length < TARGET) console.log(`select: only ${selected.length} of ${TARGET} — see status/failedBy above`)
+  if (selected.length < MIN_SELECTED) console.log(`select: only ${selected.length} (minimum ${MIN_SELECTED}) — see status/failedBy above`)
 }
 
 // ---------------------------------------------------------------- main
