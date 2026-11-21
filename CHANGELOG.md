@@ -41,7 +41,8 @@ never lose sync. **This release is phase 1: nothing is removed, the picked relay
 - More connections: up to 5 fixed relays plus up to `maxAutoRelays` picked ones.
 - The candidate list is **version 1, provisional**: 337 relays that answered every check of the
   relay survey on 2026-11-20/21 (`scripts/relay-survey/`). Retention (7/30 days) and the
-  operator/software/region caps are not yet applied; later versions will narrow it to about 100.
+  operator/software/region caps are not yet applied; later versions keep every relay that passes the full criteria
+  under those caps (no fixed size, at least 20).
 
 ### Next phases (not in this release)
 
