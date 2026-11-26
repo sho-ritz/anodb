@@ -1,0 +1,19 @@
+[package]
+name = "anodb-protocol"
+description = "anoDB wire protocol v2: keys, envelopes, HLC, merge and row rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+nostr = { version = "=0.45.7", default-features = false, features = ["std", "nip44"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+secp256k1 = { version = "0.30", default-features = false, features = ["std"] }
+thiserror = "2"
+base64 = "0.22"
+getrandom = "0.3"

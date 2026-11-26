@@ -1,0 +1,35 @@
+{
+  "description": "secret key → x-only public key and NIP-19 encodings",
+  "cases": [
+    {
+      "secret": "ca8cb61c02d53068964ba45ddede51586b0bb4c3bd8dfd2e6ef6bd48ee325d6b",
+      "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "nsec": "nsec1e2xtv8qz65cx39jt53waahj3tp4shdxrhkxl6tnw76753m3jt44sqxqhxh",
+      "npub": "npub14y23790gay6svksv0uvz5yhp6jsxnlw9jrnnxvuzllpdwj3lf06qd0z7tj"
+    },
+    {
+      "secret": "9eaed41163d1253a9fbbe4d68717e570ace9e3ec7b2cf39ab013048fab325f3a",
+      "pubkey": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "nsec": "nsec1n6hdgytr6yjn48amuntgw9l9wzkwnclv0vk08x4szvzgl2ejtuaqtaenja",
+      "npub": "npub1q0ytm5z2egxnxa6anlg48epefx45yt970g3sj5p0306gkhp2ns3sz2p8ht"
+    },
+    {
+      "secret": "c0cb16c06206469466d99a71b40f54dace25739e37cd08e8177a2b7ec2bc7b4a",
+      "pubkey": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "nsec": "nsec1cr93dsrzqerfgekenfcmgr65mt8z2uu7xlxs36qh0g4has4u0d9qvwleh6",
+      "npub": "npub1q2t6jseg3yug3aufs7fqk3lsf4wc4trf0sds6jek49kwa5elwulq223xsf"
+    },
+    {
+      "secret": "a326d85b8cc79d290aa1a394884e18699b22d199e03586ff56a95e77fa5b7336",
+      "pubkey": "9a96080744e9c46a2e447dac04df9b58b8a20b70af90015ecbb97feb270f6f1c",
+      "nsec": "nsec15vndskuvc7wjjz4p5w2gsnscdxdj95veuq6cdl6k490807jmwvmqqefg6j",
+      "npub": "npub1n2tqsp6ya8zx5tjy0kkqfhumtzu2yzms47gqzhkth9l7kfc0duwq9hg333"
+    },
+    {
+      "secret": "e1c07a810bd94927507b5ea5cdad962e1cb9bae5e12dd7e74678f544fb0e302a",
+      "pubkey": "6c2d31d2832f1073beab3c8ee935d7d3087435e31e17860b41361f73bce9c1f3",
+      "nsec": "nsec1u8q84qgtm9yjw5rmt6jumtvk9cwtnwh9uyka0e6x0r65f7cwxq4qnmaanh",
+      "npub": "npub1dsknr55r9ug8804t8j8wjdwh6vy8gd0rrctcvz6pxc0h808fc8esa99r7f"
+    }
+  ]
+}

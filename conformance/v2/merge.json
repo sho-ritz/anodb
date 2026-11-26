@@ -1,0 +1,229 @@
+{
+  "description": "Last-writer-wins per (table, rowId, column): a change replaces the cell iff its HLC string is strictly greater (§4). Applying the changes in any order gives the same result.",
+  "cases": [
+    {
+      "name": "later wins",
+      "changes": [
+        [
+          "t",
+          "r",
+          "c",
+          1,
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "c",
+          2,
+          "000000000k00000-aaaaaaaaaaaaaaaa"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "c",
+          2,
+          "000000000k00000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "name": "arrival order does not matter",
+      "changes": [
+        [
+          "t",
+          "r",
+          "c",
+          2,
+          "000000000k00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "c",
+          1,
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "c",
+          2,
+          "000000000k00000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "name": "counter breaks ties",
+      "changes": [
+        [
+          "t",
+          "r",
+          "c",
+          "x",
+          "000000000a00002-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "c",
+          "y",
+          "000000000a00001-bbbbbbbbbbbbbbbb"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "c",
+          "x",
+          "000000000a00002-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "name": "node breaks ties",
+      "changes": [
+        [
+          "t",
+          "r",
+          "c",
+          "x",
+          "000000000a00000-bbbbbbbbbbbbbbbb"
+        ],
+        [
+          "t",
+          "r",
+          "c",
+          "y",
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "c",
+          "x",
+          "000000000a00000-bbbbbbbbbbbbbbbb"
+        ]
+      ]
+    },
+    {
+      "name": "equal hlc keeps first",
+      "changes": [
+        [
+          "t",
+          "r",
+          "c",
+          "first",
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "c",
+          "second",
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "c",
+          "first",
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "name": "columns merge independently",
+      "changes": [
+        [
+          "t",
+          "r",
+          "a",
+          1,
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "b",
+          2,
+          "000000000500000-bbbbbbbbbbbbbbbb"
+        ],
+        [
+          "t",
+          "r",
+          "a",
+          3,
+          "000000000400000-bbbbbbbbbbbbbbbb"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "a",
+          1,
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "b",
+          2,
+          "000000000500000-bbbbbbbbbbbbbbbb"
+        ]
+      ]
+    },
+    {
+      "name": "tombstone is a cell",
+      "changes": [
+        [
+          "t",
+          "r",
+          "title",
+          "x",
+          "000000000a00000-aaaaaaaaaaaaaaaa"
+        ],
+        [
+          "t",
+          "r",
+          "$deleted",
+          true,
+          "000000000k00000-bbbbbbbbbbbbbbbb"
+        ],
+        [
+          "t",
+          "r",
+          "title",
+          "late",
+          "000000000f00000-aaaaaaaaaaaaaaaa"
+        ]
+      ],
+      "result": [
+        [
+          "t",
+          "r",
+          "$deleted",
+          true,
+          "000000000k00000-bbbbbbbbbbbbbbbb"
+        ],
+        [
+          "t",
+          "r",
+          "title",
+          "late",
+          "000000000f00000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    }
+  ]
+}

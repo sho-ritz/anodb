@@ -1,0 +1,54 @@
+{
+  "description": "routing tags, key ids and space ids (PROTOCOL.md §2, §5)",
+  "epoch": [
+    {
+      "epochKey": "d9a034fdd429cc163eef549e43982f499f3b5372519eeceeee8f4d7877f52b79",
+      "spaceTag": "8183894f16140c720203aef3fec7f781",
+      "keyId": "b26c554a19ccd0f7"
+    },
+    {
+      "epochKey": "566ea0e483e7940990da811930a89c5c6fc2dffa1a2cbfba5b351ba7afe0d909",
+      "spaceTag": "283b479de11c4fc577aae12941056e5c",
+      "keyId": "dc75f286391fcab5"
+    },
+    {
+      "epochKey": "02d839f5145d9f98722c1015f56d18f450a79b4b4320e1f1e189059a5aa29471",
+      "spaceTag": "7a920a341a711a6866ae0f6140e18537",
+      "keyId": "ae2f094b481e8a83"
+    }
+  ],
+  "inbox": [
+    {
+      "devicePubkey": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "inboxTag": "ff5f619691d2fe77fa47527b0da8588b"
+    },
+    {
+      "devicePubkey": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "inboxTag": "d973c482a0f288cc1c5a54c54076260a"
+    }
+  ],
+  "secret": [
+    {
+      "secret": "s3cret",
+      "secretTag": "72d335a5ff9749f21e8a6c2760494d8d",
+      "secretKey": "25699e65c470ad488bec058bc07233145b4a3a4f5fad8dc44ecf035ded4a7137"
+    },
+    {
+      "secret": "ab12cd34",
+      "secretTag": "ac84744014edbf304c1be1f87d65d35a",
+      "secretKey": "38495bd44c7078567cbb3657800552ab0ed52f0d4fa60eb570d72c256b6cf9b4"
+    }
+  ],
+  "spaceId": [
+    {
+      "owner": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "nonce": "personal-nonce",
+      "spaceId": "00cb9e29cf437b88e50ad541f1b46167"
+    },
+    {
+      "owner": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "nonce": "0123456789abcdef",
+      "spaceId": "4cda67048dafd986f618710d2a87fa4a"
+    }
+  ]
+}

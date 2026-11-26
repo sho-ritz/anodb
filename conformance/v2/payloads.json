@@ -1,0 +1,185 @@
+{
+  "description": "parseStreamPayload: structural validation of a decrypted inner payload (§3)",
+  "cases": [
+    {
+      "name": "ch",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": true
+    },
+    {
+      "name": "op",
+      "json": "{\"v\":2,\"t\":\"op\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":2,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"op\":{\"type\":\"create\",\"owner\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"nonce\":\"personal-nonce\",\"name\":\"personal\"},\"par\":[]}",
+      "valid": true
+    },
+    {
+      "name": "snap",
+      "json": "{\"v\":2,\"t\":\"snap\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":3,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"sid\":\"abc\",\"i\":0,\"n\":1,\"body\":{\"cells\":[]}}",
+      "valid": true
+    },
+    {
+      "name": "not json",
+      "json": "{",
+      "valid": false
+    },
+    {
+      "name": "v1",
+      "json": "{\"v\":1,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "space not 32 hex",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"xyz\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "key id not 16 hex",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"ABCDEF0123456789\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "seq float",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1.5,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "seq too large",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":9007199254740992,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "no dlg",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "ch not array",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":{}}",
+      "valid": false
+    },
+    {
+      "name": "change table starts with $",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"$x\",\"r\",\"c\",1,\"000000000100000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "system column",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"r\",\"$deleted\",true,\"000000000100000-0123456789abcdef\"]]}",
+      "valid": true
+    },
+    {
+      "name": "row id empty",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"\",\"c\",1,\"000000000100000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "row id 129 chars",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\",\"c\",1,\"000000000100000-0123456789abcdef\"]]}",
+      "valid": false
+    },
+    {
+      "name": "bad hlc",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"r\",\"c\",1,\"nope\"]]}",
+      "valid": false
+    },
+    {
+      "name": "change with 6 elements",
+      "json": "{\"v\":2,\"t\":\"ch\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"r\",\"c\",1,\"000000000100000-0123456789abcdef\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\"]]}",
+      "valid": false
+    },
+    {
+      "name": "op par not strings",
+      "json": "{\"v\":2,\"t\":\"op\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":2,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"op\":{\"type\":\"create\",\"owner\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"nonce\":\"personal-nonce\",\"name\":\"personal\"},\"par\":[1]}",
+      "valid": false
+    },
+    {
+      "name": "snap i >= n",
+      "json": "{\"v\":2,\"t\":\"snap\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":3,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"sid\":\"abc\",\"i\":1,\"n\":1,\"body\":{\"cells\":[]}}",
+      "valid": false
+    },
+    {
+      "name": "snap n too large",
+      "json": "{\"v\":2,\"t\":\"snap\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":3,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"sid\":\"abc\",\"i\":0,\"n\":10001,\"body\":{\"cells\":[]}}",
+      "valid": false
+    },
+    {
+      "name": "unknown t",
+      "json": "{\"v\":2,\"t\":\"zz\",\"sp\":\"00cb9e29cf437b88e50ad541f1b46167\",\"ep\":\"bef793c4b755eee1\",\"seq\":1,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23\"]],\"content\":\"{\\\"name\\\":\\\"phone\\\"}\",\"pubkey\":\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4\",\"id\":\"304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31\",\"sig\":\"aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678\"},\"c\":[[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"title\",\"milk\",\"00mubbs7i800000-0123456789abcdef\"],[\"todo\",\"a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-row1\",\"$createdAt\",1790000000000,\"00mubbs7i800000-0123456789abcdef\"]]}",
+      "valid": false
+    }
+  ],
+  "changes": [
+    {
+      "change": [
+        "todo",
+        "r",
+        "title",
+        "x",
+        "000000000100000-0123456789abcdef"
+      ],
+      "valid": true
+    },
+    {
+      "change": [
+        "todo",
+        "r",
+        "title",
+        null,
+        "000000000100000-0123456789abcdef"
+      ],
+      "valid": true
+    },
+    {
+      "change": [
+        "Todo_2",
+        "r-1",
+        "col_9",
+        {
+          "a": [
+            1
+          ]
+        },
+        "000000000500003-0123456789abcdef"
+      ],
+      "valid": true
+    },
+    {
+      "change": [
+        "todo",
+        "r",
+        "$createdAt",
+        1,
+        "000000000100000-0123456789abcdef"
+      ],
+      "valid": true
+    },
+    {
+      "change": [
+        "1todo",
+        "r",
+        "c",
+        1,
+        "000000000100000-0123456789abcdef"
+      ],
+      "valid": false
+    },
+    {
+      "change": [
+        "todo",
+        "r",
+        "c-x",
+        1,
+        "000000000100000-0123456789abcdef"
+      ],
+      "valid": false
+    },
+    {
+      "change": [
+        "todo",
+        "r",
+        "c",
+        1
+      ],
+      "valid": false
+    }
+  ]
+}

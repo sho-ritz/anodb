@@ -1,0 +1,1308 @@
+{
+  "description": "Row rule (§4.1) for writer = identity. Tables: plain, owned (\"mine\"), and a table the schema does not know (\"unknown\").",
+  "identity": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+  "other": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+  "tables": {
+    "plain": "plain",
+    "mine": "owned",
+    "unknown": "not in schema"
+  },
+  "cases": [
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": false
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "plain",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "mine",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": false
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "admin",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "unknown",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    }
+  ]
+}
