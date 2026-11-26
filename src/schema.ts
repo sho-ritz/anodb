@@ -74,12 +74,23 @@ const SQL_TYPE: Record<ColumnType, string> = {
   json: 'TEXT',
 }
 
-export function createTableSql(table: string, def: TableDefinition, defaultSpace: string, owner?: string): string {
-  const cols = Object.entries(def).map(([c, t]) => `${quoteIdent(c)} ${SQL_TYPE[t]}`)
+/** Postgres projections use native types so other tools (Prisma, Drizzle…) see ordinary columns. */
+const PG_TYPE: Record<ColumnType, string> = {
+  text: 'TEXT',
+  integer: 'BIGINT',
+  real: 'DOUBLE PRECISION',
+  boolean: 'BOOLEAN',
+  json: 'JSONB',
+}
+
+export function createTableSql(table: string, def: TableDefinition, defaultSpace: string, owner?: string, pg = false): string {
+  const cols = Object.entries(def).map(([c, t]) => `${quoteIdent(c)} ${(pg ? PG_TYPE : SQL_TYPE)[t]}`)
   const space = `space TEXT NOT NULL DEFAULT '${defaultSpace.replaceAll("'", "''")}'`
+  const rand = (bytes: 8 | 16) => (pg ? `substr(md5(gen_random_uuid()::text), 1, ${bytes * 2})` : `lower(hex(randomblob(${bytes})))`)
   // New rows are owned by the writer: <pubkey>-<random>.
-  const id = owner && /^[0-9a-f]{64}$/.test(owner) ? `id TEXT NOT NULL DEFAULT ('${owner}-' || lower(hex(randomblob(8))))` : 'id TEXT NOT NULL DEFAULT (lower(hex(randomblob(16))))'
-  return `CREATE TABLE ${quoteIdent(table)} (${[space, id, ...cols, '"createdAt" INTEGER', '"updatedAt" INTEGER NOT NULL DEFAULT 0', '"createdBy" TEXT', '"updatedBy" TEXT', 'PRIMARY KEY (space, id)'].join(', ')})`
+  const id = owner && /^[0-9a-f]{64}$/.test(owner) ? `id TEXT NOT NULL DEFAULT ('${owner}-' || ${rand(8)})` : `id TEXT NOT NULL DEFAULT (${rand(16)})`
+  const int = pg ? 'BIGINT' : 'INTEGER'
+  return `CREATE TABLE ${quoteIdent(table)} (${[space, id, ...cols, `"createdAt" ${int}`, `"updatedAt" ${int} NOT NULL DEFAULT 0`, '"createdBy" TEXT', '"updatedBy" TEXT', 'PRIMARY KEY (space, id)'].join(', ')})`
 }
 
 /** Stable fingerprint of a table definition; projection is rebuilt when it changes. */
@@ -114,7 +125,7 @@ export function checkValue(table: string, column: string, type: ColumnType, valu
  * Convert a wire value (already merged) into what goes into the projection table.
  * Remote peers may send values that do not match our type (schema drift); those become NULL.
  */
-export function toSql(type: ColumnType, value: unknown): SqlValue {
+export function toSql(type: ColumnType, value: unknown, pg = false): SqlValue | boolean {
   if (value === null || value === undefined) return null
   switch (type) {
     case 'text':
@@ -124,20 +135,8 @@ export function toSql(type: ColumnType, value: unknown): SqlValue {
     case 'real':
       return typeof value === 'number' && Number.isFinite(value) ? value : null
     case 'boolean':
-      return typeof value === 'boolean' ? (value ? 1 : 0) : null
+      return typeof value === 'boolean' ? (pg ? value : value ? 1 : 0) : null
     case 'json':
       return JSON.stringify(value)
-  }
-}
-
-export function fromSql(type: ColumnType, value: SqlValue): unknown {
-  if (value === null) return null
-  switch (type) {
-    case 'boolean':
-      return value === 1
-    case 'json':
-      return JSON.parse(value as string)
-    default:
-      return value
   }
 }

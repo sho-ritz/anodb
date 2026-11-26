@@ -10,9 +10,14 @@ const schema = defineSchema({
 type DB = Awaited<ReturnType<typeof open<typeof schema>>>
 
 /** Bypass the local check, like a modified client would: sign and send arbitrary changes. */
-const forge = (db: DB, space: string, changes: Array<[string, string, string, unknown]>) => {
-  const d = db as unknown as { sendToSpace: (s: string, t: string, p: unknown) => void; clock: { tick: () => string }; sync?: { flush: () => Promise<void> } }
-  d.sendToSpace(space, 'ch', { c: changes.map(([t, r, c, v]) => [t, r, c, v, d.clock.tick()]) })
+const forge = async (db: DB, space: string, changes: Array<[string, string, string, unknown]>) => {
+  const d = db as unknown as {
+    store: { transaction<T>(f: (s: unknown) => Promise<T>): Promise<T> }
+    sendToSpace: (s: unknown, sp: string, t: string, p: unknown) => Promise<unknown>
+    clock: { tick: () => string }
+    sync?: { flush: () => Promise<void> }
+  }
+  await d.store.transaction((s) => d.sendToSpace(s, space, 'ch', { c: changes.map(([t, r, c, v]) => [t, r, c, v, d.clock.tick()]) }))
   void d.sync?.flush()
 }
 
@@ -56,7 +61,7 @@ describe('owned() tables (createdBy / updatedBy and the row rule)', () => {
     expect((await texts(bob, space))[0]!.text).toBe('original')
 
     // A modified client sends the edit and the delete anyway: every other device drops them.
-    forge(bob, space, [
+    await forge(bob, space, [
       ['messages', id, 'text', 'edited by bob'],
       ['messages', id, '$deleted', true],
     ])
@@ -67,7 +72,7 @@ describe('owned() tables (createdBy / updatedBy and the row rule)', () => {
   it('cannot impersonate: a row id naming someone else is refused', async () => {
     const { owner, alice, bob, space } = await room()
     await expect(bob.insertInto('messages').values({ id: `${alice.pubkey}-fake`, text: 'I am alice', space }).execute()).rejects.toMatchObject({ code: 'unauthorized' })
-    forge(bob, space, [
+    await forge(bob, space, [
       ['messages', `${alice.pubkey}-fake`, '$createdAt', Date.now()],
       ['messages', `${alice.pubkey}-fake`, 'text', 'I am alice'],
     ])
@@ -101,9 +106,9 @@ describe('owned() tables (createdBy / updatedBy and the row rule)', () => {
     await until(async () => (await texts(bob, space)).length === 1, 4000, 'delivery')
     const id = (await texts(bob, space))[0]!.id
     // Bob rewrites Alice's row in his own store and posts a snapshot of it.
-    const b = bob as unknown as { store: { transaction: (f: () => void) => void; applyChanges: (s: string, c: unknown[], by?: string) => void }; clock: { tick: () => string }; snapshot: (s: string) => void }
-    b.store.transaction(() => b.store.applyChanges(space, [['messages', id, 'text', 'forged via snapshot', b.clock.tick()]], alice.pubkey))
-    b.snapshot(space)
+    const b = bob as unknown as { store: { applyChanges: (s: string, c: unknown[], by?: string) => Promise<unknown> }; clock: { tick: () => string }; snapshot: (s: string) => Promise<void> }
+    await b.store.applyChanges(space, [['messages', id, 'text', 'forged via snapshot', b.clock.tick()]], alice.pubkey)
+    await b.snapshot(space)
     await sleep(1000)
     for (const d of [owner, alice]) expect((await texts(d, space)).map((m) => m.text)).toEqual(['real'])
   })
@@ -112,7 +117,7 @@ describe('owned() tables (createdBy / updatedBy and the row rule)', () => {
     const { owner, alice, bob, space } = await room()
     await expect(bob.insertInto('items').values({ id: `${alice.pubkey}-fake`, title: 'by alice?', space }).execute()).rejects.toMatchObject({ code: 'unauthorized' })
     // Without $createdAt the row is never born, even if its other cells are accepted.
-    forge(bob, space, [['items', `${alice.pubkey}-fake`, 'title', 'by alice?']])
+    await forge(bob, space, [['items', `${alice.pubkey}-fake`, 'title', 'by alice?']])
     await sleep(800)
     for (const d of [owner, alice]) expect(await d.selectFrom('items').selectAll().execute()).toEqual([])
   })

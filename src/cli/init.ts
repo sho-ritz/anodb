@@ -16,6 +16,8 @@ export type Env = 'browser' | 'tauri' | 'electron' | 'expo' | 'node'
 export type Framework = 'react' | 'vue' | 'svelte' | 'none'
 export type KeyMode = 'stored' | 'recovery' | 'signer'
 export type WebStack = 'next' | 'vite' | 'sveltekit' | 'nuxt' | 'other'
+/** Storage engine. PGlite (Postgres in WASM) is offered where anoDB runs in Node (servers, Electron main). */
+export type Database = 'sqlite' | 'pglite'
 
 export interface Choice<T> {
   label: string
@@ -33,6 +35,7 @@ export interface InitFlags {
   lang?: Lang
   env?: Env
   framework?: Framework
+  db?: Database
   appId?: string
   keys?: KeyMode
   identity?: string
@@ -61,6 +64,7 @@ export interface InitDeps {
 export interface InitResult {
   env: Env
   framework: Framework
+  db: Database
   appId: string
   files: string[]
   recoveryKey: string | null
@@ -83,6 +87,25 @@ const DRIVERS: Record<Env, string> = {
   electron: 'node:sqlite (main process)',
   expo: 'expo-sqlite',
   node: 'node:sqlite',
+}
+
+const PGLITE_PACKAGE = '@electric-sql/pglite'
+
+/** Environments where the database can be chosen (anoDB runs in Node there). */
+export const supportsPglite = (env: Env): boolean => env === 'node' || env === 'electron'
+
+/** Folder PGlite stores its files in (Node template), relative to the project. */
+export const PGLITE_DIR = 'anodb-pgdata'
+
+export function packagesFor(env: Env, db: Database): string[] {
+  return db === 'pglite' && supportsPglite(env) ? [...PACKAGES[env], PGLITE_PACKAGE] : PACKAGES[env]
+}
+
+/** PGlite by default when the project already uses Postgres tooling. */
+export function detectDatabase(cwd: string): Database {
+  const pkg = readPackageJson(cwd)
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+  return [PGLITE_PACKAGE, '@prisma/client', 'prisma', 'drizzle-orm', 'pg', 'postgres'].some((n) => n in deps) ? 'pglite' : 'sqlite'
 }
 
 interface PackageJson {
@@ -260,7 +283,22 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     ]
     framework = await ask(flags.framework, () => p.select(m.framework, fw, fw.findIndex((c) => c.value === detected.framework)), detected.framework)
   }
-  p.log(`${m.driver}: ${DRIVERS[env]}`)
+
+  // ②' database (where anoDB runs in Node)
+  let db: Database = 'sqlite'
+  if (supportsPglite(env)) {
+    const detectedDb = detectDatabase(deps.cwd)
+    const dbChoices: Choice<Database>[] = (
+      [
+        ['sqlite', m.dbSqlite],
+        ['pglite', m.dbPglite],
+      ] as const
+    ).map(([value, label]) => ({ value, label: value === detectedDb ? `${label}${m.detected}` : label }))
+    db = await ask(flags.db, () => p.select(m.db, dbChoices, dbChoices.findIndex((c) => c.value === detectedDb)), detectedDb)
+  } else if (flags.db === 'pglite') {
+    p.log(m.dbPgliteUnsupported)
+  }
+  p.log(`${m.driver}: ${db === 'pglite' ? 'PGlite (Postgres, WASM)' : DRIVERS[env]}`)
 
   // ③ appId
   const pkgName = readPackageJson(deps.cwd).name ?? 'my-app'
@@ -343,7 +381,7 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     p.log(`${m.wrote} ${rel}`)
   }
   write(`${base}/schema.${ext}`, schemaTemplate())
-  write(`${base}/db.${ext}`, dbTemplate(env, appId, keyMode, relays, ts))
+  write(`${base}/db.${ext}`, dbTemplate(env, appId, keyMode, relays, ts, db))
   const providerFile = `${base}/provider.${ts ? 'tsx' : 'jsx'}`
   if (framework === 'react' && env !== 'node') write(providerFile, reactTemplate(ts, keyMode))
   if (envVars) {
@@ -352,9 +390,10 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     p.log(`${m.wrote} .env`)
     if (ensureGitignore(join(deps.cwd, '.gitignore'))) p.log(m.gitignore)
   }
+  if (db === 'pglite' && env === 'node' && ensureIgnored(join(deps.cwd, '.gitignore'), `${PGLITE_DIR}/`)) p.log(m.pgliteIgnored)
 
   // ⑦ install
-  const packages = PACKAGES[env]
+  const packages = packagesFor(env, db)
   const doInstall = await ask(flags.install, () => p.confirm(`${m.install} (${packages.join(' ')})`, true), false)
   if (doInstall) {
     const pm = detectPackageManager(deps.cwd)
@@ -394,7 +433,8 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     if (!wired) p.log(m.nextWrap)
     p.log(m.nextReact)
   } else p.log(m.nextBrowser)
-  return { env, framework, appId, files, recoveryKey, packages, wired }
+  if (db === 'pglite') p.log(m.nextPglite)
+  return { env, framework, db, appId, files, recoveryKey, packages, wired }
 }
 
 function writeEnv(path: string, vars: Record<string, string>): void {
@@ -451,12 +491,30 @@ export const schema = defineSchema({
 `
 }
 
-export function dbTemplate(env: Env, appId: string, keyMode: KeyMode, relays: string[] | null, ts: boolean): string {
+export function dbTemplate(env: Env, appId: string, keyMode: KeyMode, relays: string[] | null, ts: boolean, db: Database = 'sqlite'): string {
   const relayLine = relays ? `\n    relays: ${JSON.stringify(relays)},` : ''
   const schemaImport = `import { schema } from './schema${ts ? '' : '.js'}'`
   const id = JSON.stringify(appId)
   const optsType = ts ? ': { onRecoveryKey?: (key: string) => void }' : ''
   const takesOpts = keyMode === 'recovery'
+  const pglite = db === 'pglite' && supportsPglite(env)
+  if (env === 'node' && pglite) {
+    return `import { PGlite } from '${PGLITE_PACKAGE}'
+import { createAnoDB, pgliteDriver } from '@anodb/core'
+${schemaImport}
+
+// Postgres (PGlite) stored in ./${PGLITE_DIR}. The tables are ordinary Postgres tables: share \`pg\`
+// with Prisma / Drizzle (e.g. pglite-prisma-adapter) and their writes to them are synced as well.
+export const pg = await PGlite.create(process.env.ANODB_PGLITE_DIR ?? '${PGLITE_DIR}')
+
+// Keys come from .env (ANODB_DEVICE_KEY / ANODB_DELEGATION), written by \`npx @anodb/cli init\`.
+export const db = await createAnoDB({
+  appId: process.env.ANODB_APP_ID ?? ${id},
+  schema,
+  driver: pgliteDriver(pg),${relayLine}
+})
+`
+  }
   if (env === 'node') {
     return `import { createAnoDB } from '@anodb/core'
 import { nodeSqlite } from '@anodb/core/node'
@@ -471,12 +529,17 @@ export const db = await createAnoDB({
 `
   }
   if (env === 'electron') {
+    const imports = pglite
+      ? `import { PGlite } from '${PGLITE_PACKAGE}'
+import { createAnoDB, electronKeyStore, pgliteDriver } from '@anodb/core'`
+      : `import { createAnoDB, electronKeyStore } from '@anodb/core'
+import { nodeSqlite } from '@anodb/core/node'`
+    const driver = pglite ? "pgliteDriver(await PGlite.create(join(dir, 'pgdata')))" : "nodeSqlite(join(dir, 'db.sqlite'))"
     return `// Run in the Electron main process.
 import { app, safeStorage } from 'electron'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createAnoDB, electronKeyStore } from '@anodb/core'
-import { nodeSqlite } from '@anodb/core/node'
+${imports}
 ${schemaImport}
 
 const dir = join(app.getPath('userData'), 'anodb')
@@ -486,7 +549,7 @@ export async function openDB(${takesOpts ? `opts${optsType} = {}` : ''}) {
   return createAnoDB({
     appId: ${id},
     schema,
-    driver: nodeSqlite(join(dir, 'db.sqlite')),
+    driver: ${driver},
     keyStore: electronKeyStore(safeStorage, {
       read: (n) => readFile(join(dir, n)).then((b) => new Uint8Array(b)).catch(() => null),
       write: (n, d) => writeFile(join(dir, n), d, { mode: 0o600 }),

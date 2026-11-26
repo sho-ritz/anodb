@@ -1,7 +1,7 @@
 {
   "name": "@anodb/core",
   "version": "0.12.0",
-  "description": "Absolutely No DB \u2014 a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
+  "description": "Absolutely No DB — a decentralized, local-first database over Nostr. Zero servers to run. Zero servers to trust.",
   "type": "module",
   "license": "MIT",
   "author": "show-ritz",
@@ -50,6 +50,7 @@
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:pglite": "vitest run --config vitest.pglite.config.ts",
     "test:watch": "vitest",
     "smoke:public": "npm run build && node examples/public-relay-smoke.mjs",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
@@ -62,6 +63,7 @@
     "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/sql.js": "^1.4.11",

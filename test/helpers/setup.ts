@@ -2,6 +2,7 @@ import { afterEach } from 'vitest'
 import { type AnoDBOptions, createAnoDB } from '../../src/index.js'
 import { memoryKeyStore } from '../../src/keystore/memory.js'
 import { nodeSqlite } from '../../src/node.js'
+import { pgliteDriver } from '../../src/drivers/pglite.js'
 import type { SchemaDefinition } from '../../src/types.js'
 import { MockRelay } from './mock-relay.js'
 
@@ -20,6 +21,16 @@ export async function relay(opts?: ConstructorParameters<typeof MockRelay>[0]): 
   return r
 }
 
+/**
+ * Default storage for `open()`: node:sqlite, or PGlite with `ANODB_TEST_DRIVER=pglite`
+ * (`npm run test:pglite` runs the whole suite on Postgres).
+ */
+async function defaultDriver() {
+  if (process.env.ANODB_TEST_DRIVER !== 'pglite') return nodeSqlite(':memory:')
+  const { PGlite } = await import('@electric-sql/pglite')
+  return pgliteDriver(await PGlite.create())
+}
+
 export async function open<const S extends SchemaDefinition>(
   schema: S,
   relays: MockRelay[] = [],
@@ -28,7 +39,7 @@ export async function open<const S extends SchemaDefinition>(
   const db = await createAnoDB({
     appId: 'test',
     schema,
-    driver: nodeSqlite(':memory:'),
+    driver: extra.driver ?? (await defaultDriver()),
     keyStore: memoryKeyStore(),
     relays: relays.map((r) => r.url),
     relayOptions: { reconnectMinMs: 30, reconnectMaxMs: 100, publishTimeoutMs: 500 },

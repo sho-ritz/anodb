@@ -10,9 +10,9 @@ export type IngestResult = 'new' | 'seen' | 'invalid'
 export interface SyncHost {
   /** Tags to subscribe to (space epochs + own inbox + pending secrets). */
   tags(): string[]
-  ingest(relay: string, event: NostrEvent): IngestResult
+  ingest(relay: string, event: NostrEvent): Promise<IngestResult>
   /** Give a stale outbox envelope a fresh created_at (new envelope, same content). */
-  resign(event: NostrEvent): NostrEvent
+  resign(event: NostrEvent): Promise<NostrEvent>
   statusChanged(): void
   publishRejected(entryId: string): void
   now(): number
@@ -28,6 +28,8 @@ interface RelayState {
   oldest: number | null
   newestByTag: Map<string, number>
   caughtUp: boolean
+  /** Ingests still running for events of the initial batch (EOSE waits for them). */
+  pending: Set<Promise<unknown>>
 }
 
 const tagOf = (e: NostrEvent) => e.tags.find((t) => t[0] === TAG)?.[1]
@@ -110,7 +112,7 @@ export class SyncEngine {
     this.#unsub?.()
     this.#gen++
     this.#unsub = this.#pool.subscribe((relay) => this.#filtersFor(relay), {
-      onEvent: (relay, event) => this.#onEvent(relay, event),
+      onEvent: (relay, event) => void this.#onEvent(relay, event).catch(() => {}),
       onEose: (relay) => void this.#onEose(relay),
     })
     this.#host.statusChanged()
@@ -128,7 +130,7 @@ export class SyncEngine {
       if (!list) bySince.set(since, (list = []))
       list.push(tag)
     }
-    this.#state.set(relay, { gen: this.#gen, sinceByTag, oldest: null, newestByTag: new Map(), caughtUp: tags.length === 0 })
+    this.#state.set(relay, { gen: this.#gen, sinceByTag, oldest: null, newestByTag: new Map(), caughtUp: tags.length === 0, pending: new Set() })
     if (tags.length === 0) return null
     return [...bySince].map(([since, list]) => {
       const f: Filter = { kinds: [WRAP_KIND], [`#${TAG}`]: list }
@@ -137,24 +139,33 @@ export class SyncEngine {
     })
   }
 
-  #onEvent(relay: string, event: NostrEvent): void {
+  async #onEvent(relay: string, event: NostrEvent): Promise<void> {
     if (this.#closed || event.kind !== WRAP_KIND) return
     const tag = tagOf(event)
     if (!tag) return
-    if (this.#host.ingest(relay, event) === 'invalid') return
     const st = this.#state.get(relay)
     if (st && !st.caughtUp) {
+      const p = this.#host.ingest(relay, event)
+      st.pending.add(p)
+      try {
+        if ((await p) === 'invalid') return
+      } finally {
+        st.pending.delete(p)
+      }
       st.oldest = st.oldest === null ? event.created_at : Math.min(st.oldest, event.created_at)
       st.newestByTag.set(tag, Math.max(st.newestByTag.get(tag) ?? 0, event.created_at))
-    } else {
-      this.#store.advanceCursor(relay, tag, event.created_at)
+      return
     }
+    if ((await this.#host.ingest(relay, event)) === 'invalid') return
+    await this.#store.advanceCursor(relay, tag, event.created_at)
   }
 
   /** Initial batch done: page backwards with `until` until nothing new arrives, then advance cursors. */
   async #onEose(relay: string): Promise<void> {
     const st = this.#state.get(relay)
     if (!st || st.caughtUp) return
+    // The initial batch counts once every event of it has been ingested.
+    while (st.pending.size > 0) await Promise.allSettled([...st.pending])
     const tags = [...st.sinceByTag.keys()]
     const minSince = Math.min(...st.sinceByTag.values())
     let until = st.oldest
@@ -167,7 +178,7 @@ export class SyncEngine {
       for (const e of page) {
         const tag = tagOf(e)
         if (!tag) continue
-        if (this.#host.ingest(relay, e) === 'new') fresh++
+        if ((await this.#host.ingest(relay, e)) === 'new') fresh++
         oldest = oldest === null ? e.created_at : Math.min(oldest, e.created_at)
         st.newestByTag.set(tag, Math.max(st.newestByTag.get(tag) ?? 0, e.created_at))
       }
@@ -180,7 +191,7 @@ export class SyncEngine {
       } else break
     }
     if (this.#state.get(relay) !== st) return
-    for (const [tag, newest] of st.newestByTag) this.#store.advanceCursor(relay, tag, newest)
+    for (const [tag, newest] of st.newestByTag) await this.#store.advanceCursor(relay, tag, newest)
     st.caughtUp = true
     this.#host.statusChanged()
     // Extra layers (NIP-77, gap repair) run in the background; they only add data.
@@ -198,8 +209,8 @@ export class SyncEngine {
   }
 
   /** Forget cursors so the next subscription re-downloads everything (merge is idempotent). */
-  resync(): void {
-    this.#store.resetCursors()
+  async resync(): Promise<void> {
+    await this.#store.resetCursors()
     this.refresh(true)
   }
 
@@ -230,7 +241,7 @@ export class SyncEngine {
     if (connected.size === 0) return
     const fixed = this.#router.fixed
     await Promise.all(
-      this.#store.outbox().map(async ({ entryId, event, resign, holdUntil, acks }) => {
+      (await this.#store.outbox()).map(async ({ entryId, event, resign, holdUntil, acks }) => {
         // Held while peers acknowledge it over WebRTC; released (or dequeued) by the P2P layer.
         if (holdUntil > Date.now()) return
         const tag = tagOf(event)
@@ -242,11 +253,11 @@ export class SyncEngine {
         const nowSec = Math.floor(this.#host.now() / 1000)
         if (resign && nowSec - event.created_at > RESIGN_AFTER_SEC) {
           // Offline writes: a fresh created_at so `since` cursors on other devices include them.
-          toSend = this.#host.resign(event)
-          this.#store.transaction(() => {
-            this.#store.replaceOutboxEvent(entryId, toSend)
+          toSend = await this.#host.resign(event)
+          await this.#store.transaction(async (s) => {
+            await s.replaceOutboxEvent(entryId, toSend)
             const tag = tagOf(toSend)
-            if (tag) this.#store.putRaw(toSend, tag)
+            if (tag) await s.putRaw(toSend, tag)
           })
         }
         const results = await this.#pool.publish(toSend, targets)
@@ -254,7 +265,7 @@ export class SyncEngine {
         for (const [relay, r] of results) {
           if (r.outcome === 'ok' || r.outcome === 'rejected') {
             acks.set(relay, r.outcome)
-            this.#store.recordAck(entryId, relay, r.outcome, r.message)
+            await this.#store.recordAck(entryId, relay, r.outcome, r.message)
           }
         }
         // Delivery is judged on the fixed relays (phase 1: the automatic ones are extra copies), or on
@@ -263,7 +274,7 @@ export class SyncEngine {
         const answered = judged.filter((r) => acks.has(r)).length
         const ok = judged.filter((r) => acks.get(r) === 'ok').length
         if (ok >= Math.min(this.#minAcks, judged.length) || (ok > 0 && answered === judged.length)) {
-          this.#store.dequeue(entryId)
+          await this.#store.dequeue(entryId)
           for (const r of route) if (!acks.has(r) && !judged.includes(r)) this.#owe(r, toSend)
         } else if (answered === judged.length) this.#host.publishRejected(entryId)
       }),
@@ -288,8 +299,8 @@ export class SyncEngine {
     for (const e of m.values()) void this.#pool.publish(e, [relay])
   }
 
-  enqueue(event: NostrEvent, resign: boolean, holdUntil = 0): void {
-    this.#store.enqueue(event, resign, holdUntil)
+  enqueue(event: NostrEvent, resign: boolean, holdUntil = 0): Promise<void> {
+    return this.#store.enqueue(event, resign, holdUntil)
   }
 
   close(): void {
