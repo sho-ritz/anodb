@@ -200,6 +200,47 @@ await db.insertInto('profiles').values({ id: db.pubkey, name: 'Taro' }).execute(
 In every table, `createdBy` / `updatedBy` are taken from signatures (read-only), and nobody can
 create a row whose id names someone else.
 
+### Server-confirmed tables
+
+Some decisions must be made in one place: bookings, stock, the last seat. In a
+`confirmed(..., { by })` table only that identity (your server) may write. Every device enforces
+it, so clients can trust these rows as the server's decisions. Not even the owner of a space can
+write them, and neither a modified client nor a snapshot can forge them. Clients write a
+*request* to an ordinary table. On the server, `serveRequests` decides each request in a
+transaction and writes the result in the same commit.
+
+```ts
+import { confirmed, defineSchema, owned, serveRequests } from '@anodb/core'
+const SERVER = 'npub1…' // the server's identity
+export const schema = defineSchema({
+  slots: confirmed({ title: 'text', remaining: 'integer' }, { by: SERVER }),
+  bookingRequests: owned({ slot: 'text' }),                        // written by clients, even offline
+  bookings: confirmed({ slot: 'text', status: 'text' }, { by: SERVER }), // id = request id
+})
+
+// server (identity = SERVER): one request at a time, so constraints checked here hold
+serveRequests(db, {
+  requests: 'bookingRequests',
+  results: 'bookings',
+  handle: async (req, trx) => {
+    const s = await trx.selectFrom('slots').select('remaining').where('id', '=', req.slot!).executeTakeFirst()
+    if (!s || s.remaining! < 1) return { slot: req.slot, status: 'rejected' }
+    await trx.updateTable('slots').set({ remaining: s.remaining! - 1 }).where('id', '=', req.slot!).execute()
+    return { slot: req.slot, status: 'confirmed' }
+  },
+})
+```
+
+The result is written to the request's space. Give each user a private space shared with the
+server (the user adds the server as a `writer`), and keep public data such as `slots` in a space
+the server owns, with users as `reader`s. Then each user receives only their own bookings, while
+everyone sees the remaining seats.
+
+On the client, a request with no result yet is pending. While `db.status.pendingEvents > 0` it has
+not even left the device. Requests written while the server was down are decided when it starts.
+If `handle` throws, the request stays undecided: it is retried after the next change and reported
+once to `onError`.
+
 ## Sharing (spaces)
 
 ```ts
