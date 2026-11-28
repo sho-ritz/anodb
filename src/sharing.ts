@@ -31,7 +31,7 @@ import {
 } from './membership.js'
 import { type Change, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, parseInboxPayload, parseStreamPayload } from './protocol.js'
 import { changeAllowed } from './policy.js'
-import { SYS_DELETED } from './schema.js'
+import { SYS_DELETED, authorityOf } from './schema.js'
 import type { Store } from './store.js'
 import type { IngestResult } from './sync.js'
 import type { NostrEvent, SchemaDefinition } from './types.js'
@@ -132,6 +132,9 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     for (const snap of await this.#completeSnapshots(s, space)) {
       // Cells that name their signer must still pass the row rule for that signer.
       const cells = snap.cells.filter((c) => {
+        // A snapshot restates `by`, so it cannot vouch for a confirmed() cell unless the authority signed it.
+        const authority = authorityOf(this.schema[c[0]])
+        if (authority) return snap.author === authority
         const by = (c as readonly unknown[])[5]
         return typeof by !== 'string' || changeAllowed(this.schema, c, by, this.roleOf(space, by))
       })
@@ -314,7 +317,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   }
 
   /** Snapshots whose parts all arrived and whose author may write. */
-  async #completeSnapshots(s: Store, space: string): Promise<Array<{ cells: Change[]; heads: Record<string, number> }>> {
+  async #completeSnapshots(s: Store, space: string): Promise<Array<{ cells: Change[]; heads: Record<string, number>; author: string }>> {
     const groups = new Map<string, Array<{ i: number; n: number; seq: number; identity: string; device: string; body: { ops?: unknown; cells?: unknown } }>>()
     for (const m of await s.messages(space, 'snap')) {
       const p = JSON.parse(m.payload) as { sid: string; i: number; n: number; body: { ops?: unknown; cells?: unknown } }
@@ -323,7 +326,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       list.push({ i: p.i, n: p.n, seq: m.seq, identity: m.identity, device: m.device, body: p.body })
       groups.set(k, list)
     }
-    const out: Array<{ cells: Change[]; heads: Record<string, number> }> = []
+    const out: Array<{ cells: Change[]; heads: Record<string, number>; author: string }> = []
     for (const parts of groups.values()) {
       const n = parts[0]!.n
       if (parts.length !== n || new Set(parts.map((p) => p.i)).size !== n || parts.some((p) => p.n !== n)) continue
@@ -342,7 +345,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
         for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
       }
       const valid = (c: unknown) => Array.isArray(c) && (c.length === 5 || (c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5])))
-      out.push({ cells: cells.filter(valid), heads })
+      out.push({ cells: cells.filter(valid), heads, author })
     }
     return out
   }

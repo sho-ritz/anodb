@@ -497,7 +497,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
       if (!list) bySpace.set(c.space, (list = []))
       const change: Change = [c.table, c.rowId, c.column, value, this.clock.tick()]
       // Same row-level rule every other device applies: refuse here instead of sending a change they would drop.
-      if (!changeAllowed(this.schema, change, this.pubkey, this.roleOf(c.space, this.pubkey))) throw new AnoDBError('unauthorized', policyMessage(change))
+      if (!changeAllowed(this.schema, change, this.pubkey, this.roleOf(c.space, this.pubkey))) throw new AnoDBError('unauthorized', policyMessage(change, this.schema))
       list.push(change)
       touched.add(c.table)
     }

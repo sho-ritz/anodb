@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — server-confirmed tables
+
+- `confirmed(def, { by })`: only the given identity (your server) may write the table. Every
+  device enforces this, including for snapshots, which can no longer vouch for these cells unless
+  the authority signed them.
+- `serveRequests(db, { requests, results, handle })` (run it on that server): picks up client
+  requests, decides them one at a time in a transaction (e.g. the last seat goes to exactly one
+  request), and writes the result to the request's space in the same commit. It is idempotent
+  across restarts.
+
 ## Unreleased — PGlite (Postgres) driver
 
 anoDB can now store its data in **Postgres via [PGlite](https://pglite.dev)**, so it runs on a server

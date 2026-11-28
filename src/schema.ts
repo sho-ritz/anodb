@@ -1,3 +1,4 @@
+import { parsePubkey } from './crypto.js'
 import type { ColumnType, JsonColumn, SchemaDefinition, SqlValue, TableDefinition } from './types.js'
 
 const IDENT = /^[A-Za-z][A-Za-z0-9_]*$/
@@ -31,6 +32,25 @@ export function owned<const T extends TableDefinition>(def: T): T {
 }
 
 export const isOwned = (def: TableDefinition | undefined): boolean => !!def && (def as { [OWNED]?: boolean })[OWNED] === true
+
+const AUTHORITY: unique symbol = Symbol.for('anodb.authority')
+
+/**
+ * Server-confirmed table: only the given identity (the app's server / worker, as npub or hex
+ * pubkey) may create, change or delete rows. Every device enforces it when it applies a change,
+ * so clients can trust these rows as decisions of that authority (booking results, stock,
+ * remaining seats…). Clients ask for changes by writing to an ordinary table that the authority
+ * processes (see `serveRequests`).
+ *
+ *   defineSchema({ bookings: confirmed({ event: 'text', status: 'text' }, { by: SERVER_NPUB }) })
+ */
+export function confirmed<const T extends TableDefinition>(def: T, opts: { by: string }): T {
+  if (isOwned(def)) throw new Error('anoDB: a table cannot be both owned() and confirmed()')
+  return Object.assign({ ...def }, { [AUTHORITY]: parsePubkey(opts.by) }) as T
+}
+
+/** The identity that confirms writes to a `confirmed(...)` table, or null for other tables. */
+export const authorityOf = (def: TableDefinition | undefined): string | null => (def && (def as { [AUTHORITY]?: string })[AUTHORITY]) || null
 
 /** Bump to rebuild every projection (new system columns). */
 const PROJECTION_VERSION = 3

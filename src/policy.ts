@@ -1,6 +1,6 @@
 import type { Role } from './membership.js'
 import type { Change } from './protocol.js'
-import { SYS_CREATED, SYS_DELETED, isOwned, ownerOfRow } from './schema.js'
+import { SYS_CREATED, SYS_DELETED, authorityOf, isOwned, ownerOfRow } from './schema.js'
 import type { SchemaDefinition } from './types.js'
 
 /**
@@ -12,9 +12,12 @@ import type { SchemaDefinition } from './types.js'
  * - Plain tables (default): any writer may change or delete any row, like a database without RLS.
  * - `owned(...)` tables: only the creator may change a row; deleting is also allowed for admins /
  *   the owner of the space (moderation). Admins cannot edit other people's rows.
+ * - `confirmed(...)` tables: only the table's authority may write, whatever its role.
  */
 export function changeAllowed(schema: SchemaDefinition, c: Change, writer: string, role: Role | undefined): boolean {
   const [table, rowId, column] = c
+  const authority = authorityOf(schema[table])
+  if (authority) return writer === authority
   const owner = ownerOfRow(rowId)
   if (owner === null || owner === writer) return true
   if (column === SYS_CREATED) return false
@@ -24,7 +27,9 @@ export function changeAllowed(schema: SchemaDefinition, c: Change, writer: strin
 }
 
 /** Message for a local write that the rule refuses. */
-export const policyMessage = (c: Change) =>
-  c[2] === SYS_DELETED
+export const policyMessage = (c: Change, schema?: SchemaDefinition) =>
+  schema && authorityOf(schema[c[0]])
+    ? `anoDB: ${c[0]} is confirmed(): only its authority can write it — write a request instead`
+    : c[2] === SYS_DELETED
     ? `anoDB: ${c[0]} is owned(): only the member who created this row (or an admin) can delete it`
     : `anoDB: ${c[0]} is owned(): only the member who created this row can change it`
