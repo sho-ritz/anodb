@@ -16,6 +16,7 @@ anything built later — must reproduce them, so they all interoperate.
 | `hlc.json` | HLC encoding and `tick` / `receive` with a controlled clock |
 | `merge.json` | last-writer-wins per cell |
 | `policy.json` | the row rule for plain, owned and unknown tables |
+| `membership.json` | op shapes, and membership evaluation (§5.1): DAG order, missing parents and cycles, who may add / change / remove / leave / transfer / revoke, removals overriding concurrent ops, cut-offs, `mayWrite` / `mayManage` |
 
 ```sh
 npm run build && node conformance/generate.mjs        # regenerate from the TypeScript implementation

@@ -26,7 +26,7 @@ import {
 } from '../dist/crypto.js'
 import { Clock, decodeHlc, encodeHlc } from '../dist/hlc.js'
 import { DELEGATION_KIND, verifyDelegation } from '../dist/identity.js'
-import { spaceIdFor } from '../dist/membership.js'
+import { evaluate, mayManage, mayWrite, parseOp, spaceIdFor } from '../dist/membership.js'
 import { changeAllowed } from '../dist/policy.js'
 import { MESSAGE_KIND, TAG, WRAP_KIND, isChange, parseStreamPayload } from '../dist/protocol.js'
 import { owned } from '../dist/schema.js'
@@ -299,6 +299,221 @@ write('policy', {
   other,
   tables: { plain: 'plain', mine: 'owned', unknown: 'not in schema' },
   cases: policy,
+})
+
+// ---- membership (§5.1) ------------------------------------------------------------------
+// Identities and their devices. Op ids are stand-ins for inner message ids (any distinct hex).
+const who = Object.fromEntries(['owner', 'admin', 'admin2', 'writer', 'reader', 'stranger'].map((n) => [n, getPublicKey(sk(`member/${n}`))]))
+const dev = Object.fromEntries(Object.keys(who).map((n) => [n, getPublicKey(sk(`member-device/${n}`))]))
+const devices = Object.fromEntries(Object.keys(who).map((n) => [dev[n], who[n]]))
+const mSpace = spaceIdFor(who.owner, 'n1')
+const opId = (label) => sha256Hex(`anodb/conformance/op/${label}`)
+const revocation = (idName, devName) =>
+  signWith(sk(`member/${idName}`), { kind: DELEGATION_KIND, created_at: T, tags: [['revoke', dev[devName]]], content: '' })
+const sortObj = (entries) => Object.fromEntries([...entries].sort(([a], [b]) => (a < b ? -1 : 1)))
+
+/** `log`: [label, author, op, parentLabels]. Builds the records the way sharing.ts does (parseOp, drop invalid). */
+const membershipCase = (name, log, { space: sp = mSpace, extraIds = {} } = {}) => {
+  const records = log.map(([label, author, op, par]) => ({ id: extraIds[label] ?? opId(label), identity: who[author], op, par: par.map((p) => extraIds[p] ?? opId(p)) }))
+  const parsed = records.flatMap((r) => {
+    const op = parseOp(r.op)
+    return op ? [{ ...r, op }] : []
+  })
+  const m = evaluate(sp, parsed, (d) => devices[d])
+  const writes = []
+  for (const n of Object.keys(who)) {
+    const c = m.cut.get(dev[n])
+    for (const seq of [...new Set([1, c ?? 5, (c ?? 5) + 1])].sort((a, b) => a - b))
+      writes.push({ identity: who[n], device: dev[n], seq, mayWrite: mayWrite(m, who[n], dev[n], seq) })
+  }
+  return {
+    name,
+    space: sp,
+    records,
+    labels: Object.fromEntries(records.map((r, i) => [log[i][0], r.id])),
+    result: {
+      owner: m.owner,
+      roles: sortObj(m.roles),
+      cut: sortObj(m.cut),
+      everWriter: [...m.everWriter].sort(),
+      revokedDevices: [...m.revokedDevices].sort(),
+      valid: m.valid,
+    },
+    manage: Object.fromEntries(Object.keys(who).map((n) => [who[n], mayManage(m, who[n])])),
+    writes,
+  }
+}
+
+const create = (nonce = 'n1', owner = who.owner) => ({ type: 'create', owner, nonce, name: 'Family' })
+const add = (n, role) => ({ type: 'add', identity: who[n], role })
+const cutOf = (n, seq) => ({ [dev[n]]: seq })
+const membership = [
+  membershipCase('create only', [['c', 'owner', create(), []]]),
+  membershipCase('create: wrong nonce for the space id', [['c', 'owner', create('other'), []]]),
+  membershipCase('create: signed by someone other than the owner', [['c', 'stranger', create(), []]]),
+  membershipCase('create: with parents', [['c0', 'owner', create(), []], ['c', 'owner', create(), ['c0']]]),
+  membershipCase('add: owner adds any role, admin adds writer/reader only', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'admin', add('writer', 'writer'), ['a1']],
+    ['a3', 'admin', add('admin2', 'admin'), ['a2']],
+    ['a4', 'writer', add('reader', 'reader'), ['a2']],
+    ['a5', 'admin', add('reader', 'reader'), ['a2']],
+  ]),
+  membershipCase('add: an existing member cannot be added again', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['a2', 'owner', add('writer', 'admin'), ['a1']],
+  ]),
+  membershipCase('add: needs the author to be in the state of its ancestors', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    // admin adds writer without having seen its own add op
+    ['a2', 'admin', add('writer', 'writer'), ['c']],
+  ]),
+  membershipCase('role: demote with a cut-off, admin may not touch admins', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('admin2', 'admin'), ['a1']],
+    ['a3', 'owner', add('writer', 'writer'), ['a2']],
+    ['r1', 'admin', { type: 'role', identity: who.writer, role: 'reader', cut: cutOf('writer', 7) }, ['a3']],
+    ['r2', 'admin', { type: 'role', identity: who.admin2, role: 'writer' }, ['a3']],
+    ['r3', 'admin', { type: 'role', identity: who.writer, role: 'admin' }, ['a3']],
+    ['r4', 'admin', { type: 'role', identity: who.owner, role: 'writer' }, ['a3']],
+  ]),
+  membershipCase('role: promoting back to writer lifts the cut-off', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['r1', 'owner', { type: 'role', identity: who.writer, role: 'reader', cut: cutOf('writer', 3) }, ['a1']],
+    ['r2', 'owner', { type: 'role', identity: who.writer, role: 'writer' }, ['r1']],
+  ]),
+  membershipCase('remove: cut-off applies, the owner cannot be removed', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('writer', 'writer'), ['a1']],
+    ['x1', 'admin', { type: 'remove', identity: who.writer, cut: cutOf('writer', 4) }, ['a2']],
+    ['x2', 'admin', { type: 'remove', identity: who.owner, cut: {} }, ['a2']],
+  ]),
+  membershipCase('remove: admin cannot remove an admin', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('admin2', 'admin'), ['a1']],
+    ['x1', 'admin', { type: 'remove', identity: who.admin2, cut: {} }, ['a2']],
+  ]),
+  membershipCase('remove wins over a concurrent role change', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('writer', 'reader'), ['a1']],
+    ['x1', 'owner', { type: 'remove', identity: who.writer, cut: cutOf('writer', 2) }, ['a2']],
+    ['r1', 'admin', { type: 'role', identity: who.writer, role: 'writer' }, ['a2']],
+  ]),
+  membershipCase('a re-add that has seen only one of two removals is overridden by the other', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('writer', 'writer'), ['a1']],
+    ['x1', 'owner', { type: 'remove', identity: who.writer, cut: cutOf('writer', 6) }, ['a2']],
+    ['x2', 'admin', { type: 'remove', identity: who.writer, cut: cutOf('writer', 8) }, ['a2']],
+    ['a3', 'admin', add('writer', 'reader'), ['x2']],
+  ]),
+  membershipCase('re-add after every removal', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['x1', 'owner', { type: 'remove', identity: who.writer, cut: cutOf('writer', 6) }, ['a1']],
+    ['a2', 'owner', add('writer', 'writer'), ['x1']],
+  ]),
+  membershipCase('concurrent removals combine cut-offs to the minimum', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['a2', 'owner', add('writer', 'writer'), ['a1']],
+    ['x1', 'owner', { type: 'remove', identity: who.writer, cut: cutOf('writer', 9) }, ['a2']],
+    ['x2', 'admin', { type: 'remove', identity: who.writer, cut: cutOf('writer', 5) }, ['a2']],
+  ]),
+  membershipCase('leave: members may leave, the owner may not', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['l1', 'writer', { type: 'leave', cut: cutOf('writer', 3) }, ['a1']],
+    ['l2', 'owner', { type: 'leave', cut: {} }, ['a1']],
+    ['l3', 'stranger', { type: 'leave', cut: {} }, ['a1']],
+  ]),
+  membershipCase('transfer: old owner becomes admin; only the owner, only to a member', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('admin', 'admin'), ['c']],
+    ['t1', 'owner', { type: 'transfer', identity: who.admin }, ['a1']],
+    ['t2', 'owner', { type: 'transfer', identity: who.admin }, ['t1']],
+    ['t3', 'admin', { type: 'transfer', identity: who.stranger }, ['t1']],
+    ['t4', 'owner', { type: 'transfer', identity: who.owner }, ['a1']],
+  ]),
+  membershipCase('revoke: any member relays a valid revocation', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['a2', 'owner', add('reader', 'reader'), ['a1']],
+    ['v1', 'reader', { type: 'revoke', revocation: revocation('writer', 'writer'), cut: {} }, ['a2']],
+    ['v2', 'stranger', { type: 'revoke', revocation: revocation('reader', 'reader'), cut: {} }, ['a2']],
+    ['v3', 'owner', { type: 'revoke', revocation: revocation('owner', 'owner'), cut: cutOf('owner', 10) }, ['a2']],
+  ]),
+  membershipCase('revoke: a forged revocation is not an op', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['v1', 'owner', { type: 'revoke', revocation: { ...revocation('writer', 'writer'), content: 'x' }, cut: {} }, ['a1']],
+  ]),
+  membershipCase('missing parents and cycles are not evaluated', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['missing']],
+    ['a2', 'owner', add('reader', 'reader'), ['c', 'loop2']],
+    ['loop2', 'owner', add('admin', 'admin'), ['a2']],
+    ['self', 'owner', add('admin2', 'admin'), ['self']],
+    ['a3', 'owner', add('admin', 'admin'), ['c', 'c']],
+  ]),
+  membershipCase('a writer that was never removed has no cut-off', [
+    ['c', 'owner', create(), []],
+    ['a1', 'owner', add('writer', 'writer'), ['c']],
+    ['a2', 'owner', add('reader', 'reader'), ['a1']],
+  ]),
+]
+
+const opShapes = [
+  [create(), true],
+  [{ type: 'create', owner: who.owner.toUpperCase(), nonce: 'n', name: 'x' }, false],
+  [{ type: 'create', owner: who.owner, nonce: 1, name: 'x' }, false],
+  [{ type: 'create', owner: who.owner, nonce: 'n' }, false],
+  [add('writer', 'writer'), true],
+  [add('writer', 'owner'), false],
+  [add('writer', 'boss'), false],
+  [{ type: 'add', identity: 'x', role: 'reader' }, false],
+  [{ type: 'role', identity: who.writer, role: 'reader' }, true],
+  [{ type: 'role', identity: who.writer, role: 'reader', cut: {} }, true],
+  [{ type: 'role', identity: who.writer, role: 'reader', cut: { [dev.writer]: -1 } }, false],
+  [{ type: 'role', identity: who.writer, role: 'reader', cut: null }, false],
+  [{ type: 'remove', identity: who.writer, cut: cutOf('writer', 3) }, true],
+  [{ type: 'remove', identity: who.writer }, false],
+  [{ type: 'remove', identity: who.writer, cut: { [dev.writer]: 1.5 } }, false],
+  [{ type: 'remove', identity: who.writer, cut: { [dev.writer]: 2 ** 53 } }, false],
+  [{ type: 'remove', identity: who.writer, cut: { [dev.writer]: 2 ** 53 - 1 } }, true],
+  [{ type: 'remove', identity: who.writer, cut: { short: 1 } }, false],
+  [{ type: 'remove', identity: who.writer, cut: [] }, true],
+  [{ type: 'remove', identity: who.writer, cut: [1] }, false],
+  [{ type: 'remove', identity: who.writer, cut: { [dev.writer]: '3' } }, false],
+  [{ type: 'leave', cut: {} }, true],
+  [{ type: 'leave' }, false],
+  [{ type: 'transfer', identity: who.admin }, true],
+  [{ type: 'transfer' }, false],
+  [{ type: 'revoke', revocation: revocation('writer', 'writer'), cut: {} }, true],
+  [{ type: 'revoke', revocation: { ...revocation('writer', 'writer'), kind: 1 }, cut: {} }, false],
+  [{ type: 'revoke', revocation: revocation('writer', 'writer') }, false],
+  [{ type: 'join', identity: who.admin }, false],
+  [[], false],
+  ['create', false],
+]
+for (const [op, valid] of opShapes)
+  if ((parseOp(op) !== null) !== valid) throw new Error(`op shape expectation is wrong: ${JSON.stringify(op)}`)
+
+write('membership', {
+  description:
+    'Membership evaluation (§5.1). Each case lists op records {id, identity, op, par}; records whose op does not parse are dropped (like sharing.ts) before evaluate(). `devices` maps device → identity for cut-off lifting. `writes` are mayWrite(identity, device, seq) and `manage` mayManage(identity) under the result.',
+  identities: who,
+  devices,
+  ops: opShapes.map(([op, valid]) => ({ op, valid })),
+  cases: membership,
 })
 
 console.log(`wrote ${out}`)

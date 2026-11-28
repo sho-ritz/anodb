@@ -11,7 +11,8 @@ use anodb_protocol::merge::Cells;
 use anodb_protocol::nip44;
 use anodb_protocol::policy::{Role, TableRule, change_allowed};
 use anodb_protocol::{
-    Change, EpochKey, Event, Secret, StreamPayload, npub, open_space, parse_pubkey,
+    Change, EpochKey, Event, Membership, OpRecord, Secret, StreamPayload, evaluate, npub,
+    open_space, parse_op, parse_pubkey,
 };
 use serde_json::Value;
 
@@ -275,6 +276,115 @@ fn policy() {
             c["allowed"].as_bool().unwrap(),
             "{c}"
         );
+    }
+}
+
+#[test]
+fn membership_ops() {
+    for c in load("membership")["ops"].as_array().unwrap() {
+        assert_eq!(
+            parse_op(&c["op"]).is_some(),
+            c["valid"].as_bool().unwrap(),
+            "{}",
+            c["op"]
+        );
+    }
+}
+
+#[test]
+fn membership() {
+    let v = load("membership");
+    let devices: HashMap<String, String> = v["devices"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(d, i)| (d.clone(), s(i).to_owned()))
+        .collect();
+    let ids = |v: &Value| -> Vec<String> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| s(x).to_owned())
+            .collect()
+    };
+    for c in cases(&v) {
+        let name = s(&c["name"]);
+        let records: Vec<OpRecord> = c["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| {
+                Some(OpRecord {
+                    id: s(&r["id"]).into(),
+                    identity: s(&r["identity"]).into(),
+                    op: parse_op(&r["op"])?,
+                    par: ids(&r["par"]),
+                })
+            })
+            .collect();
+        let check = |m: &Membership, how: &str| {
+            let res = &c["result"];
+            assert_eq!(
+                m.owner.as_deref(),
+                res["owner"].as_str(),
+                "{name}{how}: owner"
+            );
+            let roles: HashMap<&str, &str> = m
+                .roles
+                .iter()
+                .map(|(k, r)| (k.as_str(), r.as_str()))
+                .collect();
+            let want: HashMap<&str, &str> = res["roles"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(k, r)| (k.as_str(), s(r)))
+                .collect();
+            assert_eq!(roles, want, "{name}{how}: roles");
+            let cut: Vec<(String, u64)> = m.cut.iter().map(|(k, v)| (k.clone(), *v)).collect();
+            let want: Vec<(String, u64)> = res["cut"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_u64().unwrap()))
+                .collect();
+            assert_eq!(cut, want, "{name}{how}: cut");
+            assert_eq!(
+                m.ever_writer.iter().cloned().collect::<Vec<_>>(),
+                ids(&res["everWriter"]),
+                "{name}{how}: everWriter"
+            );
+            assert_eq!(
+                m.revoked_devices.iter().cloned().collect::<Vec<_>>(),
+                ids(&res["revokedDevices"]),
+                "{name}{how}: revokedDevices"
+            );
+            assert_eq!(m.valid, ids(&res["valid"]), "{name}{how}: valid");
+            for w in c["writes"].as_array().unwrap() {
+                assert_eq!(
+                    m.may_write(
+                        s(&w["identity"]),
+                        s(&w["device"]),
+                        w["seq"].as_u64().unwrap()
+                    ),
+                    w["mayWrite"].as_bool().unwrap(),
+                    "{name}{how}: {w}"
+                );
+            }
+            for (who, ok) in c["manage"].as_object().unwrap() {
+                assert_eq!(
+                    m.may_manage(who),
+                    ok.as_bool().unwrap(),
+                    "{name}{how}: manage"
+                );
+            }
+        };
+        let lookup = |d: &str| devices.get(d).cloned();
+        check(&evaluate(s(&c["space"]), &records, lookup), "");
+        // The result does not depend on the order in which ops arrived.
+        let mut rev = records.clone();
+        rev.reverse();
+        check(&evaluate(s(&c["space"]), &rev, lookup), " (reversed)");
     }
 }
 
