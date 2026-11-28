@@ -1,5 +1,5 @@
 {
-  "description": "Snapshots (§5.4). assembleSnapshots(messages) groups `snap` messages by device + sid and keeps complete ones (cells: arrays of 5, or 6 with a hex signer; heads: safe integers). `trust`: snapshotTrusted(membership, me, snapshot) and, when trusted, the cells merged (cells naming a signer pass the row rule for it; schema: plain, mine = owned). `tombstones`: snapshotCells keeps only the $deleted cell of deleted rows.",
+  "description": "Snapshots (§5.4). assembleSnapshots(messages) groups `snap` messages by device + sid and keeps complete ones (cells: arrays of 5, or 6 with a hex signer; heads: safe integers). `trust`: snapshotTrusted(membership, me, snapshot) and, when trusted, the cells merged (cells naming a signer pass the row rule for it; cells of `booked`, confirmed by the admin, count only in snapshots by the admin). `tombstones`: snapshotCells keeps only the $deleted cell of deleted rows.",
   "space": "f6f50f5a31c5533b6bba52030f800888",
   "memberships": {
     "base": [
@@ -116,7 +116,7 @@
             "content": "",
             "pubkey": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
             "id": "73db18ba68db60f417d9eb1245abf4f79aa37e5bc1f8d5261002c8975ac6535b",
-            "sig": "2e3e267871271a6b553300cc91702127ae9c284581fd1cb346f03705bd303773495d3a9a9639ea3bd4fe27851a77d0904c42c58a4354e8a5b87ef33d58a94644"
+            "sig": "f549f5aa0252ff90171b301f34623459c8d97034b8f9d6aa3286aa74952d4ba7219fef9582e8b856fc4967939d1b115379c102c5725fc57f41b31a5abbe5dfa4"
           },
           "cut": {
             "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e": 150
@@ -130,7 +130,8 @@
   },
   "tables": {
     "plain": "plain",
-    "mine": "owned"
+    "mine": "owned",
+    "booked": "confirmed by the admin"
   },
   "cases": [
     {
@@ -140,7 +141,7 @@
           "device": "c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c",
           "identity": "100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386",
           "seq": 100,
-          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":100,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c\"]],\"content\":\"{\\\"name\\\":\\\"admin\\\"}\",\"pubkey\":\"100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386\",\"id\":\"37e0916cacc258d4501db5ea841b87ce1417cf36ad1a8d443c9dc9a057f651ae\",\"sig\":\"516bd6d0d17fbea9641524d41de96b5b08cf2acd1c01229a1bd603651b86b62d7b83d879d56110cb6ada348e83b0b0701212c10996bd6f0a03fc1bcf4b64301c\"},\"sid\":\"s1\",\"i\":1,\"n\":2,\"body\":{\"cells\":[[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"title\",\"owner row, claimed by writer\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3\"],[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"note\",\"owner row, signed by owner\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\"],[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"title\",\"x\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"not-hex\"],[\"short\",\"r\",\"c\",1],[1,2,3,4,5],[\"$sys\",\"r\",\"c\",1,\"000000000500000-aaaaaaaaaaaaaaaa\"],[\"plain\",\"r\",\"title\",1,\"not an hlc\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\"]]}}"
+          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":100,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c\"]],\"content\":\"{\\\"name\\\":\\\"admin\\\"}\",\"pubkey\":\"100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386\",\"id\":\"37e0916cacc258d4501db5ea841b87ce1417cf36ad1a8d443c9dc9a057f651ae\",\"sig\":\"516bd6d0d17fbea9641524d41de96b5b08cf2acd1c01229a1bd603651b86b62d7b83d879d56110cb6ada348e83b0b0701212c10996bd6f0a03fc1bcf4b64301c\"},\"sid\":\"s1\",\"i\":1,\"n\":2,\"body\":{\"cells\":[[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"title\",\"owner row, claimed by writer\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3\"],[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"note\",\"owner row, signed by owner\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\"],[\"mine\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732-r1\",\"title\",\"x\",\"000000000500000-aaaaaaaaaaaaaaaa\",\"not-hex\"],[\"short\",\"r\",\"c\",1],[1,2,3,4,5],[\"$sys\",\"r\",\"c\",1,\"000000000500000-aaaaaaaaaaaaaaaa\"],[\"plain\",\"r\",\"title\",1,\"not an hlc\",\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\"],[\"booked\",\"slot1\",\"title\",\"taken\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
         },
         {
           "device": "c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c",
@@ -170,6 +171,13 @@
               "owner row, signed by owner",
               "000000000500000-aaaaaaaaaaaaaaaa",
               "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732"
+            ],
+            [
+              "booked",
+              "slot1",
+              "title",
+              "taken",
+              "000000000500000-aaaaaaaaaaaaaaaa"
             ],
             [
               "plain",
@@ -293,19 +301,13 @@
       ]
     },
     {
-      "name": "same sid from two devices",
+      "name": "from the owner, restating a confirmed cell",
       "messages": [
         {
           "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
           "identity": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
           "seq": 109,
-          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":109,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"634dee11c94c1df972d44c6d6ef9094727b8a4f898f8b2b791bb589e8661bf10bedbf6d04906bcbb3110a534b82ad7b9c52f6e7e0666ed805a3a2f08157cba0a\"},\"sid\":\"s7\",\"i\":0,\"n\":1,\"body\":{\"cells\":[]}}"
-        },
-        {
-          "device": "c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c",
-          "identity": "100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386",
-          "seq": 110,
-          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":110,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c\"]],\"content\":\"{\\\"name\\\":\\\"admin\\\"}\",\"pubkey\":\"100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386\",\"id\":\"37e0916cacc258d4501db5ea841b87ce1417cf36ad1a8d443c9dc9a057f651ae\",\"sig\":\"e38605e7434a83385539bc7e99f754ad7a37392b4097b4c09dccda82c786d34e1bebbbb3ee25836f8102b4e09b6c9c51057dbf2beaaef85ee3e3293936ec5acb\"},\"sid\":\"s7\",\"i\":0,\"n\":1,\"body\":{\"cells\":[]}}"
+          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":109,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"634dee11c94c1df972d44c6d6ef9094727b8a4f898f8b2b791bb589e8661bf10bedbf6d04906bcbb3110a534b82ad7b9c52f6e7e0666ed805a3a2f08157cba0a\"},\"sid\":\"s10\",\"i\":0,\"n\":1,\"body\":{\"cells\":[[\"booked\",\"slot1\",\"title\",\"forged\",\"000000000500000-aaaaaaaaaaaaaaaa\"],[\"plain\",\"free\",\"title\",\"a\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
         }
       ],
       "assembled": [
@@ -313,13 +315,54 @@
           "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
           "author": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
           "last": 109,
+          "cells": [
+            [
+              "booked",
+              "slot1",
+              "title",
+              "forged",
+              "000000000500000-aaaaaaaaaaaaaaaa"
+            ],
+            [
+              "plain",
+              "free",
+              "title",
+              "a",
+              "000000000500000-aaaaaaaaaaaaaaaa"
+            ]
+          ],
+          "heads": {}
+        }
+      ]
+    },
+    {
+      "name": "same sid from two devices",
+      "messages": [
+        {
+          "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
+          "identity": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
+          "seq": 110,
+          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":110,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"d50b44b9b66b4ce8ae6c735fa340a53c56107005bc874c0a3aba7f72b157873424fee4ff653dc9197c188d36dd63c2e111a429bba3bf4b918ad423515efbb201\"},\"sid\":\"s7\",\"i\":0,\"n\":1,\"body\":{\"cells\":[]}}"
+        },
+        {
+          "device": "c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c",
+          "identity": "100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386",
+          "seq": 111,
+          "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":111,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c\"]],\"content\":\"{\\\"name\\\":\\\"admin\\\"}\",\"pubkey\":\"100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386\",\"id\":\"37e0916cacc258d4501db5ea841b87ce1417cf36ad1a8d443c9dc9a057f651ae\",\"sig\":\"1e4891e2a2ef1e4f12a3f00acc3a70ca4a07ff140a6af121be9490cd66ea390ae68cfccad1fad22c66143593a63be2f1bd3363b2b7d35b8edb6f10f4a0492afe\"},\"sid\":\"s7\",\"i\":0,\"n\":1,\"body\":{\"cells\":[]}}"
+        }
+      ],
+      "assembled": [
+        {
+          "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
+          "author": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
+          "last": 110,
           "cells": [],
           "heads": {}
         },
         {
           "device": "c3eae8e63038b86b8434c115669e3bed2ad988abd11c434dba9f1b1911596a2c",
           "author": "100300ca8d4ccdd7cbef3e962312a3e6b1a2fdb57773b3e70b44633832b18386",
-          "last": 110,
+          "last": 111,
           "cells": [],
           "heads": {}
         }
@@ -343,6 +386,13 @@
           "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732"
         ],
         [
+          "booked",
+          "slot1",
+          "title",
+          "taken",
+          "000000000500000-aaaaaaaaaaaaaaaa"
+        ],
+        [
           "plain",
           "free",
           "title",
@@ -373,6 +423,13 @@
           "owner row, signed by owner",
           "000000000500000-aaaaaaaaaaaaaaaa",
           "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732"
+        ],
+        [
+          "booked",
+          "slot1",
+          "title",
+          "taken",
+          "000000000500000-aaaaaaaaaaaaaaaa"
         ],
         [
           "plain",
@@ -433,6 +490,38 @@
     },
     {
       "membership": "base",
+      "snapshot": "from the owner, restating a confirmed cell",
+      "index": 0,
+      "me": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
+      "trusted": true,
+      "changes": [
+        [
+          "plain",
+          "free",
+          "title",
+          "a",
+          "000000000500000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "membership": "base",
+      "snapshot": "from the owner, restating a confirmed cell",
+      "index": 0,
+      "me": "fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3",
+      "trusted": true,
+      "changes": [
+        [
+          "plain",
+          "free",
+          "title",
+          "a",
+          "000000000500000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "membership": "base",
       "snapshot": "same sid from two devices",
       "index": 0,
       "me": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
@@ -477,6 +566,13 @@
           "owner row, signed by owner",
           "000000000500000-aaaaaaaaaaaaaaaa",
           "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732"
+        ],
+        [
+          "booked",
+          "slot1",
+          "title",
+          "taken",
+          "000000000500000-aaaaaaaaaaaaaaaa"
         ],
         [
           "plain",
@@ -509,6 +605,13 @@
           "owner row, signed by owner",
           "000000000500000-aaaaaaaaaaaaaaaa",
           "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732"
+        ],
+        [
+          "booked",
+          "slot1",
+          "title",
+          "taken",
+          "000000000500000-aaaaaaaaaaaaaaaa"
         ],
         [
           "plain",
@@ -566,6 +669,38 @@
       "me": "fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3",
       "trusted": true,
       "changes": []
+    },
+    {
+      "membership": "owner's device revoked, cut-off 150",
+      "snapshot": "from the owner, restating a confirmed cell",
+      "index": 0,
+      "me": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
+      "trusted": true,
+      "changes": [
+        [
+          "plain",
+          "free",
+          "title",
+          "a",
+          "000000000500000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
+    },
+    {
+      "membership": "owner's device revoked, cut-off 150",
+      "snapshot": "from the owner, restating a confirmed cell",
+      "index": 0,
+      "me": "fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3",
+      "trusted": true,
+      "changes": [
+        [
+          "plain",
+          "free",
+          "title",
+          "a",
+          "000000000500000-aaaaaaaaaaaaaaaa"
+        ]
+      ]
     },
     {
       "membership": "owner's device revoked, cut-off 150",
@@ -606,7 +741,7 @@
         "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
         "identity": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
         "seq": 150,
-        "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":150,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"d61a611076941dee358af9f55e2d3e4ef7b149917daaab2e2cc4e1b3b6956a594946992253a6b3cd5778b9ec30c787e2ab84f1037c071cb9a32fce07ff0927d2\"},\"sid\":\"cut150\",\"i\":0,\"n\":1,\"body\":{\"cells\":[[\"plain\",\"free\",\"title\",\"a\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
+        "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":150,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"f54dfe81f3a9c07cf48eb334de6a017476b555f4370043a4982631245dd5def7948f8763be3cc18dd53c4dc0a07fa9995190dea7e9008462511aff11dc189ac5\"},\"sid\":\"cut150\",\"i\":0,\"n\":1,\"body\":{\"cells\":[[\"plain\",\"free\",\"title\",\"a\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
       },
       "index": 0,
       "me": "fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3",
@@ -628,7 +763,7 @@
         "device": "e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e",
         "identity": "17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732",
         "seq": 151,
-        "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":151,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"f54dfe81f3a9c07cf48eb334de6a017476b555f4370043a4982631245dd5def7948f8763be3cc18dd53c4dc0a07fa9995190dea7e9008462511aff11dc189ac5\"},\"sid\":\"cut151\",\"i\":0,\"n\":1,\"body\":{\"cells\":[[\"plain\",\"free\",\"title\",\"a\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
+        "payload": "{\"v\":2,\"t\":\"snap\",\"sp\":\"f6f50f5a31c5533b6bba52030f800888\",\"ep\":\"bef793c4b755eee1\",\"seq\":151,\"dlg\":{\"kind\":7304,\"created_at\":1790000000,\"tags\":[[\"device\",\"e02939eae9ddd8b9a5541c66d07aabf5ac42068675d1638802594246aa74184e\"]],\"content\":\"{\\\"name\\\":\\\"owner\\\"}\",\"pubkey\":\"17da735eec146b3ca6234d711bfcb8d3682dcfa3771b5d3680414e03b5d54732\",\"id\":\"1e82bb347d985d77681fc8f4a770b0ebb93db6465a51a263d7eb4ffdeff22912\",\"sig\":\"6f09ca1a98dbbb99e1adefa3a7464ec2fd11424ed15d9f14cfb7d5dc4680bf0f4a8a7420bd6b9a873250a7f89f6b74bf1b5641762d500e577288c1e345eabedb\"},\"sid\":\"cut151\",\"i\":0,\"n\":1,\"body\":{\"cells\":[[\"plain\",\"free\",\"title\",\"a\",\"000000000500000-aaaaaaaaaaaaaaaa\"]]}}"
       },
       "index": 0,
       "me": "fc33e9539a9c7567bdb39eabb5a127610d7faca3a7effaf9d27e5895c703bcf3",

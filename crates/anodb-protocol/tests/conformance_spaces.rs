@@ -187,8 +187,13 @@ fn cells(v: &Value) -> Vec<Value> {
 #[test]
 fn snapshots() {
     let v = load("snapshots");
-    let rules: HashMap<&str, TableRule> =
-        [("plain", TableRule::Plain), ("mine", TableRule::Owned)].into();
+    let admin = s(&load("direct")["membership"][1]["op"]["identity"]).to_owned();
+    let rules: HashMap<&str, TableRule> = [
+        ("plain", TableRule::Plain),
+        ("mine", TableRule::Owned),
+        ("booked", TableRule::Confirmed { authority: admin }),
+    ]
+    .into();
     let memberships: HashMap<&str, Membership> = v["memberships"]
         .as_object()
         .unwrap()
@@ -243,7 +248,7 @@ fn snapshots() {
 
 #[test]
 fn snapshot_confirmed_tables() {
-    // anoDB PR #8: cells of a confirmed table count only in a snapshot by the table's authority.
+    // Also covered by snapshots.json (table "booked"); this checks the rule in isolation.
     let server = "a".repeat(64);
     let rule = TableRule::Confirmed {
         authority: server.clone(),

@@ -259,8 +259,17 @@ fn merge() {
 #[test]
 fn policy() {
     let v = load("policy");
-    let rules: HashMap<&str, TableRule> =
-        [("plain", TableRule::Plain), ("mine", TableRule::Owned)].into();
+    let rules: HashMap<&str, TableRule> = [
+        ("plain", TableRule::Plain),
+        ("mine", TableRule::Owned),
+        (
+            "booked",
+            TableRule::Confirmed {
+                authority: s(&v["other"]).into(),
+            },
+        ),
+    ]
+    .into();
     for c in cases(&v) {
         let change = Change {
             table: s(&c["table"]).into(),
@@ -390,7 +399,7 @@ fn membership() {
 
 #[test]
 fn confirmed_tables() {
-    // Not in the TypeScript main line yet (anoDB PR #8): only the authority may write, whatever the role.
+    // Also covered by policy.json (table "booked"); this checks other rows and roles directly.
     let server = "a".repeat(64);
     let other = "b".repeat(64);
     let rule = TableRule::Confirmed {

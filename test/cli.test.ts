@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { type Prompter, copySqlJsAssets, detectEnv, runInit, wireProvider } from '../src/cli/init.js'
-import { createAnoDB, defineSchema } from '../src/index.js'
+import { type Prompter, copySqlJsAssets, detectDatabase, detectEnv, runInit, wireProvider } from '../src/cli/init.js'
+import { PGlite } from '@electric-sql/pglite'
+import { createAnoDB, defineSchema, pgliteDriver } from '../src/index.js'
 import { envKeyStore } from '../src/keystore/env.js'
 import { nodeSqlite } from '../src/node.js'
 import { onCleanup } from './helpers/setup.js'
@@ -35,12 +36,13 @@ describe('anodb init', () => {
   it('asks the language first and then speaks it (interactive, Node)', async () => {
     const cwd = tmp()
     writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'my-bot' }))
-    // lang=ja, env=node(4), appId, new identity(0), device name, default relays(0), no check, no install
-    const s = scripted([0, 4, 'my-bot', 0, 'bot-1', 0, false, false])
+    // lang=ja, env=node(4), db=SQLite(0), appId, new identity(0), device name, default relays(0), no check, no install
+    const s = scripted([0, 4, 0, 'my-bot', 0, 'bot-1', 0, false, false])
     const res = await runInit({}, { cwd, prompter: s.p, env: { LANG: 'en_US.UTF-8' } })
     expect(s.questions[0]).toBe('Language / 言語')
     expect(s.questions[1]).toBe('実行環境は？')
-    expect(res).toMatchObject({ env: 'node', appId: 'my-bot' })
+    expect(s.questions[2]).toBe('データベースは？')
+    expect(res).toMatchObject({ env: 'node', db: 'sqlite', appId: 'my-bot' })
     expect(res.recoveryKey).toMatch(/^nsec1/)
     expect(s.log.join('\n')).toContain(res.recoveryKey!)
 
@@ -150,5 +152,63 @@ describe('anodb init', () => {
     expect(out).toMatch(/✔ wss:\/\/good\.example/)
     expect(out).toMatch(/✖ wss:\/\/bad\.example/)
     expect(readFileSync(join(cwd, 'src/anodb/db.js'), 'utf8')).toContain('expo-secure-store')
+  })
+
+  it('sets up PGlite (Postgres) for a Node server', async () => {
+    const cwd = tmp()
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'api' }))
+    writeFileSync(join(cwd, 'tsconfig.json'), '{}')
+    const installs: string[][] = []
+    const s = scripted([])
+    const res = await runInit(
+      { yes: true, lang: 'en', env: 'node', db: 'pglite', install: true },
+      { cwd, prompter: s.p, install: async (pm, pkgs) => void installs.push([pm, ...pkgs]) },
+    )
+    expect(res).toMatchObject({ env: 'node', db: 'pglite' })
+    expect(installs).toEqual([['npm', '@anodb/core', '@electric-sql/pglite']])
+    const dbTs = readFileSync(join(cwd, 'src/anodb/db.ts'), 'utf8')
+    expect(dbTs).toContain("import { PGlite } from '@electric-sql/pglite'")
+    expect(dbTs).toContain('export const pg = await PGlite.create(')
+    expect(dbTs).toContain('driver: pgliteDriver(pg)')
+    expect(dbTs).not.toContain('nodeSqlite')
+    const ignore = readFileSync(join(cwd, '.gitignore'), 'utf8')
+    expect(ignore).toContain('.env')
+    expect(ignore).toContain('anodb-pgdata/')
+    expect(s.log.join('\n')).toContain('Driver: PGlite (Postgres, WASM)')
+
+    // the generated keys open a PGlite database
+    const dotenv = readFileSync(join(cwd, '.env'), 'utf8')
+    const vars = Object.fromEntries(dotenv.trim().split('\n').map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+    const db = await createAnoDB({ appId: vars.ANODB_APP_ID!, schema: defineSchema({ t: { a: 'text' } }), driver: pgliteDriver(await PGlite.create()), keyStore: envKeyStore(vars), relays: [] })
+    onCleanup(() => db.close())
+    await db.insertInto('t').values({ a: 'hello' }).execute()
+    expect(await db.selectFrom('t').select('a').execute()).toEqual([{ a: 'hello' }])
+  })
+
+  it('offers PGlite by default when the project already uses Postgres tooling (Prisma)', async () => {
+    const cwd = tmp()
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'api', dependencies: { '@prisma/client': '6' } }))
+    expect(detectDatabase(cwd)).toBe('pglite')
+    // lang=en, env=node, db: default (detected), …
+    const s = scripted([1, 4, 1, 'api', 0, 'server', 0, false, false])
+    const res = await runInit({}, { cwd, prompter: s.p, env: {} })
+    expect(s.questions[2]).toBe('Database?')
+    expect(res.db).toBe('pglite')
+  })
+
+  it('PGlite in the Electron main process; other environments keep SQLite', async () => {
+    const cwd = tmp()
+    const res = await runInit({ yes: true, lang: 'en', env: 'electron', framework: 'react', db: 'pglite' }, { cwd, prompter: scripted([]).p })
+    expect(res.packages).toEqual(['@anodb/core', '@electric-sql/pglite'])
+    const dbJs = readFileSync(join(cwd, 'src/anodb/db.js'), 'utf8')
+    expect(dbJs).toContain("pgliteDriver(await PGlite.create(join(dir, 'pgdata')))")
+    expect(dbJs).toContain('electronKeyStore(safeStorage')
+
+    const expo = tmp()
+    const s = scripted([])
+    const r2 = await runInit({ yes: true, lang: 'en', env: 'expo', db: 'pglite' }, { cwd: expo, prompter: s.p })
+    expect(r2.db).toBe('sqlite')
+    expect(s.log.join('\n')).toContain('only available for Node / Electron')
+    expect(readFileSync(join(expo, 'src/anodb/db.js'), 'utf8')).toContain('expoSqliteDriver')
   })
 })

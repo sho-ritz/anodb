@@ -40,7 +40,7 @@ import {
 import { evaluate, mayManage, mayWrite, parseOp, spaceIdFor } from '../dist/membership.js'
 import { changeAllowed } from '../dist/policy.js'
 import { MESSAGE_KIND, TAG, WRAP_KIND, isChange, parseStreamPayload } from '../dist/protocol.js'
-import { owned } from '../dist/schema.js'
+import { confirmed, owned } from '../dist/schema.js'
 
 const out = join(dirname(fileURLToPath(import.meta.url)), 'v2')
 mkdirSync(out, { recursive: true })
@@ -294,7 +294,7 @@ write('merge', {
 })
 
 // ---- row rule -------------------------------------------------------------------------
-const schema = { plain: { title: 'text' }, mine: owned({ title: 'text' }) }
+const schema = { plain: { title: 'text' }, mine: owned({ title: 'text' }), booked: confirmed({ title: 'text' }, { by: other }) }
 const rows = { byWriter: `${identity}-r1`, byOther: `${other}-r1`, identityOnly: identity, noCreator: 'customid' }
 const policy = []
 for (const table of ['plain', 'mine', 'unknown'])
@@ -304,11 +304,20 @@ for (const table of ['plain', 'mine', 'unknown'])
         const change = [table, rowId, column, column === '$deleted' ? true : 'v', h(1, 0, A)]
         policy.push({ table, row: rowKind, rowId, column, writer: identity, role, allowed: changeAllowed(schema, change, identity, role ?? undefined) })
       }
+// confirmed(): only the authority (`other`) may write, whatever the role.
+for (const writer of [identity, other])
+  for (const [rowKind, rowId] of Object.entries(rows))
+    for (const column of ['title', '$createdAt', '$deleted'])
+      for (const role of ['owner', 'writer', null]) {
+        const change = ['booked', rowId, column, column === '$deleted' ? true : 'v', h(1, 0, A)]
+        policy.push({ table: 'booked', row: rowKind, rowId, column, writer, role, allowed: changeAllowed(schema, change, writer, role ?? undefined) })
+      }
 write('policy', {
-  description: 'Row rule (§4.1) for writer = identity. Tables: plain, owned ("mine"), and a table the schema does not know ("unknown").',
+  description:
+    'Row rule (§4.1). Tables: plain, owned ("mine"), confirmed by `other` ("booked"), and a table the schema does not know ("unknown"). Cases name their writer.',
   identity,
   other,
-  tables: { plain: 'plain', mine: 'owned', unknown: 'not in schema' },
+  tables: { plain: 'plain', mine: 'owned', booked: 'confirmed by other', unknown: 'not in schema' },
   cases: policy,
 })
 
@@ -673,6 +682,7 @@ const snapCells = [
   [1, 2, 3, 4, 5],
   ['$sys', 'r', 'c', 1, h(5, 0, A)],
   ['plain', 'r', 'title', 1, 'not an hlc', who.owner],
+  cell('booked', 'slot1', 'title', 'taken'),
 ]
 const snapshotSets = [
   ['complete, two parts, from an admin', [
@@ -684,13 +694,14 @@ const snapshotSets = [
   ['parts disagree on n', [snapMsg('admin', 's4', 0, 2, { cells: [] }), snapMsg('admin', 's4', 1, 3, { cells: [] })]],
   ['from a writer', [snapMsg('writer', 's5', 0, 1, { cells: [snapCells[0]], heads: [4] })]],
   ['from the owner, no cells array', [snapMsg('owner', 's6', 0, 1, { cells: 'x' })]],
+  ['from the owner, restating a confirmed cell', [snapMsg('owner', 's10', 0, 1, { cells: [cell('booked', 'slot1', 'title', 'forged'), snapCells[0]] })]],
   ['same sid from two devices', [snapMsg('owner', 's7', 0, 1, { cells: [] }), snapMsg('admin', 's7', 0, 1, { cells: [] })]],
 ]
 // The owner's device is revoked: its snapshots count only up to the cut-off (the role stays).
 const CUT_LABEL = "owner's device revoked, cut-off 150"
 const removedLog = [...baseLog, ['v1', 'owner', { type: 'revoke', revocation: revocation('owner', 'owner'), cut: cutOf('owner', 150) }, ['a3']]]
 const mRemoved = evalLog(removedLog)
-const snapSchema = { plain: { title: 'text' }, mine: owned({ title: 'text', note: 'text' }) }
+const snapSchema = { plain: { title: 'text' }, mine: owned({ title: 'text', note: 'text' }), booked: confirmed({ title: 'text' }, { by: who.admin }) }
 const snapshots = snapshotSets.map(([name, messages]) => ({
   name,
   messages,
@@ -720,10 +731,10 @@ const tomb = [
 ]
 write('snapshots', {
   description:
-    'Snapshots (§5.4). assembleSnapshots(messages) groups `snap` messages by device + sid and keeps complete ones (cells: arrays of 5, or 6 with a hex signer; heads: safe integers). `trust`: snapshotTrusted(membership, me, snapshot) and, when trusted, the cells merged (cells naming a signer pass the row rule for it; schema: plain, mine = owned). `tombstones`: snapshotCells keeps only the $deleted cell of deleted rows.',
+    'Snapshots (§5.4). assembleSnapshots(messages) groups `snap` messages by device + sid and keeps complete ones (cells: arrays of 5, or 6 with a hex signer; heads: safe integers). `trust`: snapshotTrusted(membership, me, snapshot) and, when trusted, the cells merged (cells naming a signer pass the row rule for it; cells of `booked`, confirmed by the admin, count only in snapshots by the admin). `tombstones`: snapshotCells keeps only the $deleted cell of deleted rows.',
   space: mSpace,
   memberships: { base: baseOps, [CUT_LABEL]: removedLog.map(([label, author, op, par]) => ({ id: opId(label), identity: who[author], op, par: par.map(opId) })) },
-  tables: { plain: 'plain', mine: 'owned' },
+  tables: { plain: 'plain', mine: 'owned', booked: 'confirmed by the admin' },
   cases: snapshots,
   trust,
   tombstones: { cells: tomb, result: snapshotCells(tomb) },

@@ -66,8 +66,8 @@ describe('sharing (v0.3)', () => {
     await until(async () => (await titles(alice, space)).includes('visible'))
     await expect(alice.insertInto('todo').values({ title: 'nope', space }).execute()).rejects.toThrow(/no write permission/)
     // bypass the local check: the owner still rejects the forged write
-    const a = alice as unknown as { store: { transaction<T>(f: () => T): T }; sendToSpace(s: string, t: string, b: object): void; clock: { tick(): string } }
-    a.store.transaction(() => a.sendToSpace(space, 'ch', { c: [['todo', 'forged', 'title', 'forged', a.clock.tick()]] }))
+    const a = alice as unknown as { store: { transaction<T>(f: (s: unknown) => Promise<T>): Promise<T> }; sendToSpace(s: unknown, sp: string, t: string, b: object): Promise<unknown>; clock: { tick(): string } }
+    await a.store.transaction((s) => a.sendToSpace(s, space, 'ch', { c: [['todo', 'forged', 'title', 'forged', a.clock.tick()]] }))
     await alice.flush()
     await sleep(300)
     expect(await titles(owner, space)).toEqual(['visible'])

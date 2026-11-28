@@ -1,10 +1,11 @@
 {
-  "description": "Row rule (§4.1) for writer = identity. Tables: plain, owned (\"mine\"), and a table the schema does not know (\"unknown\").",
+  "description": "Row rule (§4.1). Tables: plain, owned (\"mine\"), confirmed by `other` (\"booked\"), and a table the schema does not know (\"unknown\"). Cases name their writer.",
   "identity": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
   "other": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
   "tables": {
     "plain": "plain",
     "mine": "owned",
+    "booked": "confirmed by other",
     "unknown": "not in schema"
   },
   "cases": [
@@ -1301,6 +1302,654 @@
       "rowId": "customid",
       "column": "$deleted",
       "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "owner",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": "writer",
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "role": null,
+      "allowed": false
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byWriter",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "byOther",
+      "rowId": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e-r1",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "identityOnly",
+      "rowId": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "title",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$createdAt",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": null,
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "owner",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "role": "writer",
+      "allowed": true
+    },
+    {
+      "table": "booked",
+      "row": "noCreator",
+      "rowId": "customid",
+      "column": "$deleted",
+      "writer": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
       "role": null,
       "allowed": true
     }

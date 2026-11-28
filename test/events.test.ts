@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineSchema } from '../src/index.js'
+import { defineSchema, sql } from '../src/index.js'
 import type { SpaceEvent } from '../src/index.js'
 import { until } from './helpers/mock-relay.js'
 import { open, relay, sleep } from './helpers/setup.js'
@@ -39,7 +39,8 @@ describe('ephemeral events', () => {
     await sleep(200)
     expect(gotB).toHaveLength(1) // b does not hear its own event
     // nothing reached the database
-    expect(await a.execute('SELECT COUNT(*) AS n FROM anodb_messages WHERE type NOT IN (?, ?)', ['op', 'snap'])).toEqual([{ n: 0 }])
+    const { rows } = await sql<{ n: number }>`SELECT COUNT(*) AS n FROM anodb_messages WHERE type NOT IN (${'op'}, ${'snap'})`.execute(a.db)
+    expect(rows.map((r) => Number(r.n))).toEqual([0])
   })
 
   it('outsiders can neither send to nor read a space', async () => {

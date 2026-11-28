@@ -31,7 +31,8 @@ import {
 } from './membership.js'
 import { type Change, type InboxPayload, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, isChange, parseInboxPayload, parseStreamPayload } from './protocol.js'
 import { changeAllowed } from './policy.js'
-import { SYS_DELETED } from './schema.js'
+import { SYS_DELETED, authorityOf } from './schema.js'
+import type { Store } from './store.js'
 import type { IngestResult } from './sync.js'
 import type { NostrEvent, SchemaDefinition } from './types.js'
 
@@ -179,9 +180,15 @@ export function snapshotTrusted(m: Membership, me: string, s: AssembledSnapshot)
   return s.author === me || role === 'owner' || role === 'admin'
 }
 
-/** Cells of a trusted snapshot to merge: cells that name their signer must pass the row rule for it. */
+/**
+ * Cells of a trusted snapshot to merge: cells that name their signer must pass the row rule for it,
+ * and cells of a confirmed() table count only in a snapshot by its authority.
+ */
 export function snapshotChanges(schema: SchemaDefinition, m: Membership, s: AssembledSnapshot): Change[] {
   return s.cells.filter((c) => {
+    // A snapshot restates `by`, so it cannot vouch for a confirmed() cell unless the authority signed it.
+    const authority = authorityOf(schema[c[0]])
+    if (authority) return s.author === authority
     const by = (c as readonly unknown[])[5]
     return typeof by !== 'string' || changeAllowed(schema, c, by, m.roles.get(by))
   })
@@ -226,33 +233,29 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   #pairing: { secret: string; resolve: () => void; promise: Promise<void> } | null = null
 
   protected override async afterInit(): Promise<void> {
-    this.store.putDevice(this.devicePubkey, this.pubkey, JSON.stringify(this.delegation), delegationName(this.delegation))
-    const secret = this.store.getMeta('pairing_secret')
+    await this.store.putDevice(this.devicePubkey, this.pubkey, JSON.stringify(this.delegation), delegationName(this.delegation))
+    const secret = await this.store.getMeta('pairing_secret')
     if (secret) this.#armPairing(secret)
     await this.#rotateStaleKeys()
   }
 
   // ---- authorization -------------------------------------------------------------
 
-  /** Membership of a space, evaluated from its signed op log. */
+  /** Membership of a space, evaluated from its signed op log (kept in memory, see `reloadMembership`). */
   protected membership(space: string): Membership {
-    let m = this.#membership.get(space)
-    if (!m) {
-      const records: OpRecord[] = []
-      for (const r of this.store.opRecords(space)) {
-        const p = JSON.parse(r.payload) as { op: unknown; par: string[] }
-        const op = parseOp(p.op)
-        if (op) records.push({ id: r.msgId, identity: r.identity, op, par: p.par })
-      }
-      const devices = new Map(this.store.devices().map((d) => [d.device, d.identity]))
-      m = evaluate(space, records, (d) => devices.get(d))
-      this.#membership.set(space, m)
-    }
-    return m
+    return this.#membership.get(space) ?? evaluate(space, [], () => undefined)
   }
 
-  protected override invalidateMembership(space: string): void {
-    this.#membership.delete(space)
+  protected override async reloadMembership(s: Store, space: string): Promise<void> {
+    await super.reloadMembership(s, space)
+    const records: OpRecord[] = []
+    for (const r of await s.opRecords(space)) {
+      const p = JSON.parse(r.payload) as { op: unknown; par: string[] }
+      const op = parseOp(p.op)
+      if (op) records.push({ id: r.msgId, identity: r.identity, op, par: p.par })
+    }
+    const devices = new Map(s.devices().map((d) => [d.device, d.identity]))
+    this.#membership.set(space, evaluate(space, records, (d) => devices.get(d)))
   }
 
   protected override isAuthorizedWriter(space: string, identity: string, device: string, seq: number): boolean {
@@ -263,11 +266,11 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return this.membership(space).roles.get(identity)
   }
 
-  protected override rebuildSpace(space: string): Set<string> {
-    const touched = super.rebuildSpace(space)
+  protected override async rebuildSpace(s: Store, space: string): Promise<Set<string>> {
+    const touched = await super.rebuildSpace(s, space)
     const m = this.membership(space)
-    for (const snap of this.#completeSnapshots(space)) {
-      for (const t of this.store.applyChanges(space, snapshotChanges(this.schema, m, snap))) touched.add(t)
+    for (const snap of await this.#completeSnapshots(s, space)) {
+      for (const t of await s.applyChanges(space, snapshotChanges(this.schema, m, snap))) touched.add(t)
     }
     return touched
   }
@@ -315,13 +318,13 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   async setRole(space: string, who: string, role: Exclude<Role, 'owner'>): Promise<void> {
     const identity = parsePubkey(who)
-    const cut = canWrite(role) ? undefined : this.store.deviceMaxSeqs(space, identity)
+    const cut = canWrite(role) ? undefined : await this.store.deviceMaxSeqs(space, identity)
     await this.#postOp(space, cut ? { type: 'role', identity, role, cut } : { type: 'role', identity, role })
   }
 
   async removeMember(space: string, who: string): Promise<void> {
     const identity = parsePubkey(who)
-    await this.#postOp(space, { type: 'remove', identity, cut: this.store.deviceMaxSeqs(space, identity) })
+    await this.#postOp(space, { type: 'remove', identity, cut: await this.store.deviceMaxSeqs(space, identity) })
     await this.rotateKey(space)
   }
 
@@ -330,24 +333,28 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   }
 
   async leaveSpace(space: string): Promise<void> {
-    await this.#postOp(space, { type: 'leave', cut: this.store.deviceMaxSeqs(space, this.pubkey) })
-    this.store.setSpaceStatus(space, 'left')
+    await this.#postOp(space, { type: 'leave', cut: await this.store.deviceMaxSeqs(space, this.pubkey) })
+    await this.store.setSpaceStatus(space, 'left')
     this.sync?.refresh()
   }
 
   async #postOp(space: string, op: MemberOp): Promise<void> {
     this.assertOpen()
     await this.gate.idle()
-    const before = this.membership(space)
-    const records = this.store.opRecords(space)
-    const referenced = new Set(records.flatMap((r) => (JSON.parse(r.payload) as { par: string[] }).par))
-    const par = records.map((r) => r.msgId).filter((id) => !referenced.has(id) && before.valid.includes(id))
-    let changed = new Set<string>()
-    this.store.transaction(() => {
-      const { msgId } = this.sendToSpace(space, 'op', { op, par })
-      this.invalidateMembership(space)
-      if (!this.membership(space).valid.includes(msgId)) throw new Error(`anoDB: not allowed: ${op.type} in space ${space}`)
-      changed = this.rebuildSpace(space)
+    const changed = await this.store.transaction(async (s) => {
+      const before = this.membership(space)
+      const records = await s.opRecords(space)
+      const referenced = new Set(records.flatMap((r) => (JSON.parse(r.payload) as { par: string[] }).par))
+      const par = records.map((r) => r.msgId).filter((id) => !referenced.has(id) && before.valid.includes(id))
+      try {
+        const { msgId } = await this.sendToSpace(s, space, 'op', { op, par })
+        if (!this.membership(space).valid.includes(msgId)) throw new Error(`anoDB: not allowed: ${op.type} in space ${space}`)
+        return await this.rebuildSpace(s, space)
+      } catch (e) {
+        // The op is rolled back: restore the membership it was evaluated with.
+        this.#membership.set(space, before)
+        throw e
+      }
     })
     this.notify(changed, 'local')
     void this.sync?.flush()
@@ -356,7 +363,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   async #addMember(space: string, identity: string, role: Exclude<Role, 'owner'>, delegations: NostrEvent[]): Promise<void> {
     for (const d of delegations) {
       const device = d.tags.find((t) => t[0] === 'device')?.[1]
-      if (device && verifyDelegation(d, device) === identity) this.store.putDevice(device, identity, JSON.stringify(d), delegationName(d))
+      if (device && verifyDelegation(d, device) === identity) await this.store.putDevice(device, identity, JSON.stringify(d), delegationName(d))
     }
     if (!this.membership(space).roles.has(identity)) await this.#postOp(space, { type: 'add', identity, role })
     await this.rotateKey(space, new Set([identity]))
@@ -371,90 +378,92 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   async rotateKey(space: string, invitees: ReadonlySet<string> = new Set()): Promise<void> {
     this.assertOpen()
     const m = this.membership(space)
-    const s = this.store.spaces().find((x) => x.id === space)
+    const s = this.store.space(space)
     if (!s) throw new Error(`anoDB: unknown space ${space}`)
     if (!mayManage(m, this.pubkey)) throw new Error('anoDB: only owners and admins can rotate keys')
     const key = randomBytes(32)
     const ek = await this.storeKey(space, key, this.currentKey(space).num + 1)
     await this.gate.idle()
-    const ops = this.store.inners(space, 'op')
+    const ops = await this.store.inners(space, 'op')
     const grant: KeyGrant = { sp: space, name: s.name, personal: s.personal, num: ek.num, key: bytesToHex(key), ops }
-    this.store.transaction(() => {
+    await this.store.transaction(async (tx) => {
       for (const [identity] of m.roles) {
-        for (const d of this.store.devices(identity)) {
+        for (const d of tx.devices(identity)) {
           if (d.revoked || d.device === this.devicePubkey || m.revokedDevices.has(d.device)) continue
           const body = invitees.has(identity) ? { ...grant, t: 'invite', role: m.roles.get(identity) } : { ...grant, t: 'key' }
-          this.#sendInbox(d.device, body)
+          await this.#sendInbox(tx, d.device, body)
         }
       }
     })
-    this.#snapshot(space, ek)
+    await this.#snapshot(space, ek)
     this.sync?.refresh()
     void this.sync?.flush()
   }
 
   /** Post the current state of a space as a (multi-part) snapshot message. */
-  protected snapshot(space: string): void {
-    this.#snapshot(space, this.currentKey(space))
+  protected snapshot(space: string): Promise<void> {
+    return this.#snapshot(space, this.currentKey(space))
   }
 
-  #snapshot(space: string, key: EpochKey): void {
-    const items: Array<{ op?: string; cell?: Change }> = [
-      ...this.store.inners(space, 'op').map((op) => ({ op })),
-      ...snapshotCells(this.store.cells(space)).map((cell) => ({ cell })),
-    ]
-    const parts: Array<{ ops: string[]; cells: Change[] }> = [{ ops: [], cells: [] }]
-    let size = 0
-    for (const it of items) {
-      const n = byteLength(JSON.stringify(it.op ?? it.cell)) + 1
-      if (size + n > MAX_BODY_BYTES && size > 0) {
-        parts.push({ ops: [], cells: [] })
-        size = 0
-      }
-      const p = parts[parts.length - 1]!
-      if (it.op) p.ops.push(it.op)
-      else p.cells.push(it.cell!)
-      size += n
-    }
-    const sid = randomHex(8)
-    const heads = this.store.deviceMaxSeqs(space)
+  async #snapshot(space: string, key: EpochKey): Promise<void> {
     const startedAt = Math.floor(this.now() / 1000)
-    this.store.transaction(() => {
-      parts.forEach((body, i) => this.sendToSpace(space, 'snap', { sid, i, n: parts.length, body: i === 0 ? { ...body, heads } : body }, key))
-      this.store.setMeta(`snap:${space}`, String(Date.now()))
+    await this.store.transaction(async (s) => {
+      const items: Array<{ op?: string; cell?: Change }> = [
+        ...(await s.inners(space, 'op')).map((op) => ({ op })),
+        ...snapshotCells(await s.cells(space)).map((cell) => ({ cell })),
+      ]
+      const parts: Array<{ ops: string[]; cells: Change[] }> = [{ ops: [], cells: [] }]
+      let size = 0
+      for (const it of items) {
+        const n = byteLength(JSON.stringify(it.op ?? it.cell)) + 1
+        if (size + n > MAX_BODY_BYTES && size > 0) {
+          parts.push({ ops: [], cells: [] })
+          size = 0
+        }
+        const p = parts[parts.length - 1]!
+        if (it.op) p.ops.push(it.op)
+        else p.cells.push(it.cell!)
+        size += n
+      }
+      const sid = randomHex(8)
+      const heads = await s.deviceMaxSeqs(space)
+      for (const [i, body] of parts.entries()) {
+        await this.sendToSpace(s, space, 'snap', { sid, i, n: parts.length, body: i === 0 ? { ...body, heads } : body }, key)
+      }
+      await s.setMeta(`snap:${space}`, String(Date.now()))
     })
-    this.afterSnapshot(space, startedAt)
+    await this.afterSnapshot(space, startedAt)
     void this.sync?.flush()
   }
 
   /** Hook (v0.4: prune superseded envelopes). */
-  protected afterSnapshot(_space: string, _before: number): void {}
+  protected async afterSnapshot(_space: string, _before: number): Promise<void> {}
 
   /** Sequence numbers covered by complete, authorized snapshots: device → seq. */
-  protected snapshotCoverage(space: string): Map<string, number> {
+  protected async snapshotCoverage(s: Store, space: string): Promise<Map<string, number>> {
     const cover = new Map<string, number>()
-    for (const snap of this.#completeSnapshots(space)) {
+    for (const snap of await this.#completeSnapshots(s, space)) {
       for (const [d, seq] of Object.entries(snap.heads)) if (seq > (cover.get(d) ?? 0)) cover.set(d, seq)
     }
     return cover
   }
 
   /** Snapshots whose parts all arrived and whose author may write. */
-  #completeSnapshots(space: string): AssembledSnapshot[] {
+  async #completeSnapshots(s: Store, space: string): Promise<AssembledSnapshot[]> {
     const m = this.membership(space)
-    return assembleSnapshots(this.store.messages(space, 'snap')).filter((s) => snapshotTrusted(m, this.pubkey, s))
+    return assembleSnapshots(await s.messages(space, 'snap')).filter((x) => snapshotTrusted(m, this.pubkey, x))
   }
 
-  protected override afterLocalWrite(spaces: string[]): void {
-    for (const space of spaces) this.#maybeSnapshot(space)
+  protected override async afterLocalWrite(spaces: string[]): Promise<void> {
+    for (const space of spaces) await this.#maybeSnapshot(space)
   }
 
-  #maybeSnapshot(space: string): void {
-    const since = Number(this.store.getMeta(`snap:${space}`) ?? '0')
-    if (this.store.countMessages(space, 'ch', since) < SNAPSHOT_EVERY) return
+  async #maybeSnapshot(space: string): Promise<void> {
     const role = this.membership(space).roles.get(this.pubkey)
     if (role !== 'owner' && role !== 'admin') return // others would not trust it (see #completeSnapshots)
-    this.snapshot(space)
+    const since = Number((await this.store.getMeta(`snap:${space}`)) ?? '0')
+    if ((await this.store.countMessages(space, 'ch', since)) < SNAPSHOT_EVERY) return
+    await this.snapshot(space)
   }
 
   async #rotateStaleKeys(): Promise<void> {
@@ -468,24 +477,24 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   // ---- receiving membership effects ------------------------------------------------------
 
-  protected override onMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['onMessage']>[3]): Set<string> {
+  protected override async onMessage(s: Store, space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['onMessage']>[4]): Promise<Set<string>> {
     if (p.t === 'snap') {
       // Import portable ops carried by the snapshot, then re-evaluate everything.
       const ops = (p.body as { ops?: unknown }).ops
-      if (Array.isArray(ops)) for (const o of ops) if (typeof o === 'string') this.#importInner(space, o)
-      this.invalidateMembership(space)
-      return this.rebuildSpace(space)
+      if (Array.isArray(ops)) for (const o of ops) if (typeof o === 'string') await this.#importInner(s, space, o)
+      await this.reloadMembership(s, space)
+      return this.rebuildSpace(s, space)
     }
-    return super.onMessage(space, identity, device, p)
+    return super.onMessage(s, space, identity, device, p)
   }
 
-  protected override afterRemoteMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['afterRemoteMessage']>[3]): void {
-    this.store.putDevice(device, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
+  protected override async afterRemoteMessage(space: string, identity: string, device: string, p: Parameters<AnoDBCore<S>['afterRemoteMessage']>[3]): Promise<void> {
+    await this.store.putDevice(device, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
     if (p.t !== 'op') return
     const m = this.membership(space)
-    const s = this.store.spaces().find((x) => x.id === space)
+    const s = this.store.space(space)
     if (s?.status === 'active' && !m.roles.has(this.pubkey) && m.owner !== null) {
-      this.store.setSpaceStatus(space, 'removed')
+      await this.store.setSpaceStatus(space, 'removed')
       this.sync?.refresh()
       return
     }
@@ -495,12 +504,12 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   }
 
   /** Store a portable signed op (from an invitation or snapshot) after verifying it. */
-  #importInner(space: string, innerJson: string): boolean {
+  async #importInner(s: Store, space: string, innerJson: string): Promise<boolean> {
     const op = portableOp(space, innerJson)
     if (!op) return false
-    if (this.store.hasMessage(space, op.device, op.seq)) return true
-    this.store.putMessage({ space, device: op.device, seq: op.seq, identity: op.identity, type: 'op', payload: op.payload }, op.id, innerJson)
-    this.store.putDevice(op.device, op.identity, JSON.stringify(op.delegation), delegationName(op.delegation))
+    if (await s.hasMessage(space, op.device, op.seq)) return true
+    await s.putMessage({ space, device: op.device, seq: op.seq, identity: op.identity, type: 'op', payload: op.payload }, op.id, innerJson)
+    await s.putDevice(op.device, op.identity, JSON.stringify(op.delegation), delegationName(op.delegation))
     return true
   }
 
@@ -518,31 +527,31 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     return super.routeSeed(tag)
   }
 
-  #sendInbox(device: string, body: Record<string, unknown>): void {
+  async #sendInbox(s: Store, device: string, body: Record<string, unknown>): Promise<void> {
     const inner = signWith(this.deviceSk, {
       kind: MESSAGE_KIND,
       created_at: Math.floor(this.now() / 1000),
       tags: [],
       content: JSON.stringify({ v: 2, dlg: this.delegation, ...body }),
     })
-    const outer = this.wrapToDevice(JSON.stringify(inner), device)
-    this.sync?.enqueue(outer, false)
+    const outer = await this.wrapToDevice(s, JSON.stringify(inner), device)
+    if (this.sync) await s.enqueue(outer, false)
   }
 
-  #sendSecret(secret: string, body: Record<string, unknown>): void {
+  async #sendSecret(secret: string, body: Record<string, unknown>): Promise<void> {
     const inner = signWith(this.deviceSk, {
       kind: MESSAGE_KIND,
       created_at: Math.floor(this.now() / 1000),
       tags: [],
       content: JSON.stringify({ v: 2, dlg: this.delegation, ...body }),
     })
-    const outer = this.wrap(JSON.stringify(inner), secretTag(secret), secretKeyFor(secret))
     if (!this.sync) throw new Error('anoDB: no relays configured')
-    this.sync.enqueue(outer, false)
+    const outer = await this.wrap(this.store, JSON.stringify(inner), secretTag(secret), secretKeyFor(secret))
+    await this.store.enqueue(outer, false)
     void this.sync.flush()
   }
 
-  protected override ingestOther(tag: string, outer: NostrEvent): IngestResult {
+  protected override async ingestOther(tag: string, outer: NostrEvent): Promise<IngestResult> {
     let convKey: Uint8Array | null = null
     let secret: string | null = null
     if (tag === inboxTag(this.devicePubkey)) {
@@ -559,38 +568,38 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const opened = openDirect(outer, convKey)
     if (!opened) return 'invalid'
     const { inner, payload: p, sender } = opened
-    this.store.putRaw(outer, tag)
+    await this.store.putRaw(outer, tag)
     try {
-      if (secret === null) this.#onInbox(sender, inner.pubkey, p)
-      else if (this.#pairing?.secret === secret && p.t === 'pair') void this.#onPaired(sender, p)
+      if (secret === null) await this.#onInbox(sender, inner.pubkey, p)
+      else if (this.#pairing?.secret === secret && p.t === 'pair') void this.#onPaired(sender, p).catch(() => {})
     } catch {
       return 'invalid'
     }
     return 'new'
   }
 
-  #onInbox(sender: string, senderDevice: string, p: Record<string, unknown>): void {
+  async #onInbox(sender: string, senderDevice: string, p: Record<string, unknown>): Promise<void> {
     if (p.t !== 'key' && p.t !== 'invite') return
     const g = parseKeyGrant(p)
     if (!g) return
     // Validate against the ops carried in the grant (plus what we know).
-    const before = this.store.opRecords(g.sp).length
-    this.store.transaction(() => {
-      for (const o of g.ops) if (typeof o === 'string') this.#importInner(g.sp, o)
+    await this.store.transaction(async (s) => {
+      const before = (await s.opRecords(g.sp)).length
+      for (const o of g.ops) if (typeof o === 'string') await this.#importInner(s, g.sp, o)
+      if ((await s.opRecords(g.sp)).length !== before || !this.#membership.has(g.sp)) await this.reloadMembership(s, g.sp)
     })
-    if (this.store.opRecords(g.sp).length !== before) this.invalidateMembership(g.sp)
     const role = grantRole(this.membership(g.sp), sender, this.pubkey)
     if (!role) return
-    this.store.putDevice(senderDevice, sender, JSON.stringify(p.dlg), delegationName(p.dlg as NostrEvent))
-    const known = this.store.spaces().find((s) => s.id === g.sp)
+    await this.store.putDevice(senderDevice, sender, JSON.stringify(p.dlg), delegationName(p.dlg as NostrEvent))
+    const known = this.store.space(g.sp)
     if (p.t === 'invite' && known?.status !== 'active') {
-      this.store.putInviteIn(g.sp, sender, role, String(g.name ?? ''), JSON.stringify(g))
+      await this.store.putInviteIn(g.sp, sender, role, String(g.name ?? ''), JSON.stringify(g))
       const inv: Invitation = { space: g.sp, name: String(g.name ?? ''), role, from: sender }
       for (const fn of this.#inviteListeners) fn(inv)
       return
     }
     if (known?.status !== 'active') return
-    void this.#acceptKey(g, sender !== this.pubkey)
+    await this.#acceptKey(g, sender !== this.pubkey)
   }
 
   async #acceptKey(g: KeyGrant, forward: boolean): Promise<void> {
@@ -600,9 +609,9 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     this.sync?.refresh()
     // Share with my other devices (they may not be known to the sender).
     if (forward) {
-      this.store.transaction(() => {
-        for (const d of this.store.devices(this.pubkey)) {
-          if (!d.revoked && d.device !== this.devicePubkey) this.#sendInbox(d.device, { ...g, t: 'key' })
+      await this.store.transaction(async (s) => {
+        for (const d of s.devices(this.pubkey)) {
+          if (!d.revoked && d.device !== this.devicePubkey) await this.#sendInbox(s, d.device, { ...g, t: 'key' })
         }
       })
       void this.sync?.flush()
@@ -629,16 +638,16 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const g = JSON.parse(inv.payload) as KeyGrant
     await this.storeKey(g.sp, hexToBytes(g.key), g.num)
     await this.gate.idle()
-    this.store.transaction(() => {
-      this.store.upsertSpace(g.sp, g.name, false)
-      this.store.setInviteInStatus(space, 'accepted')
+    await this.store.transaction(async (s) => {
+      await s.upsertSpace(g.sp, g.name, false)
+      await s.setInviteInStatus(space, 'accepted')
+      await this.reloadMembership(s, space)
     })
-    this.invalidateMembership(space)
     this.sync?.refresh()
   }
 
-  declineInvitation(space: string): void {
-    this.store.setInviteInStatus(space, 'declined')
+  declineInvitation(space: string): Promise<void> {
+    return this.store.setInviteInStatus(space, 'declined')
   }
 
   /**
@@ -654,7 +663,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const signer = this.requireIdentitySigner()
     const delegations = this.store.devices(this.pubkey).filter((d) => !d.revoked).map((d) => JSON.parse(d.delegation) as NostrEvent)
     const ev = await createKeyPackage(signer, delegations, this.now())
-    this.enqueuePlain(ev)
+    await this.enqueuePlain(ev)
     return ev
   }
 
@@ -679,7 +688,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
    */
   async startPairing(): Promise<PairingOffer & { done: Promise<void> }> {
     const secret = randomHex(16)
-    this.store.setMeta('pairing_secret', secret)
+    await this.store.setMeta('pairing_secret', secret)
     this.#armPairing(secret)
     return {
       uri: `anodb://pair?app=${encodeURIComponent(this.appId)}&d=${this.devicePubkey}&s=${secret}`,
@@ -711,16 +720,16 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
         const signer = this.requireIdentitySigner()
         const delegation = await createDelegation(signer, device, name, this.now())
         await this.gate.idle()
-        this.store.putDevice(device, this.pubkey, JSON.stringify(delegation), name)
+        await this.store.putDevice(device, this.pubkey, JSON.stringify(delegation), name)
         const spaces: KeyGrant[] = []
         for (const s of this.store.spaces()) {
           if (s.status !== 'active') continue
           const k = this.currentKey(s.id)
-          spaces.push({ sp: s.id, name: s.name, personal: s.personal, num: k.num, key: bytesToHex(k.key), ops: this.store.inners(s.id, 'op') })
+          spaces.push({ sp: s.id, name: s.name, personal: s.personal, num: k.num, key: bytesToHex(k.key), ops: await this.store.inners(s.id, 'op') })
         }
-        this.#sendSecret(secret, { t: 'pair', delegation, spaces })
+        await this.#sendSecret(secret, { t: 'pair', delegation, spaces })
         // The new device catches up from a fresh snapshot of each space (not the full history).
-        for (const s of spaces) this.snapshot(s.sp)
+        for (const s of spaces) await this.snapshot(s.sp)
         void this.sync?.flush()
       },
     }
@@ -736,15 +745,15 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     await this.keyStore.set('delegation', JSON.stringify(delegation))
     await this.keyStore.remove('identity')
     this.identitySigner = null
-    this.store.wipe()
-    this.store.setMeta('identity', sender)
-    this.store.deleteMeta('pairing_secret')
+    await this.store.wipe()
+    await this.store.setMeta('identity', sender)
+    await this.store.deleteMeta('pairing_secret')
     for (const g of grants) {
       const sealed = await this.keyStore.seal(hexToBytes(g.key))
-      this.store.transaction(() => {
-        this.store.putKey(g.sp, keyId(hexToBytes(g.key)), g.num, sealed)
-        this.store.upsertSpace(g.sp, g.name, g.personal)
-        for (const o of g.ops) if (typeof o === 'string') this.#importInner(g.sp, o)
+      await this.store.transaction(async (s) => {
+        await s.putKey(g.sp, keyId(hexToBytes(g.key)), g.num, sealed)
+        await s.upsertSpace(g.sp, g.name, g.personal)
+        for (const o of g.ops) if (typeof o === 'string') await this.#importInner(s, g.sp, o)
       })
     }
     this.#pairing?.resolve()
@@ -756,10 +765,10 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
     const signer = this.requireIdentitySigner()
     if (device === this.devicePubkey) throw new Error('anoDB: cannot revoke the current device')
     const revocation = await createRevocation(signer, device, this.now())
-    this.store.revokeDevice(device)
+    await this.store.revokeDevice(device)
     for (const s of this.store.spaces()) {
       if (s.status !== 'active' || !this.membership(s.id).roles.has(this.pubkey)) continue
-      await this.#postOp(s.id, { type: 'revoke', revocation, cut: { [device]: this.store.deviceMaxSeqs(s.id, undefined, device)[device] ?? 0 } })
+      await this.#postOp(s.id, { type: 'revoke', revocation, cut: { [device]: (await this.store.deviceMaxSeqs(s.id, undefined, device))[device] ?? 0 } })
       if (mayManage(this.membership(s.id), this.pubkey)) await this.rotateKey(s.id)
     }
   }
@@ -767,7 +776,7 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   // ---- write permission check uses roles ---------------------------------------------------------
 
   protected override assertCanWrite(space: string): void {
-    const s = this.store.spaces().find((x) => x.id === space)
+    const s = this.store.space(space)
     if (!s || s.status !== 'active') throw new Error(`anoDB: unknown or inactive space "${space}"`)
     if (!canWrite(this.membership(space).roles.get(this.pubkey))) throw new Error(`anoDB: no write permission in space ${space}`)
   }

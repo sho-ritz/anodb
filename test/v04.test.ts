@@ -43,7 +43,7 @@ describe('NIP-77 sync (v0.4)', () => {
       else {
         // NIP-01 cannot page inside one second, so this relay alone cannot deliver everything —
         // but the loss is no longer silent: sequence numbers expose it (layer 3).
-        await until(() => b.syncHealth().gaps.length > 0, 4000, 'gap detected')
+        await until(async () => (await b.syncHealth()).gaps.length > 0, 4000, 'gap detected')
         expect(await count()).toBeLessThan(11)
       }
     }
@@ -67,7 +67,7 @@ describe('NIP-77 sync (v0.4)', () => {
     await until(() => b.status.state === 'synced', 4000)
     await a.insertInto('todo').values({ title: 'plain' }).execute()
     await until(async () => (await titles(b)).includes('plain'))
-    expect(a.syncHealth().nip77[r.url]).toBe(false)
+    expect((await a.syncHealth()).nip77[r.url]).toBe(false)
   })
 
   it('detects sequence gaps and repairs them', async () => {
@@ -88,12 +88,12 @@ describe('NIP-77 sync (v0.4)', () => {
     const b = await dev.reopen()
     await until(() => b.status.state === 'synced', 4000)
     await until(async () => (await titles(b)).filter((t) => t?.startsWith('g')).length === 2, 3000)
-    const gaps = b.syncHealth().gaps
+    const gaps = (await b.syncHealth()).gaps
     expect(gaps).toHaveLength(1)
     expect(gaps[0]!.missing).toHaveLength(1)
     r.inject(dropped)
     await b.repair()
-    expect(b.syncHealth().gaps).toEqual([])
+    expect((await b.syncHealth()).gaps).toEqual([])
     expect((await titles(b)).filter((t) => t?.startsWith('g'))).toHaveLength(3)
   })
 
@@ -104,7 +104,7 @@ describe('NIP-77 sync (v0.4)', () => {
     await until(() => a.status.pendingEvents === 0)
     const old = [...r.events.values()].filter((e) => e.kind === WRAP_KIND)
     await sleep(1100)
-    ;(a as unknown as { snapshot(s: string): void }).snapshot(a.personalSpace)
+    await (a as unknown as { snapshot(s: string): Promise<void> }).snapshot(a.personalSpace)
     await until(() => a.status.pendingEvents === 0)
     const deletions = r.received.filter((e) => e.kind === 5)
     for (const e of old) expect(deletions.some((d) => d.pubkey === e.pubkey && d.tags.some((t) => t[0] === 'e' && t[1] === e.id))).toBe(true)
