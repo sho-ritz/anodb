@@ -6,6 +6,7 @@
 //! TypeScript implementation), so all implementations interoperate.
 
 pub mod derive;
+pub mod direct;
 pub mod envelope;
 pub mod event;
 pub mod hlc;
@@ -16,6 +17,7 @@ pub mod merge;
 pub mod nip44;
 pub mod payload;
 pub mod policy;
+pub mod snapshot;
 
 pub use envelope::{EpochKey, OpenError, Opened, open_space, seal, seal_space, sign_inner};
 pub use event::{Event, Template};

@@ -25,7 +25,18 @@ import {
   verifySignedEvent,
 } from '../dist/crypto.js'
 import { Clock, decodeHlc, encodeHlc } from '../dist/hlc.js'
-import { DELEGATION_KIND, verifyDelegation } from '../dist/identity.js'
+import { DELEGATION_KIND, KEY_PACKAGE_KIND, parseKeyPackage, verifyDelegation } from '../dist/identity.js'
+import {
+  assembleSnapshots,
+  grantRole,
+  openDirect,
+  pairingCode,
+  parseKeyGrant,
+  portableOp,
+  snapshotCells,
+  snapshotChanges,
+  snapshotTrusted,
+} from '../dist/sharing.js'
 import { evaluate, mayManage, mayWrite, parseOp, spaceIdFor } from '../dist/membership.js'
 import { changeAllowed } from '../dist/policy.js'
 import { MESSAGE_KIND, TAG, WRAP_KIND, isChange, parseStreamPayload } from '../dist/protocol.js'
@@ -514,6 +525,198 @@ write('membership', {
   devices,
   ops: opShapes.map(([op, valid]) => ({ op, valid })),
   cases: membership,
+})
+
+// ---- direct messages, grants, portable ops, pairing, key packages (§5.3, §5.5, §5.6) ----------
+const evalLog = (log) =>
+  evaluate(
+    mSpace,
+    log.map(([label, author, op, par]) => ({ id: opId(label), identity: who[author], op: parseOp(op), par: par.map(opId) })),
+    (d) => devices[d],
+  )
+const baseLog = [
+  ['c', 'owner', create(), []],
+  ['a1', 'owner', add('admin', 'admin'), ['c']],
+  ['a2', 'owner', add('writer', 'writer'), ['a1']],
+  ['a3', 'owner', add('reader', 'reader'), ['a2']],
+]
+const baseOps = baseLog.map(([label, author, op, par]) => ({ id: opId(label), identity: who[author], op, par: par.map(opId) }))
+const mBase = evalLog(baseLog)
+
+const dlgOf = (n) => createDelegation(sk(`member/${n}`), dev[n], n, T * 1000)
+const innerFrom = (n, payload, key = sk(`member-device/${n}`)) =>
+  signWith(key, { kind: MESSAGE_KIND, created_at: T, tags: [], content: typeof payload === 'string' ? payload : JSON.stringify(payload) })
+const opInner = (n, seq, op, par, sp = mSpace) => innerFrom(n, { v: 2, t: 'op', sp, ep: kid, seq, dlg: dlgOf(n), op, par })
+
+const portable = [
+  ['valid op', JSON.stringify(opInner('admin', 3, add('reader', 'reader'), [opId('a1')]))],
+  ['for another space', JSON.stringify(opInner('admin', 3, add('reader', 'reader'), [], 'f'.repeat(32)))],
+  ['not an op', JSON.stringify(innerFrom('admin', { v: 2, t: 'ch', sp: mSpace, ep: kid, seq: 3, dlg: dlgOf('admin'), c: [] }))],
+  ['tampered', JSON.stringify({ ...opInner('admin', 3, add('reader', 'reader'), []), created_at: T + 1 })],
+  ['delegation names another device', JSON.stringify(innerFrom('admin', { v: 2, t: 'op', sp: mSpace, ep: kid, seq: 3, dlg: dlgOf('writer'), op: add('reader', 'reader'), par: [] }))],
+  ['wrong kind', JSON.stringify(signWith(sk('member-device/admin'), { kind: 1, created_at: T, tags: [], content: '{}' }))],
+  ['not JSON', '{"id":'],
+].map(([name, json]) => {
+  const r = portableOp(mSpace, json)
+  return { name, json, result: r && { id: r.id, device: r.device, identity: r.identity, seq: r.seq } }
+})
+
+const grantShapes = [
+  [{ sp: mSpace, name: 'Family', personal: false, num: 2, key: bytesToHex(epochKey), ops: [] }, true],
+  [{ sp: mSpace, key: bytesToHex(epochKey), ops: ['x', 1] }, true],
+  [{ sp: mSpace, key: bytesToHex(epochKey).toUpperCase(), ops: [] }, false],
+  [{ sp: mSpace, key: 'ab', ops: [] }, false],
+  [{ sp: 1, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, key: bytesToHex(epochKey) }, false],
+  [{ sp: mSpace, key: bytesToHex(epochKey), ops: {} }, false],
+  [null, false],
+  ['grant', false],
+].map(([grant, valid]) => {
+  if ((parseKeyGrant(grant) !== null) !== valid) throw new Error(`grant shape expectation is wrong: ${JSON.stringify(grant)}`)
+  return { grant, valid }
+})
+const grantRoles = []
+for (const sender of Object.keys(who))
+  for (const me of Object.keys(who)) grantRoles.push({ sender: who[sender], me: who[me], role: grantRole(mBase, who[sender], who[me]) ?? null })
+
+// Envelopes to one device: an ephemeral key, pairwise NIP-44 with the receiver (§2).
+const recipientSk = sk('member-device/reader')
+const recipient = getPublicKey(recipientSk)
+let eph = 0
+const toDevice = (innerJson, { to = recipient, tag = inboxTag(to) } = {}) => {
+  const e = sk(`eph/${eph++}`)
+  return signWith(e, { kind: WRAP_KIND, created_at: T, tags: [[TAG, tag]], content: encrypt(innerJson, conversationKey(e, to)) })
+}
+const keyGrantMsg = { v: 2, t: 'key', dlg: dlgOf('admin'), sp: mSpace, name: 'Family', personal: false, num: 2, key: bytesToHex(epochKey), ops: [] }
+const goodInbox = toDevice(JSON.stringify(innerFrom('admin', keyGrantMsg)))
+const inboxCases = [
+  ['key grant', goodInbox],
+  ['invite', toDevice(JSON.stringify(innerFrom('admin', { ...keyGrantMsg, t: 'invite', role: 'writer' })))],
+  ['tampered envelope', { ...goodInbox, created_at: T + 1 }],
+  ['sealed to another device', toDevice(JSON.stringify(innerFrom('admin', keyGrantMsg)), { to: dev.writer, tag: inboxTag(recipient) })],
+  ['inner badly signed', toDevice(JSON.stringify({ ...innerFrom('admin', keyGrantMsg), content: JSON.stringify({ ...keyGrantMsg, num: 3 }) }))],
+  ['older protocol', toDevice(JSON.stringify(innerFrom('admin', { ...keyGrantMsg, v: 1 })))],
+  ['no type', toDevice(JSON.stringify(innerFrom('admin', { ...keyGrantMsg, t: 5 })))],
+  ['delegation for another device', toDevice(JSON.stringify(innerFrom('admin', { ...keyGrantMsg, dlg: dlgOf('writer') })))],
+  ['inner is not JSON', toDevice('not json')],
+  ['inner is not a message', toDevice(JSON.stringify(signWith(sk('member-device/admin'), { kind: 1, created_at: T, tags: [], content: JSON.stringify(keyGrantMsg) })))],
+].map(([name, outer]) => {
+  const r = openDirect(outer, conversationKey(recipientSk, outer.pubkey))
+  return { name, outer, result: r && { sender: r.sender, device: r.inner.pubkey, t: r.payload.t, msgId: r.inner.id } }
+})
+// Pairing: the same open, keyed by the pairing secret.
+const pairSecret = '0123456789abcdef0123456789abcdef'
+const pairOuter = (() => {
+  const inner = innerFrom('owner', { v: 2, t: 'pair', dlg: dlgOf('owner'), delegation: createDelegation(sk('member/owner'), recipient, 'new', T * 1000), spaces: [] })
+  return signWith(sk('eph/pair'), { kind: WRAP_KIND, created_at: T, tags: [[TAG, secretTag(pairSecret)]], content: encrypt(JSON.stringify(inner), secretKeyFor(pairSecret)) })
+})()
+const pairResult = openDirect(pairOuter, secretKeyFor(pairSecret))
+
+const keyPackage = (content, key = sk('member/writer'), kind = KEY_PACKAGE_KIND) =>
+  signWith(key, { kind, created_at: T, tags: [], content: typeof content === 'string' ? content : JSON.stringify(content) })
+const wDlg = createDelegation(sk('member/writer'), dev.writer, 'phone', T * 1000)
+const wDlg2 = createDelegation(sk('member/writer'), dev.admin, 'laptop', T * 1000)
+const foreignDlg = createDelegation(sk('member/admin'), dev.reader, 'x', T * 1000)
+const keyPackages = [
+  ['two devices, one foreign delegation dropped', keyPackage({ v: 2, delegations: [wDlg, foreignDlg, wDlg2, 'junk'] })],
+  ['badly signed', { ...keyPackage({ v: 2, delegations: [wDlg] }), content: JSON.stringify({ v: 2, delegations: [] }) }],
+  ['wrong kind', keyPackage({ v: 2, delegations: [wDlg] }, sk('member/writer'), 1)],
+  ['content not JSON', keyPackage('{')],
+  ['no delegations', keyPackage({ v: 2 })],
+  ['content null', keyPackage('null')],
+].map(([name, event]) => ({ name, event, devices: parseKeyPackage(event).map((d) => d.device) }))
+
+write('direct', {
+  description:
+    'Envelopes to one device (inbox, §5.3) and to a pairing secret (§5.5): openDirect(outer, conversation key) → sender identity, device, type, or null. The inbox conversation key is NIP-44 between `recipientSecret` and outer.pubkey. Also: key-grant shapes, grantRole (receiver role when a grant from `sender` is acceptable, under `membership`), portable ops (signed inner op events carried by grants and snapshots), pairing codes and key packages.',
+  space: mSpace,
+  recipientSecret: bytesToHex(recipientSk),
+  inbox: inboxCases,
+  pairing: { secret: pairSecret, outer: pairOuter, result: pairResult && { sender: pairResult.sender, t: pairResult.payload.t } },
+  pairingCodes: [0, 1, 2, 3, 4].map((i) => {
+    const d = getPublicKey(sk(`pair-device/${i}`))
+    const s = sha256Hex(`anodb/conformance/pair-secret/${i}`).slice(0, 32)
+    return { device: d, secret: s, code: pairingCode(d, s) }
+  }),
+  membership: baseOps,
+  grants: grantShapes,
+  grantRoles,
+  portableOps: portable,
+  keyPackages,
+})
+
+// ---- snapshots (§5.4) -------------------------------------------------------------------------
+let snapSeq = 100
+const snapMsg = (n, sid, i, parts, body, { seq = snapSeq++ } = {}) => ({
+  device: dev[n],
+  identity: who[n],
+  seq,
+  payload: JSON.stringify({ v: 2, t: 'snap', sp: mSpace, ep: kid, seq, dlg: dlgOf(n), sid, i, n: parts, body }),
+})
+const cell = (table, row, col, value, by) => [table, row, col, value, h(5, 0, A), ...(by ? [by] : [])]
+const wRow = `${who.writer}-r1`
+const oRow = `${who.owner}-r1`
+const snapCells = [
+  cell('plain', 'free', 'title', 'a'),
+  cell('mine', wRow, 'title', 'writer row, signed by writer', who.writer),
+  cell('mine', oRow, 'title', 'owner row, claimed by writer', who.writer),
+  cell('mine', oRow, 'note', 'owner row, signed by owner', who.owner),
+  ['mine', oRow, 'title', 'x', h(5, 0, A), 'not-hex'],
+  ['short', 'r', 'c', 1],
+]
+const snapshotSets = [
+  ['complete, two parts, from an admin', [
+    snapMsg('admin', 's1', 1, 2, { cells: snapCells.slice(2) }),
+    snapMsg('admin', 's1', 0, 2, { ops: [], cells: snapCells.slice(0, 2), heads: { [dev.writer]: 7, [dev.admin]: 2, bad: 1.5, str: '3' } }),
+  ]],
+  ['missing part', [snapMsg('admin', 's2', 0, 2, { cells: [snapCells[0]] })]],
+  ['duplicate part index', [snapMsg('admin', 's3', 0, 2, { cells: [] }), snapMsg('admin', 's3', 0, 2, { cells: [] })]],
+  ['parts disagree on n', [snapMsg('admin', 's4', 0, 2, { cells: [] }), snapMsg('admin', 's4', 1, 3, { cells: [] })]],
+  ['from a writer', [snapMsg('writer', 's5', 0, 1, { cells: [snapCells[0]], heads: [4] })]],
+  ['from the owner, no cells array', [snapMsg('owner', 's6', 0, 1, { cells: 'x' })]],
+  ['same sid from two devices', [snapMsg('owner', 's7', 0, 1, { cells: [] }), snapMsg('admin', 's7', 0, 1, { cells: [] })]],
+]
+// The owner's device is revoked: its snapshots count only up to the cut-off (the role stays).
+const CUT_LABEL = "owner's device revoked, cut-off 150"
+const removedLog = [...baseLog, ['v1', 'owner', { type: 'revoke', revocation: revocation('owner', 'owner'), cut: cutOf('owner', 150) }, ['a3']]]
+const mRemoved = evalLog(removedLog)
+const snapSchema = { plain: { title: 'text' }, mine: owned({ title: 'text', note: 'text' }) }
+const snapshots = snapshotSets.map(([name, messages]) => ({
+  name,
+  messages,
+  assembled: assembleSnapshots(messages),
+}))
+const trust = []
+for (const [label, m] of [['base', mBase], [CUT_LABEL, mRemoved]])
+  for (const s of snapshots)
+    for (const [i, a] of s.assembled.entries())
+      for (const me of ['owner', 'writer']) {
+        const trusted = snapshotTrusted(m, who[me], a)
+        trust.push({ membership: label, snapshot: s.name, index: i, me: who[me], trusted, changes: trusted ? snapshotChanges(snapSchema, m, a) : null })
+      }
+for (const seq of [150, 151]) {
+  const msg = snapMsg('owner', `cut${seq}`, 0, 1, { cells: [snapCells[0]] }, { seq })
+  const [a] = assembleSnapshots([msg])
+  const trusted = snapshotTrusted(mRemoved, who.writer, a)
+  trust.push({ membership: CUT_LABEL, snapshot: `owner's snapshot at seq ${seq}`, message: msg, index: 0, me: who.writer, trusted, changes: trusted ? snapshotChanges(snapSchema, mRemoved, a) : null })
+}
+
+const tomb = [
+  ['todo', 'r1', 'title', 'milk', h(1, 0, A)],
+  ['todo', 'r1', '$deleted', true, h(2, 0, A)],
+  ['todo', 'r2', 'title', 'eggs', h(1, 0, A)],
+  ['todo', 'r2', '$deleted', false, h(3, 0, A)],
+  ['note', 'r1', 'title', 'other table, same row id', h(1, 0, A)],
+]
+write('snapshots', {
+  description:
+    'Snapshots (§5.4). assembleSnapshots(messages) groups `snap` messages by device + sid and keeps complete ones (cells: arrays of 5, or 6 with a hex signer; heads: safe integers). `trust`: snapshotTrusted(membership, me, snapshot) and, when trusted, the cells merged (cells naming a signer pass the row rule for it; schema: plain, mine = owned). `tombstones`: snapshotCells keeps only the $deleted cell of deleted rows.',
+  space: mSpace,
+  memberships: { base: baseOps, [CUT_LABEL]: removedLog.map(([label, author, op, par]) => ({ id: opId(label), identity: who[author], op, par: par.map(opId) })) },
+  tables: { plain: 'plain', mine: 'owned' },
+  cases: snapshots,
+  trust,
+  tombstones: { cells: tomb, result: snapshotCells(tomb) },
 })
 
 console.log(`wrote ${out}`)

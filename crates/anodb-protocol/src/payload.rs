@@ -64,6 +64,23 @@ impl Change {
         })
     }
 
+    /// A snapshot cell: a change, optionally followed by the identity that signed it (§5.4).
+    ///
+    /// Stricter than the TypeScript implementation, which keeps any 5-element array here.
+    pub fn parse_cell(v: &Value) -> Option<Self> {
+        let a = v.as_array()?;
+        match a.len() {
+            5 => Self::parse(v),
+            6 => {
+                let by = a[5].as_str().filter(|s| is_lower_hex(s, 64))?;
+                let mut c = Self::parse(&Value::Array(a[..5].to_vec()))?;
+                c.by = Some(by.to_owned());
+                Some(c)
+            }
+            _ => None,
+        }
+    }
+
     pub fn to_value(&self) -> Value {
         let mut a = vec![
             self.table.clone().into(),
