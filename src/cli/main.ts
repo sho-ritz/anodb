@@ -14,7 +14,9 @@ Options:
   --lang ja|en                 language of the prompts
   --env browser|tauri|electron|expo|node
   --framework react|vue|svelte|none
-  --db sqlite|pglite           database (Node / Electron): SQLite or PGlite (Postgres)
+  --db sqlite|pglite|postgres  database (Node / Electron): SQLite, PGlite (Postgres in WASM),
+                               or a PostgreSQL server (Node; e.g. Docker)
+  --database-url <url>         PostgreSQL connection URL (with --db postgres)
   --app-id <id>
   --keys stored|recovery|signer   end-user key handling (non-Node)
   --identity <nsec|hex>        import an identity key (Node)
@@ -80,7 +82,8 @@ function parse(argv: string[]): { cmd: string | undefined; flags: InitFlags } {
       case '--lang': flags.lang = oneOf('ja', 'en'); break
       case '--env': flags.env = oneOf('browser', 'tauri', 'electron', 'expo', 'node'); break
       case '--framework': flags.framework = oneOf('react', 'vue', 'svelte', 'none'); break
-      case '--db': flags.db = oneOf('sqlite', 'pglite'); break
+      case '--db': flags.db = oneOf('sqlite', 'pglite', 'postgres'); break
+      case '--database-url': flags.databaseUrl = val(); break
       case '--app-id': flags.appId = val(); break
       case '--keys': flags.keys = oneOf('stored', 'recovery', 'signer'); break
       case '--identity': flags.identity = val(); break

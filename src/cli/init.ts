@@ -16,8 +16,11 @@ export type Env = 'browser' | 'tauri' | 'electron' | 'expo' | 'node'
 export type Framework = 'react' | 'vue' | 'svelte' | 'none'
 export type KeyMode = 'stored' | 'recovery' | 'signer'
 export type WebStack = 'next' | 'vite' | 'sveltekit' | 'nuxt' | 'other'
-/** Storage engine. PGlite (Postgres in WASM) is offered where anoDB runs in Node (servers, Electron main). */
-export type Database = 'sqlite' | 'pglite'
+/**
+ * Storage engine. PGlite (Postgres in WASM) is offered where anoDB runs in Node (servers, Electron
+ * main); a PostgreSQL server (node-postgres) on Node servers.
+ */
+export type Database = 'sqlite' | 'pglite' | 'postgres'
 
 export interface Choice<T> {
   label: string
@@ -36,6 +39,8 @@ export interface InitFlags {
   env?: Env
   framework?: Framework
   db?: Database
+  /** PostgreSQL connection URL (with `db: 'postgres'`). */
+  databaseUrl?: string
   appId?: string
   keys?: KeyMode
   identity?: string
@@ -94,18 +99,45 @@ const PGLITE_PACKAGE = '@electric-sql/pglite'
 /** Environments where the database can be chosen (anoDB runs in Node there). */
 export const supportsPglite = (env: Env): boolean => env === 'node' || env === 'electron'
 
+/** Environments where a PostgreSQL server can be chosen (servers). */
+export const supportsPostgres = (env: Env): boolean => env === 'node'
+
 /** Folder PGlite stores its files in (Node template), relative to the project. */
 export const PGLITE_DIR = 'anodb-pgdata'
 
-export function packagesFor(env: Env, db: Database): string[] {
+/** Default PostgreSQL URL offered by the wizard (a local Docker `postgres` image). */
+export const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@127.0.0.1:5432/postgres'
+
+export function packagesFor(env: Env, db: Database, ts = false): string[] {
+  if (db === 'postgres' && supportsPostgres(env)) return [...PACKAGES[env], 'pg', ...(ts ? ['@types/pg'] : [])]
   return db === 'pglite' && supportsPglite(env) ? [...PACKAGES[env], PGLITE_PACKAGE] : PACKAGES[env]
 }
 
-/** PGlite by default when the project already uses Postgres tooling. */
-export function detectDatabase(cwd: string): Database {
+const POSTGRES_TOOLING = ['@prisma/client', 'prisma', 'drizzle-orm', 'typeorm', '@mikro-orm/core', 'sequelize', 'knex', 'pg', 'postgres']
+
+/**
+ * The default choice: PGlite when the project uses it, a PostgreSQL server when it already uses
+ * Postgres tooling (PGlite where a server is not offered, i.e. Electron), else SQLite.
+ */
+export function detectDatabase(cwd: string, env: Env = 'node'): Database {
   const pkg = readPackageJson(cwd)
   const deps = { ...pkg.dependencies, ...pkg.devDependencies }
-  return [PGLITE_PACKAGE, '@prisma/client', 'prisma', 'drizzle-orm', 'pg', 'postgres'].some((n) => n in deps) ? 'pglite' : 'sqlite'
+  if (PGLITE_PACKAGE in deps) return 'pglite'
+  if (POSTGRES_TOOLING.some((n) => n in deps)) return supportsPostgres(env) ? 'postgres' : 'pglite'
+  return 'sqlite'
+}
+
+/** `DATABASE_URL` from the environment or the project's .env (what Prisma / TypeORM already use). */
+function existingDatabaseUrl(cwd: string, env: Record<string, string | undefined>): string | null {
+  if (env.ANODB_DATABASE_URL) return env.ANODB_DATABASE_URL
+  if (env.DATABASE_URL) return env.DATABASE_URL
+  const path = join(cwd, '.env')
+  if (!existsSync(path)) return null
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const m = /^\s*(?:ANODB_DATABASE_URL|DATABASE_URL)\s*=\s*"?([^"\s]+)"?/.exec(line)
+    if (m) return m[1]!
+  }
+  return null
 }
 
 interface PackageJson {
@@ -286,19 +318,30 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
 
   // ②' database (where anoDB runs in Node)
   let db: Database = 'sqlite'
+  let databaseUrl: string | null = null
   if (supportsPglite(env)) {
-    const detectedDb = detectDatabase(deps.cwd)
-    const dbChoices: Choice<Database>[] = (
-      [
-        ['sqlite', m.dbSqlite],
-        ['pglite', m.dbPglite],
-      ] as const
-    ).map(([value, label]) => ({ value, label: value === detectedDb ? `${label}${m.detected}` : label }))
+    const detectedDb = detectDatabase(deps.cwd, env)
+    const options: Array<readonly [Database, string]> = [
+      ['sqlite', m.dbSqlite],
+      ['pglite', m.dbPglite],
+      ...(supportsPostgres(env) ? [['postgres', m.dbPostgres] as const] : []),
+    ]
+    const dbChoices: Choice<Database>[] = options.map(([value, label]) => ({ value, label: value === detectedDb ? `${label}${m.detected}` : label }))
     db = await ask(flags.db, () => p.select(m.db, dbChoices, dbChoices.findIndex((c) => c.value === detectedDb)), detectedDb)
+    if (db === 'postgres' && !supportsPostgres(env)) {
+      p.log(m.dbPostgresUnsupported)
+      db = 'sqlite'
+    }
+    if (db === 'postgres') {
+      const known = existingDatabaseUrl(deps.cwd, deps.env ?? process.env) ?? DEFAULT_DATABASE_URL
+      databaseUrl = (await ask(flags.databaseUrl, () => p.input(m.dbUrl, known), known)).trim() || known
+    }
   } else if (flags.db === 'pglite') {
     p.log(m.dbPgliteUnsupported)
+  } else if (flags.db === 'postgres') {
+    p.log(m.dbPostgresUnsupported)
   }
-  p.log(`${m.driver}: ${db === 'pglite' ? 'PGlite (Postgres, WASM)' : DRIVERS[env]}`)
+  p.log(`${m.driver}: ${db === 'pglite' ? 'PGlite (Postgres, WASM)' : db === 'postgres' ? 'PostgreSQL server (pg)' : DRIVERS[env]}`)
 
   // ③ appId
   const pkgName = readPackageJson(deps.cwd).name ?? 'my-app'
@@ -344,6 +387,7 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
       ANODB_APP_ID: appId,
       ANODB_DEVICE_KEY: nsecEncode(deviceSk),
       ANODB_DELEGATION: bytesToBase64(new TextEncoder().encode(JSON.stringify(delegation))),
+      ...(databaseUrl ? { ANODB_DATABASE_URL: databaseUrl } : {}),
     }
     identity.fill(0)
   }
@@ -393,7 +437,7 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
   if (db === 'pglite' && env === 'node' && ensureIgnored(join(deps.cwd, '.gitignore'), `${PGLITE_DIR}/`)) p.log(m.pgliteIgnored)
 
   // ⑦ install
-  const packages = packagesFor(env, db)
+  const packages = packagesFor(env, db, ts)
   const doInstall = await ask(flags.install, () => p.confirm(`${m.install} (${packages.join(' ')})`, true), false)
   if (doInstall) {
     const pm = detectPackageManager(deps.cwd)
@@ -434,6 +478,7 @@ export async function runInit(flags: InitFlags, deps: InitDeps): Promise<InitRes
     p.log(m.nextReact)
   } else p.log(m.nextBrowser)
   if (db === 'pglite') p.log(m.nextPglite)
+  if (db === 'postgres') p.log(m.nextPostgres)
   return { env, framework, db, appId, files, recoveryKey, packages, wired }
 }
 
@@ -498,6 +543,24 @@ export function dbTemplate(env: Env, appId: string, keyMode: KeyMode, relays: st
   const optsType = ts ? ': { onRecoveryKey?: (key: string) => void }' : ''
   const takesOpts = keyMode === 'recovery'
   const pglite = db === 'pglite' && supportsPglite(env)
+  if (env === 'node' && db === 'postgres') {
+    return `import pg from 'pg'
+import { createAnoDB, pgDriver } from '@anodb/core'
+${schemaImport}
+
+// anoDB's tables live in your PostgreSQL server (ANODB_DATABASE_URL in .env). They are ordinary
+// Postgres tables: Prisma, TypeORM, Drizzle or psql can read them, and their writes to them are synced
+// as well. anoDB refuses to start if a table of the same name already exists that it did not create.
+export const pool = new pg.Pool({ connectionString: process.env.ANODB_DATABASE_URL ?? process.env.DATABASE_URL })
+
+// Keys come from .env (ANODB_DEVICE_KEY / ANODB_DELEGATION), written by \`npx @anodb/cli init\`.
+export const db = await createAnoDB({
+  appId: process.env.ANODB_APP_ID ?? ${id},
+  schema,
+  driver: pgDriver(pool),${relayLine}
+})
+`
+  }
   if (env === 'node' && pglite) {
     return `import { PGlite } from '${PGLITE_PACKAGE}'
 import { createAnoDB, pgliteDriver } from '@anodb/core'

@@ -4,12 +4,25 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { type Prompter, copySqlJsAssets, detectDatabase, detectEnv, runInit, wireProvider } from '../src/cli/init.js'
 import { PGlite } from '@electric-sql/pglite'
-import { createAnoDB, defineSchema, pgliteDriver } from '../src/index.js'
+import { createAnoDB, defineSchema, pgDriver, pgliteDriver } from '../src/index.js'
 import { envKeyStore } from '../src/keystore/env.js'
 import { nodeSqlite } from '../src/node.js'
-import { onCleanup } from './helpers/setup.js'
+import { TEST_PG_URL, freshPgDatabase, onCleanup, pgPool } from './helpers/setup.js'
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'anodb-init-'))
+
+async function reachable(url: string): Promise<boolean> {
+  const { default: pg } = await import('pg')
+  const c = new pg.Client({ connectionString: url, connectionTimeoutMillis: 2000 })
+  try {
+    await c.connect()
+    await c.end()
+    return true
+  } catch {
+    return false
+  }
+}
+const pgUp = await reachable(TEST_PG_URL)
 
 /** Scripted prompter: answers questions in order and records the output. */
 function scripted(answers: unknown[]) {
@@ -21,8 +34,10 @@ function scripted(answers: unknown[]) {
     return answers.shift()
   }
   const p: Prompter = {
-    select: async (q, choices) => {
+    // a number picks that choice, null takes the default, anything else is the value itself
+    select: async (q, choices, defaultIndex) => {
       const a = next(q)
+      if (a === null) return choices[defaultIndex]!.value
       return typeof a === 'number' ? choices[a]!.value : (a as never)
     },
     input: async (q, d) => (next(q) as string) || d,
@@ -185,15 +200,71 @@ describe('anodb init', () => {
     expect(await db.selectFrom('t').select('a').execute()).toEqual([{ a: 'hello' }])
   })
 
-  it('offers PGlite by default when the project already uses Postgres tooling (Prisma)', async () => {
+  it('offers a PostgreSQL server by default when the project already uses Postgres tooling, reusing its DATABASE_URL', async () => {
     const cwd = tmp()
     writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'api', dependencies: { '@prisma/client': '6' } }))
-    expect(detectDatabase(cwd)).toBe('pglite')
-    // lang=en, env=node, db: default (detected), …
-    const s = scripted([1, 4, 1, 'api', 0, 'server', 0, false, false])
+    writeFileSync(join(cwd, '.env'), 'DATABASE_URL="postgres://app:secret@db.local:5432/app"\n')
+    expect(detectDatabase(cwd)).toBe('postgres')
+    expect(detectDatabase(cwd, 'electron')).toBe('pglite')
+    // lang=en, env=node, db: default (detected), URL: default (from .env), …
+    const s = scripted([1, 4, null, '', 'api', 0, 'server', 0, false, false])
     const res = await runInit({}, { cwd, prompter: s.p, env: {} })
     expect(s.questions[2]).toBe('Database?')
-    expect(res.db).toBe('pglite')
+    expect(s.questions[3]).toBe('PostgreSQL connection URL?')
+    expect(res.db).toBe('postgres')
+    const dotenv = readFileSync(join(cwd, '.env'), 'utf8')
+    expect(dotenv).toContain('DATABASE_URL="postgres://app:secret@db.local:5432/app"') // left as it was
+    expect(dotenv).toContain('ANODB_DATABASE_URL=postgres://app:secret@db.local:5432/app')
+    // a project that uses PGlite keeps PGlite
+    const lite = tmp()
+    writeFileSync(join(lite, 'package.json'), JSON.stringify({ dependencies: { '@electric-sql/pglite': '0.5', pg: '8' } }))
+    expect(detectDatabase(lite)).toBe('pglite')
+  })
+
+  it('sets up a PostgreSQL server (Docker) for a Node server, and the result opens', async () => {
+    const cwd = tmp()
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ name: 'api' }))
+    writeFileSync(join(cwd, 'tsconfig.json'), '{}')
+    const installs: string[][] = []
+    const s = scripted([])
+    const url = 'postgres://app:app@127.0.0.1:5432/app'
+    const res = await runInit(
+      { yes: true, lang: 'en', env: 'node', db: 'postgres', databaseUrl: url, install: true },
+      { cwd, prompter: s.p, install: async (pm, pkgs) => void installs.push([pm, ...pkgs]) },
+    )
+    expect(res).toMatchObject({ env: 'node', db: 'postgres' })
+    expect(installs).toEqual([['npm', '@anodb/core', 'pg', '@types/pg']])
+    const dbTs = readFileSync(join(cwd, 'src/anodb/db.ts'), 'utf8')
+    expect(dbTs).toContain("import pg from 'pg'")
+    expect(dbTs).toContain('new pg.Pool({ connectionString: process.env.ANODB_DATABASE_URL ?? process.env.DATABASE_URL })')
+    expect(dbTs).toContain('driver: pgDriver(pool)')
+    expect(dbTs).not.toMatch(/PGlite|nodeSqlite/)
+    expect(s.log.join('\n')).toContain('Driver: PostgreSQL server (pg)')
+    const dotenv = readFileSync(join(cwd, '.env'), 'utf8')
+    expect(dotenv).toContain(`ANODB_DATABASE_URL=${url}`)
+    expect(readFileSync(join(cwd, '.gitignore'), 'utf8')).toContain('.env')
+    // JavaScript projects do not get @types/pg
+    const js = tmp()
+    const r2 = await runInit({ yes: true, lang: 'en', env: 'node', db: 'postgres', databaseUrl: url }, { cwd: js, prompter: scripted([]).p })
+    expect(r2.packages).toEqual(['@anodb/core', 'pg'])
+  })
+
+  it.skipIf(!pgUp)('the generated keys open anoDB on the PostgreSQL server', async () => {
+    const cwd = tmp()
+    const dbUrl = await freshPgDatabase()
+    await runInit({ yes: true, lang: 'en', env: 'node', db: 'postgres', databaseUrl: dbUrl }, { cwd, prompter: scripted([]).p })
+    const dotenv = readFileSync(join(cwd, '.env'), 'utf8')
+    const vars = Object.fromEntries(dotenv.trim().split('\n').map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
+    const db = await createAnoDB({
+      appId: vars.ANODB_APP_ID!,
+      schema: defineSchema({ t: { a: 'text' } }),
+      driver: pgDriver(await pgPool(vars.ANODB_DATABASE_URL!), { close: false }),
+      keyStore: envKeyStore(vars),
+      relays: [],
+    })
+    onCleanup(() => db.close())
+    await db.insertInto('t').values({ a: 'hello' }).execute()
+    expect(await db.selectFrom('t').select('a').execute()).toEqual([{ a: 'hello' }])
   })
 
   it('PGlite in the Electron main process; other environments keep SQLite', async () => {
@@ -210,5 +281,15 @@ describe('anodb init', () => {
     expect(r2.db).toBe('sqlite')
     expect(s.log.join('\n')).toContain('only available for Node / Electron')
     expect(readFileSync(join(expo, 'src/anodb/db.js'), 'utf8')).toContain('expoSqliteDriver')
+
+    // a PostgreSQL server is for Node servers only
+    const desktop = tmp()
+    const s3 = scripted([])
+    const r3 = await runInit({ yes: true, lang: 'en', env: 'electron', db: 'postgres' }, { cwd: desktop, prompter: s3.p })
+    expect(r3.db).toBe('sqlite')
+    expect(s3.log.join('\n')).toContain('only available for Node; using SQLite')
+    const s4 = scripted([])
+    expect((await runInit({ yes: true, lang: 'en', env: 'expo', db: 'postgres' }, { cwd: tmp(), prompter: s4.p })).db).toBe('sqlite')
+    expect(s4.log.join('\n')).toContain('only available for Node; using SQLite')
   })
 })

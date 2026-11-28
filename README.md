@@ -156,6 +156,31 @@ committed. A row that fails the checks (for example an unknown `space`, or someo
   system columns (`createdAt`, `updatedBy`, …) are ignored.
 - Pass `pgliteDriver(pg, { close: false })` when other code keeps using `pg` after `db.close()`.
 
+### A PostgreSQL server (Docker, existing databases)
+
+```sh
+npx @anodb/cli init --env node --db postgres --database-url postgres://app:app@127.0.0.1:5432/app
+```
+
+```ts
+import pg from 'pg'
+import { createAnoDB, pgDriver } from '@anodb/core'
+
+export const pool = new pg.Pool({ connectionString: process.env.ANODB_DATABASE_URL })
+export const db = await createAnoDB({ appId, schema, driver: pgDriver(pool) })
+```
+
+This behaves the same as PGlite above, but on a real server. anoDB's tables are ordinary tables
+in that database.
+
+- **Other tools on the same database.** Prisma, TypeORM, Drizzle and psql can connect to it with
+  their own connections. anoDB commits their writes to its tables through triggers, and picks them
+  up right away with `LISTEN / NOTIFY` on a connection of its own.
+- **Connections.** Transactions use one pooled connection and `LISTEN` holds another, so the pool
+  needs at least 3. `pgDriver(pool, { close: false })` leaves the pool open after `db.close()`.
+- **Name conflicts.** anoDB refuses to start when a table with a schema table's name already exists
+  and anoDB did not create it. Use another database, or rename one of the tables.
+
 ### Keys (most secure defaults)
 
 | Environment | Default key store |
