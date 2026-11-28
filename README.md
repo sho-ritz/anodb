@@ -359,6 +359,32 @@ This is **phase 1** of a compatible migration (see `docs/DECISIONS.md`, rows 29�
 are still always written and read, so older versions keep syncing. A later version switches each
 space to its picked relays automatically once all of its devices run a version that reads them.
 
+### Host your own relay on Cloudflare
+
+You can also run a relay of your own on your Cloudflare account with one command. It runs on
+Workers with a SQLite-backed Durable Object, on the free plan:
+
+```sh
+npx anodb relay deploy          # or: npx @anodb/cli relay deploy
+# ✔ Your relay is live: wss://anodb-relay.<your-account>.workers.dev
+```
+
+The first run opens Wrangler's browser login. The Worker name is saved in
+`.anodb/relay/relay.json`, so running the command again updates the same Worker, and the events
+it already stores are kept. Set `CLOUDFLARE_API_TOKEN` to deploy from CI.
+
+- **Supported NIPs**: NIP-01, NIP-09 (anoDB's prune), NIP-11 and NIP-77 (fast `reconcile`).
+- **Accepted kinds**: by default only the kinds anoDB publishes. Pass `--kinds '*'` to accept any
+  kind, or a list like `--kinds 1,7303`.
+- **Other commands**: `--name <worker>` names the Worker, `--dry-run` builds without deploying,
+  and `npx anodb relay dev` runs the relay locally at `ws://localhost:8787`.
+- **Checking a deployed relay**:
+  `ANODB_RELAY_URL=wss://… npx vitest run test/relay.test.ts` runs a sync between two apps
+  against it.
+- **Who can use it**: the relay is open. Anyone who knows the URL can publish the accepted kinds.
+  Events are encrypted and signed, so this does not expose your data. NIP-42 (allowing only
+  authenticated connections) is not implemented yet.
+
 ## Sync health
 
 ```ts

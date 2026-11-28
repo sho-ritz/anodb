@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — self-hosted relay on Cloudflare
+
+- `npx anodb relay deploy`: deploys a Nostr relay to your Cloudflare account, on Workers with a
+  SQLite-backed Durable Object. It uses Wrangler's browser login and prints the `wss://` URL.
+  Running it again updates the same Worker and keeps the stored events.
+- `npx anodb relay dev` runs the same relay locally, and `--dry-run` only builds it.
+- The relay supports NIP-01, 09, 11 and 77. By default it accepts only the kinds anoDB uses.
+  Subscriptions are stored in SQL, so they survive WebSocket hibernation.
+
 ## Unreleased — server-confirmed tables
 
 - `confirmed(def, { by })`: only the given identity (your server) may write the table. Every

@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { type InitFlags, copySqlJsAssets, runInit } from './init.js'
+import { type RelayFlags, runRelay } from './relay.js'
 
 const HELP = `anodb — Absolutely No DB
 
 Usage:
   npx @anodb/cli init [options]     set up anoDB in this project (interactive)
   npx anodb assets             copy the sql.js files into <public>/anodb (browser apps)
+  npx anodb relay deploy       host your own relay on Cloudflare (Workers + Durable Objects)
+  npx anodb relay dev          run that relay locally (ws://localhost:8787)
 
 Options:
   --lang ja|en                 language of the prompts
@@ -22,7 +25,41 @@ Options:
   --wire / --no-wire           wrap the app in <DBProvider> (React)
   --yes                        accept defaults, no prompts
   --force                      overwrite generated files
+
+Relay options:
+  --name <worker>              Worker name (default anodb-relay; remembered in .anodb/relay)
+  --kinds anodb|*|<k,k>        accepted event kinds (default: the kinds anoDB uses)
+  --dir <path>                 where wrangler.toml / relay.json live (default .anodb/relay)
+  --dry-run                    build the Worker without deploying
+  --port <n>                   port for relay dev
 `
+
+function parseRelay(argv: string[]): RelayFlags {
+  const flags: RelayFlags = {}
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!
+    const val = () => {
+      const v = argv[++i]
+      if (v === undefined) throw new Error(`missing value for ${a}`)
+      return v
+    }
+    switch (a) {
+      case '--lang': {
+        const v = val()
+        if (v !== 'ja' && v !== 'en') throw new Error('--lang must be one of ja, en')
+        flags.lang = v
+        break
+      }
+      case '--name': flags.name = val(); break
+      case '--kinds': flags.kinds = val(); break
+      case '--dir': flags.dir = val(); break
+      case '--dry-run': flags.dryRun = true; break
+      case '--port': flags.port = Number(val()); break
+      default: throw new Error(`unknown option ${a}`)
+    }
+  }
+  return flags
+}
 
 function parse(argv: string[]): { cmd: string | undefined; flags: InitFlags } {
   const flags: InitFlags = {}
@@ -64,7 +101,12 @@ function parse(argv: string[]): { cmd: string | undefined; flags: InitFlags } {
 }
 
 try {
-  const { cmd, flags } = parse(process.argv.slice(2))
+  const argv = process.argv.slice(2)
+  if (argv[0] === 'relay') {
+    await runRelay(argv[1], parseRelay(argv.slice(2)), { cwd: process.cwd() })
+    process.exit(0)
+  }
+  const { cmd, flags } = parse(argv)
   if (cmd === 'assets') {
     const out = copySqlJsAssets(process.cwd())
     if (!out) throw new Error('sql.js is not installed (npm install sql.js)')
