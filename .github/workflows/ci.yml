@@ -17,3 +17,30 @@ jobs:
       - run: npm test
       - run: npm run test:pglite
       - run: npm run build
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci && npm run build
+      # The checked-in vectors must match what the TypeScript implementation produces now.
+      - name: Conformance vectors are up to date
+        run: |
+          node conformance/generate.mjs
+          if ! git diff --exit-code -- conformance; then
+            echo "conformance vectors are stale; run node conformance/generate.mjs"
+            exit 1
+          fi
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo run -q -p anodb-protocol --example interop | node conformance/check-rust.mjs
+      - run: cargo clippy -p anodb-engine --features tls -- -D warnings
+      # A TypeScript device and a Rust device share spaces through a relay.
+      - name: Interop with the TypeScript implementation
+        run: |
+          cargo build -q -p anodb-engine --example peer
+          ANODB_RUST_PEER="$PWD/target/debug/examples/peer" npx vitest run test/rust-interop.test.ts

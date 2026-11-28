@@ -1,0 +1,23 @@
+[package]
+name = "anodb-engine"
+description = "anoDB engine: SQLite storage, merge and membership on top of anodb-protocol, plus a relay client"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+default = []
+# wss:// relays (rustls with the webpki root certificates).
+tls = ["tungstenite/rustls-tls-webpki-roots"]
+
+[dependencies]
+anodb-protocol = { path = "../anodb-protocol" }
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+serde_json = "1"
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
+thiserror = "2"
+hex = "0.4"
+getrandom = "0.3"

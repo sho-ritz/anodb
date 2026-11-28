@@ -1,0 +1,114 @@
+{
+  "description": "NIP-01 event id + Schnorr signature verification",
+  "cases": [
+    {
+      "name": "valid",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "t",
+            "x"
+          ],
+          [
+            "e",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "",
+            "root"
+          ]
+        ],
+        "content": "hello \"quoted\"\n\ttab \u0001 ü 🎉",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "258fa064a22046daadbc2054c887002800263f6758ea900877d30fc46a3b8814",
+        "sig": "841820af3023b7a694e67797d3f41b16b559f304c7b5121e0b7bc7437aa8189976829e1f3d11139c4433579b3ab0b51cc882b12a9e919670d6a9a74806bc8ced"
+      },
+      "valid": true
+    },
+    {
+      "name": "tampered content",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "t",
+            "x"
+          ],
+          [
+            "e",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "",
+            "root"
+          ]
+        ],
+        "content": "changed",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "258fa064a22046daadbc2054c887002800263f6758ea900877d30fc46a3b8814",
+        "sig": "841820af3023b7a694e67797d3f41b16b559f304c7b5121e0b7bc7437aa8189976829e1f3d11139c4433579b3ab0b51cc882b12a9e919670d6a9a74806bc8ced"
+      },
+      "valid": false
+    },
+    {
+      "name": "tampered tags",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [],
+        "content": "hello \"quoted\"\n\ttab \u0001 ü 🎉",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "258fa064a22046daadbc2054c887002800263f6758ea900877d30fc46a3b8814",
+        "sig": "841820af3023b7a694e67797d3f41b16b559f304c7b5121e0b7bc7437aa8189976829e1f3d11139c4433579b3ab0b51cc882b12a9e919670d6a9a74806bc8ced"
+      },
+      "valid": false
+    },
+    {
+      "name": "wrong pubkey",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "t",
+            "x"
+          ],
+          [
+            "e",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "",
+            "root"
+          ]
+        ],
+        "content": "hello \"quoted\"\n\ttab \u0001 ü 🎉",
+        "pubkey": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+        "id": "258fa064a22046daadbc2054c887002800263f6758ea900877d30fc46a3b8814",
+        "sig": "841820af3023b7a694e67797d3f41b16b559f304c7b5121e0b7bc7437aa8189976829e1f3d11139c4433579b3ab0b51cc882b12a9e919670d6a9a74806bc8ced"
+      },
+      "valid": false
+    },
+    {
+      "name": "bad sig",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "t",
+            "x"
+          ],
+          [
+            "e",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "",
+            "root"
+          ]
+        ],
+        "content": "hello \"quoted\"\n\ttab \u0001 ü 🎉",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "258fa064a22046daadbc2054c887002800263f6758ea900877d30fc46a3b8814",
+        "sig": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "valid": false
+    }
+  ]
+}

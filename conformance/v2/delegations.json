@@ -1,0 +1,100 @@
+{
+  "description": "verifyDelegation(event, devicePubkey) → identity or null (PROTOCOL.md §1.1)",
+  "cases": [
+    {
+      "name": "valid",
+      "event": {
+        "kind": 7304,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "device",
+            "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23"
+          ]
+        ],
+        "content": "{\"name\":\"phone\"}",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31",
+        "sig": "aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678"
+      },
+      "device": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "identity": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4"
+    },
+    {
+      "name": "other identity",
+      "event": {
+        "kind": 7304,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "device",
+            "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23"
+          ]
+        ],
+        "content": "{\"name\":\"x\"}",
+        "pubkey": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+        "id": "64ad40df35b5d05e6273abbe71e5282ab3e2cb3a47452595ac32806a4947dcc7",
+        "sig": "cba6497b3cc02783862c3994fb3508233e0df1744045d4b2630270feaa743721e9ce95b6ea2559cde4839df4c257291f6ab3022013e1f11fcedd6f85ab9955b4"
+      },
+      "device": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "identity": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e"
+    },
+    {
+      "name": "wrong device",
+      "event": {
+        "kind": 7304,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "device",
+            "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23"
+          ]
+        ],
+        "content": "{\"name\":\"phone\"}",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31",
+        "sig": "aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678"
+      },
+      "device": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "identity": null
+    },
+    {
+      "name": "wrong kind",
+      "event": {
+        "kind": 1,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "device",
+            "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23"
+          ]
+        ],
+        "content": "",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "678078c473def1da359b776aa6faf41897fe8ad835eb1d20e52011ac4866b055",
+        "sig": "6948e869bbcdcb5f4d99a18d73968ba003b143d426454df5c509d2b865ef467cfb11b7ad136752cc1c4f907ce858de6876a5d2d8d16e578a7db40bc548f94779"
+      },
+      "device": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "identity": null
+    },
+    {
+      "name": "tampered",
+      "event": {
+        "kind": 7304,
+        "created_at": 1790000000,
+        "tags": [
+          [
+            "device",
+            "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e"
+          ]
+        ],
+        "content": "{\"name\":\"phone\"}",
+        "pubkey": "a9151f15e8e935065a0c7f182a12e1d4a069fdc590e7333382ffc2d74a3f4bf4",
+        "id": "304e6c66dbce466d327ccc3e1a75b9e8094f3e53591a48eea81663019ef4cd31",
+        "sig": "aacceeb302bfbc021a9f841390b6043d1ab9c9ab5dbae8d6afbd92a921d63762124c683f2fe4abbd629949e8eb27775e54b18e533c5dbf76ac25773b158ad678"
+      },
+      "device": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "identity": null
+    }
+  ]
+}

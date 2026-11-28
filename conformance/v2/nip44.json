@@ -1,0 +1,41 @@
+{
+  "description": "NIP-44 v2 conversation keys and encryption with a fixed nonce",
+  "conversationKeys": [
+    {
+      "secret": "9eaed41163d1253a9fbbe4d68717e570ace9e3ec7b2cf39ab013048fab325f3a",
+      "pubkey": "0297a94328893888f78987920b47f04d5d8aac697c1b0d4b36a96ceed33f773e",
+      "conversationKey": "40b5086d74f8569e365975d0a5fa05152bf3c3463756ffc72c6ac3aa4f0b3792"
+    },
+    {
+      "secret": "c0cb16c06206469466d99a71b40f54dace25739e37cd08e8177a2b7ec2bc7b4a",
+      "pubkey": "03c8bdd04aca0d33775d9fd153e43949ab422cbe7a2309502f8bf48b5c2a9c23",
+      "conversationKey": "40b5086d74f8569e365975d0a5fa05152bf3c3463756ffc72c6ac3aa4f0b3792"
+    }
+  ],
+  "encrypt": [
+    {
+      "conversationKey": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+      "nonce": "6927ed3401499cb73d0b037755fe190fbef4db379853ece86a22294446b6f266",
+      "plaintext": "a",
+      "payload": "Amkn7TQBSZy3PQsDd1X+GQ++9Ns3mFPs6GoiKURGtvJm38wC3HZu4eMORxNPYFp++/Rc2OyfXYOixE5szEJ19eSiBO47st+KlfzVFPX8mqk1yLDc9HEIHuDIjq9O3H0F+X7s"
+    },
+    {
+      "conversationKey": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+      "nonce": "f5c18c70c8731ff55247cfc77506729f58cb551b9c6a2303e629a3bdcef274b7",
+      "plaintext": "こんにちは anoDB",
+      "payload": "AvXBjHDIcx/1UkfPx3UGcp9Yy1UbnGojA+Ypo73O8nS3pqrE0rh5OS6H3fqMlNFDZSR3N5gB5XF7MT+TI4P+RosKq/as6HA15VsciW/sn2PkiYjKn4aBDfv2Kko5QQK0Pgq5"
+    },
+    {
+      "conversationKey": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+      "nonce": "698f4d9ddb757c334d567fecc4a4205e1053fc3d5d361a678fa3924fd0e62f58",
+      "plaintext": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "payload": "AmmPTZ3bdXwzTVZ/7MSkIF4QU/w9XTYaZ4+jkk/Q5i9YLlIMCNl73R6aOkbRwk1BCbo1X9cuu4sJcW4s4RUmHpb+pbaIA30aoMkSS5Yc0AhyJFUm5Ye+Cw2HMnT9Ah3cTt8fZbtAabmfz8nxm/kmBVaawit7QHJylRLItRrBc9gqd3xfDTQSNW+k+inHSbx7OqvPP3P48+UEMDXgVpahc27kNn87gVYccrVk1Yo24jVzB+VRcoIrHPA67yMPrrdXK3VDtp0re2YfYFITunpw/rXctI13mLFxAMl5VVLoWAh/t4tgWWM3kFJHB4nS4bWsv3r3mWLdo9WgNhWtPEAqWGB1WZEjXXI1MXLOmJreGi+VYF4wnHaSxGnkEZ7e4LporRPhY3Pil6TkyDp2D4jOD/66zuu1G/Idu/mqDaicMsaZko9lM8qcBIzZTVH903HnIyQPxdCc2HSapfaxLp57G3pom/OeABqXJxmaaPICQigOZ7TIAgqpfgTvF0xwl05uOVsxv/ZuAzaMO+Iu19O8SLZYJt3EyLXkVRytgFpiJfqDaxOFuNX6VxKuTQmybj1dWEx9I0fmiinJ1uSbq8yikwhln0QRxtds8fgKTwb4KHbf2BTpPn0x76cN2Bgzm2+84y9MroD0V1xRhcRlI4JLtrL2+s0AUGRr5ptsm0/mATmdl/VTww8amVzHg9bT7pmTzQkKSI06nm7zE7Di8sTDPCw0li5uYbXCiEQ6XLK/UFzrPC4nkcbWjWbyR7Wux2VqxR4iQsNDshIbYSN9ws6SUTG+hPOUFjvNFSIC+/F5Llfpa4zfoWhskT49RpGzBWJvrVVo0CP4MAL2S/NPutKT39HJyTGAT8d5c44jeY3okAsljsscU0ZJFoUHnYqw5FZoeGuoJto9cUhFBI3VLabcALyFzz5HrESz0iumHSTnMToOAvnZF06MOB7NHIaYQ2dazB4Up9bIuC+DyQ/VvKMVuuriegLeuI3knDLrn1o6XIqMmTKHNHd2sxoqmTsMpv4blY01Tpo+u3RPKwsDYzo1+Xwy+2MTKKpU+48PgBA9sEY/z4nHBFrP6XyD8PVpbv8FM7N+9nTixD3fFBF6y+XcHABLYmGWjf5TVeQ9gay44Z/XalkkWDtrPKozpzxKJQIuGbVx1sdTeRYVgKjdS0ZngklWxYfFg5a50yEGJwtyylKvV2qa7FDueq3xjLc2NEh6pzyrn4ZPrlsJ1n1C8sWpIsgTFQb5ApHzms5NfGUCOydii0hXeJuFjPtAkWzgp0DKRoD1UI8uO23Q8kcSWINq6pHWX9Pdmv3bUwEG7Hq6TSKmejqyXOWl3FC3bReMOq8knWM1cVhe90ftltZqPAfgjg17bu/RGjPLGIMYRIENYEnHu4jonjgIPYTPsn1GQyI3XZB/OEWoxaCYjxsMtBmKNEbVbZbo6qbFlTYqUuxeXR7FkIc="
+    },
+    {
+      "conversationKey": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+      "nonce": "b95250514928a27aae5a4e5ba42f7aa2d7e2772c142669803d78272a32a681c7",
+      "plaintext": "{\"v\":2,\"t\":\"ch\"}",
+      "payload": "ArlSUFFJKKJ6rlpOW6QveqLX4ncsFCZpgD14JyoypoHHa9F1Q3yLfxoa6gyK06Ltzrvg9CwmcZHHAnfzch83KJqz/xPiYVuZHAXZVTVTvTms3rIHa5LFOWu3+mOPwBR3nehD"
+    }
+  ]
+}

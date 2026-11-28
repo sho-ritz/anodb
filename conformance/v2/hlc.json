@@ -1,0 +1,105 @@
+{
+  "description": "Hybrid logical clock: encoding (base36 millis[10] + counter[5] + \"-\" + node[16]) and tick/receive with a controlled wall clock (§4)",
+  "encode": [
+    {
+      "millis": 0,
+      "counter": 0,
+      "node": "0123456789abcdef",
+      "hlc": "000000000000000-0123456789abcdef"
+    },
+    {
+      "millis": 1790000000000,
+      "counter": 42,
+      "node": "fedcba9876543210",
+      "hlc": "00mubbs7i800016-fedcba9876543210"
+    },
+    {
+      "millis": 3656158440062975,
+      "counter": 60466175,
+      "node": "ffffffffffffffff",
+      "hlc": "zzzzzzzzzzzzzzz-ffffffffffffffff"
+    }
+  ],
+  "invalid": [
+    {
+      "hlc": "",
+      "valid": false
+    },
+    {
+      "hlc": "ABC",
+      "valid": false
+    },
+    {
+      "hlc": "0000000000000000-0123456789abcdef",
+      "valid": false
+    },
+    {
+      "hlc": "000000000000000-0123456789ABCDEF",
+      "valid": false
+    },
+    {
+      "hlc": "000000000000000_0123456789abcdef",
+      "valid": false
+    }
+  ],
+  "clock": {
+    "node": "0123456789abcdef",
+    "steps": [
+      {
+        "op": "tick",
+        "wall": 1000,
+        "result": "00000000rs00000-0123456789abcdef"
+      },
+      {
+        "op": "tick",
+        "wall": 1000,
+        "result": "00000000rs00001-0123456789abcdef"
+      },
+      {
+        "op": "tick",
+        "wall": 2000,
+        "result": "00000001jk00000-0123456789abcdef"
+      },
+      {
+        "op": "receive",
+        "wall": 2000,
+        "remote": "00000003uw00007-ffffffffffffffff",
+        "result": "00000003uw00007-0123456789abcdef"
+      },
+      {
+        "op": "tick",
+        "wall": 2000,
+        "result": "00000003uw00008-0123456789abcdef"
+      },
+      {
+        "op": "receive",
+        "wall": 2000,
+        "remote": "00000003uw0000k-ffffffffffffffff",
+        "result": "00000003uw0000k-0123456789abcdef"
+      },
+      {
+        "op": "receive",
+        "wall": 2000,
+        "remote": "000000002s0002r-ffffffffffffffff",
+        "result": "00000003uw0000k-0123456789abcdef"
+      },
+      {
+        "op": "receive",
+        "wall": 9000,
+        "remote": "00000002bc00001-ffffffffffffffff",
+        "result": "00000006y000000-0123456789abcdef"
+      },
+      {
+        "op": "tick",
+        "wall": 9000,
+        "result": "00000006y000001-0123456789abcdef"
+      }
+    ]
+  },
+  "counterOverflow": {
+    "node": "0123456789abcdef",
+    "start": "000000001ezzzzz-ffffffffffffffff",
+    "wall": 10,
+    "tick": "000000001f00000-0123456789abcdef"
+  }
+}

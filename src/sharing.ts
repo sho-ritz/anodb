@@ -29,7 +29,7 @@ import {
   mayWrite,
   parseOp,
 } from './membership.js'
-import { type Change, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, parseInboxPayload, parseStreamPayload } from './protocol.js'
+import { type Change, type InboxPayload, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, isChange, parseInboxPayload, parseStreamPayload } from './protocol.js'
 import { changeAllowed } from './policy.js'
 import { SYS_DELETED, authorityOf } from './schema.js'
 import type { Store } from './store.js'
@@ -67,7 +67,7 @@ export interface Device {
   current: boolean
 }
 
-interface KeyGrant {
+export interface KeyGrant {
   sp: string
   name: string
   personal: boolean
@@ -75,6 +75,147 @@ interface KeyGrant {
   key: string
   ops: string[]
 }
+
+// ---- pure protocol rules (§5.3–5.5), shared with the conformance vectors --------------------
+
+/** The grant fields a `key` / `invite` / pairing grant must have (§5.3). */
+export function parseKeyGrant(g: unknown): KeyGrant | null {
+  if (typeof g !== 'object' || g === null) return null
+  const x = g as Record<string, unknown>
+  return typeof x.sp === 'string' &&
+    typeof x.key === 'string' &&
+    /^[0-9a-f]{64}$/.test(x.key) &&
+    Array.isArray(x.ops) &&
+    Number.isSafeInteger(x.num) &&
+    (x.num as number) >= 0 &&
+    (x.name === undefined || typeof x.name === 'string')
+    ? (g as KeyGrant)
+    : null
+}
+
+/** The receiver's role if a `key` / `invite` grant from `sender` is acceptable under `m` (§5.3). */
+export function grantRole(m: Membership, sender: string, me: string): Role | undefined {
+  return mayManage(m, sender) || sender === me ? m.roles.get(me) : undefined
+}
+
+export interface PortableOp {
+  id: string
+  device: string
+  identity: string
+  seq: number
+  delegation: NostrEvent
+  /** The inner message content (the op payload JSON). */
+  payload: string
+}
+
+/** A complete signed inner op event carried by a grant or snapshot, verified without epoch keys. */
+export function portableOp(space: string, innerJson: string): PortableOp | null {
+  let inner: unknown
+  try {
+    inner = JSON.parse(innerJson)
+  } catch {
+    return null
+  }
+  if (!isEvent(inner) || inner.kind !== MESSAGE_KIND || !verifySignedEvent(inner)) return null
+  const p = parseStreamPayload(inner.content)
+  if (!p || p.sp !== space || p.t !== 'op') return null
+  const identity = verifyDelegation(p.dlg, inner.pubkey)
+  if (!identity) return null
+  return { id: inner.id, device: inner.pubkey, identity, seq: p.seq, delegation: p.dlg, payload: inner.content }
+}
+
+export interface SnapshotMessage {
+  device: string
+  identity: string
+  seq: number
+  /** The `snap` payload JSON. */
+  payload: string
+}
+
+export interface AssembledSnapshot {
+  device: string
+  author: string
+  /** Highest seq among its parts. */
+  last: number
+  cells: Change[]
+  heads: Record<string, number>
+}
+
+/** Snapshots (grouped by device and `sid`) whose parts have all arrived, in message order. */
+export function assembleSnapshots(messages: Iterable<SnapshotMessage>): AssembledSnapshot[] {
+  const groups = new Map<string, Array<{ i: number; n: number; seq: number; identity: string; device: string; body: { ops?: unknown; cells?: unknown } }>>()
+  for (const m of messages) {
+    const p = JSON.parse(m.payload) as { sid: string; i: number; n: number; body: { ops?: unknown; cells?: unknown } }
+    const k = `${m.device}/${p.sid}`
+    const list = groups.get(k) ?? []
+    list.push({ i: p.i, n: p.n, seq: m.seq, identity: m.identity, device: m.device, body: p.body })
+    groups.set(k, list)
+  }
+  const out: AssembledSnapshot[] = []
+  for (const parts of groups.values()) {
+    const n = parts[0]!.n
+    if (parts.length !== n || new Set(parts.map((p) => p.i)).size !== n || parts.some((p) => p.n !== n)) continue
+    const cells = parts.flatMap((p) => (Array.isArray(p.body?.cells) ? (p.body.cells as Change[]) : []))
+    const h = parts.find((p) => p.i === 0)?.body as { heads?: unknown } | undefined
+    const heads: Record<string, number> = {}
+    if (h?.heads && typeof h.heads === 'object') {
+      for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
+    }
+    // A change (as in `ch` messages), optionally followed by the identity that signed it.
+    const valid = (c: unknown) =>
+      Array.isArray(c) && (c.length === 5 ? isChange(c) : c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5]) && isChange(c.slice(0, 5)))
+    out.push({ device: parts[0]!.device, author: parts[0]!.identity, last: Math.max(...parts.map((p) => p.seq)), cells: cells.filter(valid), heads })
+  }
+  return out
+}
+
+/**
+ * Whether a complete snapshot is merged (§5.4). It restates every cell, including other members'
+ * rows, so it is only trusted from someone who may manage the space (owner / admin) — or from this
+ * identity's own devices. A plain writer's snapshot could otherwise rewrite or impersonate anyone's rows.
+ */
+export function snapshotTrusted(m: Membership, me: string, s: AssembledSnapshot): boolean {
+  if (!mayWrite(m, s.author, s.device, s.last)) return false
+  const role = m.roles.get(s.author)
+  return s.author === me || role === 'owner' || role === 'admin'
+}
+
+/**
+ * Cells of a trusted snapshot to merge: cells that name their signer must pass the row rule for it,
+ * and cells of a confirmed() table count only in a snapshot by its authority.
+ */
+export function snapshotChanges(schema: SchemaDefinition, m: Membership, s: AssembledSnapshot): Change[] {
+  return s.cells.filter((c) => {
+    // A snapshot restates `by`, so it cannot vouch for a confirmed() cell unless the authority signed it.
+    const authority = authorityOf(schema[c[0]])
+    if (authority) return s.author === authority
+    const by = (c as readonly unknown[])[5]
+    return typeof by !== 'string' || changeAllowed(schema, c, by, m.roles.get(by))
+  })
+}
+
+/**
+ * Open an envelope sent to one device (inbox) or to a pairing secret, given its conversation key:
+ * the inner message, its payload and the sending identity, or null.
+ */
+export function openDirect(outer: NostrEvent, convKey: Uint8Array): { inner: NostrEvent; payload: InboxPayload; sender: string } | null {
+  if (outer.content.length > 200_000 || !verifySignedEvent(outer)) return null
+  let inner: unknown
+  try {
+    inner = JSON.parse(decrypt(outer.content, convKey))
+  } catch {
+    return null
+  }
+  if (!isEvent(inner) || inner.kind !== MESSAGE_KIND || !verifySignedEvent(inner)) return null
+  const payload = parseInboxPayload(inner.content)
+  if (!payload) return null
+  const sender = verifyDelegation(payload.dlg, inner.pubkey)
+  return sender ? { inner, payload, sender } : null
+}
+
+/** The 6-digit code both devices show while pairing (§5.5). */
+export const pairingCode = (devicePk: string, secret: string) =>
+  String(parseInt(sha256Hex(`anodb/v2/pair-code/${devicePk}/${secret}`).slice(0, 8), 16) % 1_000_000).padStart(6, '0')
 
 /**
  * Cells for a snapshot. Deleted rows keep only their tombstone (so late writes cannot resurrect
@@ -84,8 +225,6 @@ export function snapshotCells(cells: Change[]): Change[] {
   const deleted = new Set(cells.filter((c) => c[2] === SYS_DELETED && c[3] === true).map((c) => `${c[0]}\u0000${c[1]}`))
   return cells.filter((c) => !deleted.has(`${c[0]}\u0000${c[1]}`) || c[2] === SYS_DELETED)
 }
-
-const pairingCode = (devicePk: string, secret: string) => String(parseInt(sha256Hex(`anodb/v2/pair-code/${devicePk}/${secret}`).slice(0, 8), 16) % 1_000_000).padStart(6, '0')
 
 /** Adds multi-user spaces, roles, invitations, key rotation, snapshots and device pairing. */
 export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
@@ -129,16 +268,9 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   protected override async rebuildSpace(s: Store, space: string): Promise<Set<string>> {
     const touched = await super.rebuildSpace(s, space)
+    const m = this.membership(space)
     for (const snap of await this.#completeSnapshots(s, space)) {
-      // Cells that name their signer must still pass the row rule for that signer.
-      const cells = snap.cells.filter((c) => {
-        // A snapshot restates `by`, so it cannot vouch for a confirmed() cell unless the authority signed it.
-        const authority = authorityOf(this.schema[c[0]])
-        if (authority) return snap.author === authority
-        const by = (c as readonly unknown[])[5]
-        return typeof by !== 'string' || changeAllowed(this.schema, c, by, this.roleOf(space, by))
-      })
-      for (const t of await s.applyChanges(space, cells)) touched.add(t)
+      for (const t of await s.applyChanges(space, snapshotChanges(this.schema, m, snap))) touched.add(t)
     }
     return touched
   }
@@ -317,37 +449,9 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   }
 
   /** Snapshots whose parts all arrived and whose author may write. */
-  async #completeSnapshots(s: Store, space: string): Promise<Array<{ cells: Change[]; heads: Record<string, number>; author: string }>> {
-    const groups = new Map<string, Array<{ i: number; n: number; seq: number; identity: string; device: string; body: { ops?: unknown; cells?: unknown } }>>()
-    for (const m of await s.messages(space, 'snap')) {
-      const p = JSON.parse(m.payload) as { sid: string; i: number; n: number; body: { ops?: unknown; cells?: unknown } }
-      const k = `${m.device}/${p.sid}`
-      const list = groups.get(k) ?? []
-      list.push({ i: p.i, n: p.n, seq: m.seq, identity: m.identity, device: m.device, body: p.body })
-      groups.set(k, list)
-    }
-    const out: Array<{ cells: Change[]; heads: Record<string, number>; author: string }> = []
-    for (const parts of groups.values()) {
-      const n = parts[0]!.n
-      if (parts.length !== n || new Set(parts.map((p) => p.i)).size !== n || parts.some((p) => p.n !== n)) continue
-      const last = Math.max(...parts.map((p) => p.seq))
-      const author = parts[0]!.identity
-      if (!this.isAuthorizedWriter(space, author, parts[0]!.device, last)) continue
-      // A snapshot restates every cell, including other members' rows, so it is only trusted from
-      // someone who may manage the space (owner / admin) — or from this identity's own devices.
-      // A plain writer's snapshot could otherwise rewrite or impersonate anyone's rows.
-      const role = this.roleOf(space, author)
-      if (author !== this.pubkey && role !== 'owner' && role !== 'admin') continue
-      const cells = parts.flatMap((p) => (Array.isArray(p.body?.cells) ? (p.body.cells as Change[]) : []))
-      const h = parts.find((p) => p.i === 0)?.body as { heads?: unknown } | undefined
-      const heads: Record<string, number> = {}
-      if (h?.heads && typeof h.heads === 'object') {
-        for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
-      }
-      const valid = (c: unknown) => Array.isArray(c) && (c.length === 5 || (c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5])))
-      out.push({ cells: cells.filter(valid), heads, author })
-    }
-    return out
+  async #completeSnapshots(s: Store, space: string): Promise<AssembledSnapshot[]> {
+    const m = this.membership(space)
+    return assembleSnapshots(await s.messages(space, 'snap')).filter((x) => snapshotTrusted(m, this.pubkey, x))
   }
 
   protected override async afterLocalWrite(spaces: string[]): Promise<void> {
@@ -401,20 +505,11 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   /** Store a portable signed op (from an invitation or snapshot) after verifying it. */
   async #importInner(s: Store, space: string, innerJson: string): Promise<boolean> {
-    let inner: unknown
-    try {
-      inner = JSON.parse(innerJson)
-    } catch {
-      return false
-    }
-    if (!isEvent(inner) || inner.kind !== MESSAGE_KIND || !verifySignedEvent(inner)) return false
-    const p = parseStreamPayload(inner.content)
-    if (!p || p.sp !== space || p.t !== 'op') return false
-    const identity = verifyDelegation(p.dlg, inner.pubkey)
-    if (!identity) return false
-    if (await s.hasMessage(space, inner.pubkey, p.seq)) return true
-    await s.putMessage({ space, device: inner.pubkey, seq: p.seq, identity, type: 'op', payload: inner.content }, inner.id, innerJson)
-    await s.putDevice(inner.pubkey, identity, JSON.stringify(p.dlg), delegationName(p.dlg))
+    const op = portableOp(space, innerJson)
+    if (!op) return false
+    if (await s.hasMessage(space, op.device, op.seq)) return true
+    await s.putMessage({ space, device: op.device, seq: op.seq, identity: op.identity, type: 'op', payload: op.payload }, op.id, innerJson)
+    await s.putDevice(op.device, op.identity, JSON.stringify(op.delegation), delegationName(op.delegation))
     return true
   }
 
@@ -470,18 +565,9 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
       if (!secret) return 'invalid'
       convKey = secretKeyFor(secret)
     }
-    if (outer.content.length > 200_000 || !verifySignedEvent(outer)) return 'invalid'
-    let inner: unknown
-    try {
-      inner = JSON.parse(decrypt(outer.content, convKey))
-    } catch {
-      return 'invalid'
-    }
-    if (!isEvent(inner) || inner.kind !== MESSAGE_KIND || !verifySignedEvent(inner)) return 'invalid'
-    const p = parseInboxPayload(inner.content)
-    if (!p) return 'invalid'
-    const sender = verifyDelegation(p.dlg, inner.pubkey)
-    if (!sender) return 'invalid'
+    const opened = openDirect(outer, convKey)
+    if (!opened) return 'invalid'
+    const { inner, payload: p, sender } = opened
     await this.store.putRaw(outer, tag)
     try {
       if (secret === null) await this.#onInbox(sender, inner.pubkey, p)
@@ -494,22 +580,21 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
 
   async #onInbox(sender: string, senderDevice: string, p: Record<string, unknown>): Promise<void> {
     if (p.t !== 'key' && p.t !== 'invite') return
-    const g = p as unknown as KeyGrant & { role?: Role }
-    if (typeof g.sp !== 'string' || typeof g.key !== 'string' || !/^[0-9a-f]{64}$/.test(g.key) || !Array.isArray(g.ops)) return
+    const g = parseKeyGrant(p)
+    if (!g) return
     // Validate against the ops carried in the grant (plus what we know).
     await this.store.transaction(async (s) => {
       const before = (await s.opRecords(g.sp)).length
       for (const o of g.ops) if (typeof o === 'string') await this.#importInner(s, g.sp, o)
       if ((await s.opRecords(g.sp)).length !== before || !this.#membership.has(g.sp)) await this.reloadMembership(s, g.sp)
     })
-    const m = this.membership(g.sp)
-    const fromManager = mayManage(m, sender) || sender === this.pubkey
-    if (!fromManager || !m.roles.has(this.pubkey)) return
+    const role = grantRole(this.membership(g.sp), sender, this.pubkey)
+    if (!role) return
     await this.store.putDevice(senderDevice, sender, JSON.stringify(p.dlg), delegationName(p.dlg as NostrEvent))
     const known = this.store.space(g.sp)
     if (p.t === 'invite' && known?.status !== 'active') {
-      await this.store.putInviteIn(g.sp, sender, m.roles.get(this.pubkey)!, String(g.name ?? ''), JSON.stringify(g))
-      const inv: Invitation = { space: g.sp, name: String(g.name ?? ''), role: m.roles.get(this.pubkey)!, from: sender }
+      await this.store.putInviteIn(g.sp, sender, role, String(g.name ?? ''), JSON.stringify(g))
+      const inv: Invitation = { space: g.sp, name: String(g.name ?? ''), role, from: sender }
       for (const fn of this.#inviteListeners) fn(inv)
       return
     }
@@ -653,7 +738,8 @@ export class AnoDBSharing<S extends SchemaDefinition> extends AnoDBCore<S> {
   async #onPaired(sender: string, p: Record<string, unknown>): Promise<void> {
     const delegation = p.delegation
     if (verifyDelegation(delegation, this.devicePubkey) !== sender || !Array.isArray(p.spaces)) return
-    const grants = (p.spaces as KeyGrant[]).filter((g) => typeof g.sp === 'string' && typeof g.key === 'string' && /^[0-9a-f]{64}$/.test(g.key))
+    // (A grant without `ops` used to throw halfway through adopting the identity; now it is skipped.)
+    const grants = (p.spaces as unknown[]).map(parseKeyGrant).filter((g): g is KeyGrant => g !== null)
     await this.gate.idle()
     // Adopt the identity: drop this device's provisional identity and all its data.
     await this.keyStore.set('delegation', JSON.stringify(delegation))
