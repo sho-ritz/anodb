@@ -51,6 +51,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:pglite": "vitest run --config vitest.pglite.config.ts",
+    "test:pg": "vitest run --config vitest.pg.config.ts",
     "test:watch": "vitest",
     "smoke:public": "npm run build && node examples/public-relay-smoke.mjs",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
@@ -65,10 +66,12 @@
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",
     "@types/node": "^26.6.6",
+    "@types/pg": "8.23.1",
     "@types/react": "^19.3.0",
     "@types/sql.js": "^1.4.11",
     "@types/ws": "^8.18.2",
     "node-datachannel": "^0.33.6",
+    "pg": "8.23.1",
     "react": "^19.3.1",
     "sql.js": "^1.15.2",
     "typescript": "^7.0.2",

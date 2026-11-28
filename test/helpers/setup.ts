@@ -2,6 +2,7 @@ import { afterEach } from 'vitest'
 import { type AnoDBOptions, createAnoDB } from '../../src/index.js'
 import { memoryKeyStore } from '../../src/keystore/memory.js'
 import { nodeSqlite } from '../../src/node.js'
+import { pgDriver } from '../../src/drivers/pg.js'
 import { pgliteDriver } from '../../src/drivers/pglite.js'
 import type { SchemaDefinition } from '../../src/types.js'
 import { MockRelay } from './mock-relay.js'
@@ -21,11 +22,49 @@ export async function relay(opts?: ConstructorParameters<typeof MockRelay>[0]): 
   return r
 }
 
+/** Admin connection for `ANODB_TEST_DRIVER=pg` (the Docker Postgres of `npm run test:pg`). */
+export const TEST_PG_URL = process.env.ANODB_TEST_PG_URL ?? 'postgres://app:app@127.0.0.1:5432/postgres'
+
+/** A new, empty database on the test Postgres server (dropped after the test). */
+export async function freshPgDatabase(): Promise<string> {
+  const { default: pg } = await import('pg')
+  const name = `anodb_test_${Math.random().toString(36).slice(2, 12)}`
+  const admin = new pg.Client({ connectionString: TEST_PG_URL })
+  await admin.connect()
+  try {
+    await admin.query(`CREATE DATABASE ${name}`)
+  } finally {
+    await admin.end()
+  }
+  cleanup.push(async () => {
+    const c = new pg.Client({ connectionString: TEST_PG_URL })
+    await c.connect()
+    try {
+      await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
+    } finally {
+      await c.end()
+    }
+  })
+  const url = new URL(TEST_PG_URL)
+  url.pathname = `/${name}`
+  return url.toString()
+}
+
+/** A pool on `url`, ended after the test. */
+export async function pgPool(url: string) {
+  const { default: pg } = await import('pg')
+  const pool = new pg.Pool({ connectionString: url, max: 5 })
+  cleanup.push(() => (pool.ended ? undefined : pool.end()))
+  return pool
+}
+
 /**
- * Default storage for `open()`: node:sqlite, or PGlite with `ANODB_TEST_DRIVER=pglite`
- * (`npm run test:pglite` runs the whole suite on Postgres).
+ * Default storage for `open()`: node:sqlite, PGlite with `ANODB_TEST_DRIVER=pglite`, or a fresh
+ * database on a Postgres server with `ANODB_TEST_DRIVER=pg` (`npm run test:pglite` / `test:pg` run
+ * the whole suite on Postgres).
  */
 async function defaultDriver() {
+  if (process.env.ANODB_TEST_DRIVER === 'pg') return pgDriver(await pgPool(await freshPgDatabase()))
   if (process.env.ANODB_TEST_DRIVER !== 'pglite') return nodeSqlite(':memory:')
   const { PGlite } = await import('@electric-sql/pglite')
   return pgliteDriver(await PGlite.create())

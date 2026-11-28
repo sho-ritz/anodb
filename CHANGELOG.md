@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — PostgreSQL server driver
+
+- `pgDriver(pool)`: anoDB on a PostgreSQL server (node-postgres `Pool`, e.g. Postgres in Docker),
+  with the same behaviour as PGlite: native Postgres tables, Kysely compiled to Postgres, and
+  writes from other tools synced. Prisma, TypeORM, Drizzle and psql can use other connections to
+  the same database. anoDB picks their writes up through triggers and `LISTEN / NOTIFY`.
+  - Transactions run on one pooled client, and `LISTEN` holds another, so give the pool at least 3
+    connections.
+  - BIGINT columns are read as numbers, like PGlite.
+- `npx @anodb/cli init` offers **PostgreSQL server** next to SQLite and PGlite (Node servers):
+  - It asks for the connection URL, defaulting to an existing `DATABASE_URL`, and writes it to
+    `.env` as `ANODB_DATABASE_URL`.
+  - It installs `pg`, plus `@types/pg` for TypeScript projects, and generates a `db.ts` with
+    `pgDriver(pool)`.
+  - Projects that already use Postgres tooling (Prisma, TypeORM, Drizzle, `pg`, …) get it as the
+    default.
+  - Flags: `--db postgres --database-url <url>`.
+- `npm run test:pg` runs the whole test suite on a PostgreSQL server, with one fresh database per
+  test. `docker-compose.test.yml` starts one.
+
 ## Unreleased — self-hosted relay on Cloudflare
 
 - `npx anodb relay deploy`: deploys a Nostr relay to your Cloudflare account, on Workers with a
