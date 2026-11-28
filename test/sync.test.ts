@@ -17,15 +17,15 @@ async function secondDevice(a: DB, relays: Awaited<ReturnType<typeof relay>>[], 
   const ia = a as unknown as { keysBySpace: Map<string, Array<{ key: Uint8Array; num: number }>>; personal: string }
   const ib = b as unknown as {
     storeKey(s: string, k: Uint8Array, n: number): Promise<void>
-    store: { upsertSpace(id: string, name: string, personal: boolean): void; setSpaceStatus(id: string, s: string): void }
-    setPersonal(s: string): void
+    store: { upsertSpace(id: string, name: string, personal: boolean): Promise<void>; setSpaceStatus(id: string, s: string): Promise<void> }
+    setPersonal(s: string): Promise<void>
     sync: { refresh(): void } | null
   }
   const k = ia.keysBySpace.get(ia.personal)![0]!
   await ib.storeKey(ia.personal, k.key, k.num)
-  ib.store.setSpaceStatus(b.personalSpace, 'left')
-  ib.store.upsertSpace(ia.personal, 'personal', true)
-  ib.setPersonal(ia.personal)
+  await ib.store.setSpaceStatus(b.personalSpace, 'left')
+  await ib.store.upsertSpace(ia.personal, 'personal', true)
+  await ib.setPersonal(ia.personal)
   ib.sync?.refresh()
   return b
 }

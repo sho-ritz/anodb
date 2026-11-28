@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased — PGlite (Postgres) driver
+
+anoDB can now store its data in **Postgres via [PGlite](https://pglite.dev)**, so it runs on a server
+next to Prisma, Drizzle or any other tool that talks to the same database.
+
+### New
+
+- `pgliteDriver(pg, { close? })`: Postgres in WASM. User tables are native Postgres tables
+  (`boolean`, `bigint`, `double precision`, `jsonb`). Kysely compiles to Postgres, raw SQL uses
+  Postgres syntax (`$1`).
+- **Writes from outside anoDB are synced.** On Postgres, triggers queue rows that other tools insert,
+  update or delete; anoDB commits them like its own writes (permissions, HLC, signature, encryption,
+  relays), on `LISTEN / NOTIFY`, a timer, and at startup. `db.syncExternalWrites()` waits for them.
+  Rows that fail the checks are restored and reported as `AnoDBError` code `'rejected-write'`.
+- anoDB refuses to start (instead of dropping it) when a Postgres table of the same name already
+  exists that it did not create.
+- `createAnoDB({ driver })` accepts any `AsyncSqlDriver` (`{ dialect, exec, run, all, transaction?, listen?, close }`).
+  New types: `AsyncSqlDriver`, `AnyDriver`, `SqlDialectName`, `PGliteLike`, `PGliteDriverOptions`.
+- `npm run test:pglite` runs the whole test suite on PGlite.
+
+### Changed (breaking)
+
+The storage layer is now asynchronous end to end (PGlite has no synchronous API). The SQLite drivers
+(`nodeSqlite`, `sqlJsDriver`, `browserDriver`, `expoSqliteDriver`) keep their synchronous interface
+and are wrapped internally; local writes stay atomic because every statement goes through one lock
+and transactions hold it until they end.
+
+- `syncHealth()` and `resync()` return a `Promise`; `declineInvitation()` returns a `Promise`.
+- `reconcile(relay)` no longer returns `false` while another reconciliation with the same relay is
+  running: calls for one relay run one after another.
+- Protected hooks for subclasses are async and take the transaction store where they write
+  (`sendToSpace`, `onMessage`, `rebuildSpace`, `wrap`, `afterLocalWrite`, `afterSnapshot`, …).
+  `invalidateMembership(space)` is replaced by `reloadMembership(store, space)`.
+- `spaces()`, `members()`, `devices()`, `invitations()`, `roleIn()` stay synchronous (kept in memory).
+
+### `@anodb/cli`
+
+- `init` asks for the database in Node and Electron projects: SQLite (default) or PGlite (default
+  when the project already depends on Prisma, Drizzle, `pg` or PGlite). Flag: `--db sqlite|pglite`.
+  The PGlite template exports `pg` for sharing with other tools and ignores `anodb-pgdata/`.
+
+### Compatibility
+
+- Wire protocol stays **v2**; PGlite and SQLite devices sync with each other and with 0.12.0.
+- Existing SQLite databases open unchanged (same tables, no migration).
+
 ## 0.12.0 — automatic relay selection, phase 1 (compatible)
 
 anoDB is moving from a few fixed relays to relays **picked per space from a vetted candidate list**
