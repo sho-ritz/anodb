@@ -5,6 +5,7 @@ import { TAG, WRAP_KIND } from './protocol.js'
 import { type P2PMode, type PeerInfo, P2PSync } from './p2p.js'
 import type { Filter } from './relay-pool.js'
 import { AnoDBSharing } from './sharing.js'
+import type { Store } from './store.js'
 import type { NostrEvent, SchemaDefinition } from './types.js'
 
 const BACKFILL_PAGE = 500
@@ -21,7 +22,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   readonly #negUnsupported = new Set<string>()
   #reconcileTimer: ReturnType<typeof setInterval> | null = null
   #lastRepair = 0
-  #reconciling = new Set<string>()
+  readonly #reconciling = new Map<string, Promise<boolean>>()
   #p2p: P2PSync | null = null
   readonly #eventListeners = new Set<{ fn: (e: SpaceEvent) => void; space?: string; type?: string }>()
   readonly #seenEvents = new Set<string>()
@@ -76,15 +77,19 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
           }
           return out
         },
-        ingest: (e) => this.ingestGated('p2p', e) !== 'invalid',
+        ingest: async (e) => (await this.ingestGated('p2p', e)) !== 'invalid',
         delivered: (entryId) => {
-          this.store.dequeue(entryId)
-          this.store.markRawLocal(entryId)
-          this.emitStatus()
+          void (async () => {
+            await this.store.dequeue(entryId)
+            await this.store.markRawLocal(entryId)
+            this.emitStatus()
+          })().catch(() => {})
         },
         release: (entryId) => {
-          this.store.releaseOutbox(entryId)
-          void this.sync?.flush()
+          void this.store
+            .releaseOutbox(entryId)
+            .then(() => this.sync?.flush())
+            .catch(() => {})
         },
       },
       this.opts.p2p ?? {},
@@ -119,56 +124,61 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   /**
    * Layer 1: NIP-77 set reconciliation with one relay (fetch what we miss, upload what it misses).
    * Layer 3: if sequence gaps remain, do a deep re-fetch from all relays (rate limited).
-   * Returns whether the relay supports NIP-77.
+   * Returns whether the relay supports NIP-77. Calls for the same relay run one after another.
    */
   async reconcile(relay: string): Promise<boolean> {
-    const pool = this.sync?.pool
-    if (!pool || this.closed || this.#reconciling.has(relay)) return false
-    this.#reconciling.add(relay)
+    if (!this.sync?.pool || this.closed) return false
+    const prev = this.#reconciling.get(relay)
+    const run = (prev ? prev.catch(() => false) : Promise.resolve(false)).then(() => this.#reconcileOnce(relay))
+    this.#reconciling.set(relay, run)
     try {
-      let supported = false
-      if (!this.#negUnsupported.has(relay)) {
-        const tags = this.sync!.tagsOn(relay, this.subscriptionTags())
-        const res = tags.length ? await pool.negentropy(relay, { kinds: [WRAP_KIND], [`#${TAG}`]: tags }, this.store.rawIndex(tags)) : null
-        if (!res) this.#negUnsupported.add(relay)
-        else {
-          supported = true
-          // Relays cap results per REQ even for id lookups: keep asking for what is still missing.
-          let remaining = new Set(res.need)
-          while (remaining.size > 0) {
-            const ids = [...remaining].slice(0, 100)
-            const events = await pool.query([{ ids }], { relays: [relay] })
-            let progress = false
-            for (const e of events) {
-              if (!remaining.delete(e.id)) continue
-              progress = true
-              this.ingestGated(relay, e)
-            }
-            if (!progress) break
-          }
-          remaining = new Set()
-          const uploads = res.have.map((id) => this.store.getRaw(id)).filter((e): e is NostrEvent => e !== undefined)
-          await Promise.all(uploads.map((e) => pool.publish(e, [relay])))
-        }
-      }
-      if (this.syncHealth().gaps.length > 0 && this.now() - this.#lastRepair > 10 * 60_000) await this.repair()
-      return supported
+      return await run
     } finally {
-      this.#reconciling.delete(relay)
+      if (this.#reconciling.get(relay) === run) this.#reconciling.delete(relay)
     }
   }
 
+  async #reconcileOnce(relay: string): Promise<boolean> {
+    const pool = this.sync?.pool
+    if (!pool || this.closed) return false
+    let supported = false
+    if (!this.#negUnsupported.has(relay)) {
+      const tags = this.sync!.tagsOn(relay, this.subscriptionTags())
+      const res = tags.length ? await pool.negentropy(relay, { kinds: [WRAP_KIND], [`#${TAG}`]: tags }, await this.store.rawIndex(tags)) : null
+      if (!res) this.#negUnsupported.add(relay)
+      else {
+        supported = true
+        // Relays cap results per REQ even for id lookups: keep asking for what is still missing.
+        let remaining = new Set(res.need)
+        while (remaining.size > 0) {
+          const ids = [...remaining].slice(0, 100)
+          const events = await pool.query([{ ids }], { relays: [relay] })
+          let progress = false
+          for (const e of events) {
+            if (!remaining.delete(e.id)) continue
+            progress = true
+            await this.ingestGated(relay, e)
+          }
+          if (!progress) break
+        }
+        remaining = new Set()
+        const uploads = (await Promise.all(res.have.map((id) => this.store.getRaw(id)))).filter((e): e is NostrEvent => e !== undefined)
+        await Promise.all(uploads.map((e) => pool.publish(e, [relay])))
+      }
+    }
+    if ((await this.syncHealth()).gaps.length > 0 && this.now() - this.#lastRepair > 10 * 60_000) await this.repair()
+    return supported
+  }
+
   /** Layer 3: messages known to exist (by per-device sequence numbers) but not received. */
-  syncHealth(): { gaps: SyncGap[]; nip77: Record<string, boolean> } {
+  async syncHealth(): Promise<{ gaps: SyncGap[]; nip77: Record<string, boolean> }> {
     const gaps: SyncGap[] = []
     for (const s of this.store.spaces()) {
       if (s.status !== 'active') continue
-      const cover = this.snapshotCoverage(s.id)
-      for (const [device, max] of Object.entries(this.store.deviceMaxSeqs(s.id))) {
+      const cover = await this.snapshotCoverage(this.store, s.id)
+      for (const [device, max] of Object.entries(await this.store.deviceMaxSeqs(s.id))) {
         if (device === this.devicePubkey) continue
-        const have = new Set(
-          this.store.driver.all<{ seq: number }>('SELECT seq FROM anodb_messages WHERE space = ? AND device = ?', [s.id, device]).map((r) => r.seq),
-        )
+        const have = new Set(await this.store.seqsOf(s.id, device))
         const missing: number[] = []
         for (let q = (cover.get(device) ?? 0) + 1; q <= max && missing.length < 100; q++) if (!have.has(q)) missing.push(q)
         if (missing.length) gaps.push({ space: s.id, device, missing })
@@ -196,7 +206,7 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
           const events = await pool.query([f], { relays: [relay] })
           if (events.length === 0) break
           let fresh = 0
-          for (const e of events) if (this.ingestGated(relay, e) === 'new') fresh++
+          for (const e of events) if ((await this.ingestGated(relay, e)) === 'new') fresh++
           const oldest = Math.min(...events.map((e) => e.created_at))
           if (fresh === 0 && until !== undefined && oldest >= until) until -= 1
           else until = oldest
@@ -209,20 +219,20 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
   // ---- pruneOldEvents (NIP-09) ---------------------------------------------------------
 
   /** Envelope keys are derived from the device key + a random salt so they can sign deletions later. */
-  protected override wrap(innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): NostrEvent {
-    if (!this.opts.pruneOldEvents || signerSk || this.opts.metadataProtection === 'none') return super.wrap(innerJson, tag, convKey, signerSk)
+  protected override async wrap(s: Store, innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): Promise<NostrEvent> {
+    if (!this.opts.pruneOldEvents || signerSk || this.opts.metadataProtection === 'none') return super.wrap(s, innerJson, tag, convKey, signerSk)
     const salt = randomHex(16)
-    const ev = super.wrap(innerJson, tag, convKey, this.#pruneKey(salt))
-    this.store.putPrunable(ev.id, salt, tag, ev.created_at)
+    const ev = await super.wrap(s, innerJson, tag, convKey, this.#pruneKey(salt))
+    await s.putPrunable(ev.id, salt, tag, ev.created_at)
     return ev
   }
 
-  protected override resignEnvelope(e: NostrEvent): NostrEvent {
+  protected override async resignEnvelope(e: NostrEvent): Promise<NostrEvent> {
     if (!this.opts.pruneOldEvents || this.opts.metadataProtection === 'none') return super.resignEnvelope(e)
     const tag = e.tags.find((t) => t[0] === TAG)?.[1] ?? ''
     const salt = randomHex(16)
     const ev = signWith(this.#pruneKey(salt), { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
-    this.store.putPrunable(ev.id, salt, tag, ev.created_at)
+    await this.store.putPrunable(ev.id, salt, tag, ev.created_at)
     return ev
   }
 
@@ -230,18 +240,18 @@ export class AnoDB<S extends SchemaDefinition> extends AnoDBSharing<S> {
     return hexToBytes(sha256Hex(`anodb/v2/prune/${bytesToHex(this.deviceSk)}/${salt}`))
   }
 
-  protected override afterSnapshot(space: string, before: number): void {
+  protected override async afterSnapshot(space: string, before: number): Promise<void> {
     if (!this.opts.pruneOldEvents || !this.sync) return
     const tags = (this.keysBySpace.get(space) ?? []).map((k) => k.tag)
-    for (const p of this.store.prunable(tags, before)) {
+    for (const p of await this.store.prunable(tags, before)) {
       const del = signWith(this.#pruneKey(p.salt), {
         kind: 5,
         created_at: Math.floor(this.now() / 1000),
         tags: [['e', p.eventId], ['k', String(WRAP_KIND)]],
         content: '',
       })
-      this.store.enqueue(del, false)
-      this.store.forgetPrunable(p.eventId)
+      await this.store.enqueue(del, false)
+      await this.store.forgetPrunable(p.eventId)
     }
     void this.sync.flush()
   }

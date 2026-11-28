@@ -1,6 +1,6 @@
 import { CompiledQuery, type Compilable, type Kysely, type RootOperationNode } from 'kysely'
 import { BlobStore, DEFAULT_BLOB_SERVERS } from './blob.js'
-import { type CapturedCell, beginCapture, endCapture, fromCaptured, installCapture } from './capture.js'
+import { type CapturedCell, EXTERNAL_CHANNEL, beginCapture, capturedCount, fromCaptured, installCapture, readCaptured, takeExternal } from './capture.js'
 import {
   bytesToHex,
   conversationKey,
@@ -38,13 +38,18 @@ import { SYS_CREATED, SYS_DELETED, validateSchema } from './schema.js'
 import { type Signer, localSigner } from './signer.js'
 import { Store } from './store.js'
 import { type IngestResult, SyncEngine, type SyncHost } from './sync.js'
-import type { NostrEvent, SchemaDefinition, SqlValue, SqliteDriver, SyncStatus } from './types.js'
+import type { AnyDriver, NostrEvent, SchemaDefinition, SqlValue, SyncStatus } from './types.js'
 
 export interface AnoDBOptions<S extends SchemaDefinition> {
   /** Application namespace. Different appIds never share spaces. */
   appId: string
   schema: S
-  driver: SqliteDriver
+  /**
+   * Storage: a synchronous SQLite driver (`nodeSqlite`, `browserDriver`, `expoSqliteDriver`…) or an
+   * async one (`pgliteDriver`). With Postgres, user tables are native Postgres tables and writes
+   * made by other tools on the same database are synced too.
+   */
+  driver: AnyDriver
   /**
    * Where keys live. Default: browserKeyStore() when IndexedDB exists (browsers, Tauri), otherwise
    * envKeyStore() (Node: ANODB_DEVICE_KEY / ANODB_DELEGATION from `npx @anodb/cli init`).
@@ -102,7 +107,15 @@ export type ChangeListener = (tables: ReadonlySet<string>, origin: 'local' | 're
 export type ErrorListener = (error: AnoDBError) => void
 export type StatusListener = (status: SyncStatus) => void
 
-export type AnoDBErrorCode = 'publish-rejected' | 'invalid-event' | 'unauthorized' | 'decrypt-failed' | 'unsupported-protocol' | 'tab-locked'
+export type AnoDBErrorCode =
+  | 'publish-rejected'
+  | 'invalid-event'
+  | 'unauthorized'
+  | 'decrypt-failed'
+  | 'unsupported-protocol'
+  | 'tab-locked'
+  /** A write made outside anoDB (Postgres: Prisma, psql…) was not allowed and has been undone. */
+  | 'rejected-write'
 
 export class AnoDBError extends Error {
   readonly code: AnoDBErrorCode
@@ -159,7 +172,7 @@ export async function prepare<S extends SchemaDefinition>(opts: AnoDBOptions<S>)
   if (!opts.appId) throw new Error('anoDB: appId is required')
   validateSchema(opts.schema)
   const now = opts.now ?? Date.now
-  const store = new Store(opts.driver)
+  const store = await Store.open(opts.driver)
   const keyStore = opts.keyStore ?? defaultKeyStore(opts.appId)
   const mode = opts.identity ?? 'stored'
 
@@ -200,10 +213,19 @@ export async function prepare<S extends SchemaDefinition>(opts: AnoDBOptions<S>)
   if (identitySigner && (await identitySigner.getPublicKey()) !== identity) {
     throw new Error('anoDB: signer / identity key does not belong to this device’s identity')
   }
-  const owner = store.getMeta('identity')
-  if (owner && owner !== identity) throw new Error('anoDB: this database belongs to a different identity')
-  store.setMeta('identity', identity)
-  return { opts, store, keyStore, deviceSk, devicePk, identity, delegation, identitySigner, now }
+  const owner = await store.getMeta('identity')
+  if (owner && owner !== identity) {
+    await store.close()
+    throw new Error('anoDB: this database belongs to a different identity')
+  }
+  await store.setMeta('identity', identity)
+  let nodeId = await store.getMeta('node_id')
+  if (!nodeId) {
+    nodeId = randomHex(8)
+    await store.setMeta('node_id', nodeId)
+  }
+  const hlc = await store.getMeta('hlc')
+  return { opts, store, keyStore, deviceSk, devicePk, identity, delegation, identitySigner, now, nodeId, hlc }
 }
 
 function defaultKeyStore(appId: string): KeyStore {
@@ -221,6 +243,8 @@ export interface Internals<S extends SchemaDefinition> {
   delegation: NostrEvent
   identitySigner: Signer | null
   now: () => number
+  nodeId: string
+  hlc: string | undefined
 }
 
 export class AnoDBCore<S extends SchemaDefinition> {
@@ -256,6 +280,12 @@ export class AnoDBCore<S extends SchemaDefinition> {
   readonly #pendingNotify = new Set<string>()
   #closed = false
   #lastStatus = ''
+  /** Capture transaction of an open Kysely transaction. */
+  #cap: { s: Store; end: () => Promise<void> } | null = null
+  #extRun: Promise<void> | null = null
+  #extAgain = false
+  #extUnlisten: (() => Promise<void>) | null = null
+  #extTimer: ReturnType<typeof setInterval> | null = null
 
   constructor(i: Internals<S>) {
     this.opts = i.opts
@@ -270,12 +300,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     this.delegation = i.delegation
     this.identitySigner = i.identitySigner
     this.now = i.now
-    let nodeId = this.store.getMeta('node_id')
-    if (!nodeId) {
-      nodeId = randomHex(8)
-      this.store.setMeta('node_id', nodeId)
-    }
-    this.clock = new Clock(nodeId, this.store.getMeta('hlc'), this.now)
+    this.clock = new Clock(i.nodeId, i.hlc, this.now)
     const relays = i.opts.relays ?? DEFAULT_RELAYS
     const auto = i.opts.autoRelays ?? i.opts.relays === undefined
     const router = new RelayRouter(relays, auto ? (i.opts.relayCandidates ?? RELAY_CANDIDATES) : null, i.opts.maxAutoRelays ?? 20)
@@ -288,7 +313,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
           router,
         })
       : null
-    this.kysely = createKysely<S>(this.executor(), this.schema)
+    this.kysely = createKysely<S>(this.executor(), this.schema, this.store.dialect)
     this.blobs = new BlobStore({
       deviceSk: i.deviceSk,
       servers: i.opts.blobServers ?? DEFAULT_BLOB_SERVERS,
@@ -299,24 +324,26 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** @internal */
   async _init(): Promise<void> {
     await this.loadKeys()
+    for (const s of this.store.spaces()) await this.reloadMembership(this.store, s.id)
     let personal = this.store.spaces().find((s) => s.personal && s.status === 'active')
     if (!personal) {
       const id = await this.createSpaceInternal('personal', true)
       personal = { id, name: 'personal', personal: true, status: 'active' }
     }
-    this.setPersonal(personal.id)
+    await this.setPersonal(personal.id)
     await this.afterInit()
     this.sync?.start()
+    if (this.store.pg) await this.#watchExternalWrites()
   }
 
   /** Extension point for subclasses. */
   protected async afterInit(): Promise<void> {}
 
   /** Switch the personal space (the default for inserts); rebuilds projections and their capture triggers. */
-  protected setPersonal(space: string): void {
+  protected async setPersonal(space: string): Promise<void> {
     this.personal = space
-    this.store.applySchema(this.schema, space, this.pubkey)
-    installCapture(this.store.driver, this.schema)
+    await this.store.applySchema(this.schema, space, this.pubkey)
+    await this.store.transaction((s) => installCapture(s, this.schema))
   }
 
   // ---- SQL-like API (Kysely) ------------------------------------------------
@@ -359,7 +386,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     const compiled = compileQuery(query)
     // Kysely queries keep typed results (booleans, JSON) even though they re-run as raw SQL here.
     const node = (compiled as { query?: RootOperationNode }).query
-    const convert = node ? resultConverter(this.schema, node) : null
+    const convert = node && !this.store.pg ? resultConverter(this.schema, node) : null
     const tables = new Set(Object.keys(this.schema).filter((t) => compiled.sql.includes(`"${t}"`) || new RegExp(`\\b${t}\\b`).test(compiled.sql)))
     let alive = true
     const run = () => {
@@ -380,18 +407,19 @@ export class AnoDBCore<S extends SchemaDefinition> {
   }
 
   protected executor(): SqlExecutor {
-    const drv = () => this.store.driver
     return {
       execute: async (sql, params) => {
         this.assertOpen()
         await this.gate.idle()
-        beginCapture(drv())
-        let rows: Record<string, SqlValue>[]
+        const { s, end } = await this.store.capture()
+        let rows: Record<string, unknown>[]
         let cells: CapturedCell[]
         try {
-          rows = drv().all<Record<string, SqlValue>>(sql, params)
+          await beginCapture(s)
+          rows = await s.allNative<Record<string, unknown>>(sql, params)
+          cells = await readCaptured(s)
         } finally {
-          cells = endCapture(drv())
+          await end()
         }
         if (cells.length > 0) await this.commitCaptured(cells)
         return { rows, changedRows: countRows(cells) }
@@ -400,22 +428,43 @@ export class AnoDBCore<S extends SchemaDefinition> {
         this.assertOpen()
         await this.gate.idle()
         this.gate.close()
-        beginCapture(drv())
+        try {
+          this.#cap = await this.store.capture()
+          await beginCapture(this.#cap.s)
+        } catch (e) {
+          const cap = this.#cap
+          this.#cap = null
+          await cap?.end().catch(() => {})
+          this.reopenGate()
+          throw e
+        }
       },
-      executeInTransaction: (sql, params) => {
-        const count = () => drv().all<{ n: number }>('SELECT COUNT(*) AS n FROM temp.anodb_cap')[0]!.n
-        const before = count()
-        const rows = drv().all<Record<string, SqlValue>>(sql, params)
-        return { rows, changedRows: count() > before ? 1 : 0 }
+      executeInTransaction: async (sql, params) => {
+        const s = this.#cap!.s
+        const before = await capturedCount(s)
+        const rows = await s.allNative<Record<string, unknown>>(sql, params)
+        return { rows, changedRows: (await capturedCount(s)) > before ? 1 : 0 }
       },
       commit: async () => {
-        const cells = endCapture(drv())
-        this.reopenGate()
+        const cap = this.#cap!
+        this.#cap = null
+        let cells: CapturedCell[]
+        try {
+          cells = await readCaptured(cap.s)
+        } finally {
+          await cap.end()
+          this.reopenGate()
+        }
         if (cells.length > 0) await this.commitCaptured(cells)
       },
       rollback: async () => {
-        endCapture(drv())
-        this.reopenGate()
+        const cap = this.#cap
+        this.#cap = null
+        try {
+          await cap?.end()
+        } finally {
+          this.reopenGate()
+        }
       },
     }
   }
@@ -426,8 +475,8 @@ export class AnoDBCore<S extends SchemaDefinition> {
     if (this.#pendingNotify.size > 0) this.notify(new Set(), 'remote')
   }
 
-  /** Validate captured cells and commit them as signed, encrypted messages. */
-  protected async commitCaptured(cells: CapturedCell[]): Promise<void> {
+  /** Validate captured cells (throws on the first one that is not allowed) and stamp them with HLCs. */
+  protected prepareCaptured(cells: CapturedCell[]): { bySpace: Map<string, Change[]>; touched: Set<string> } {
     const bySpace = new Map<string, Change[]>()
     const touched = new Set<string>()
     const nowMs = this.now()
@@ -443,34 +492,128 @@ export class AnoDBCore<S extends SchemaDefinition> {
       let value: unknown
       if (c.column === SYS_DELETED) value = true
       else if (c.column === SYS_CREATED) value = nowMs
-      else value = fromCaptured(c.table, c.column, def[c.column]!, c.value)
+      else value = fromCaptured(c.table, c.column, def[c.column]!, c.value, this.store.pg)
       let list = bySpace.get(c.space)
       if (!list) bySpace.set(c.space, (list = []))
       const change: Change = [c.table, c.rowId, c.column, value, this.clock.tick()]
       // Same row-level rule every other device applies: refuse here instead of sending a change they would drop.
-      if (!changeAllowed(this.schema, change, this.pubkey, this.roleOf(c.space, this.pubkey))) throw new AnoDBError('unauthorized', policyMessage(change))
+      if (!changeAllowed(this.schema, change, this.pubkey, this.roleOf(c.space, this.pubkey))) throw new AnoDBError('unauthorized', policyMessage(change, this.schema))
       list.push(change)
       touched.add(c.table)
     }
+    return { bySpace, touched }
+  }
+
+  /** Merge prepared changes and send them as signed, encrypted messages. */
+  protected async writeChanges(s: Store, bySpace: Map<string, Change[]>): Promise<void> {
+    for (const [space, changes] of bySpace) {
+      await s.applyChanges(space, changes, this.pubkey)
+      for (const batch of splitChanges(changes)) await this.sendToSpace(s, space, 'ch', { c: batch })
+    }
+    await s.setMeta('hlc', this.clock.current())
+  }
+
+  /** Validate captured cells and commit them as signed, encrypted messages. */
+  protected async commitCaptured(cells: CapturedCell[]): Promise<void> {
+    const { bySpace, touched } = this.prepareCaptured(cells)
     await this.gate.idle()
-    this.store.transaction(() => {
-      for (const [space, changes] of bySpace) {
-        this.store.applyChanges(space, changes, this.pubkey)
-        for (const batch of splitChanges(changes)) this.sendToSpace(space, 'ch', { c: batch })
-      }
-      this.store.setMeta('hlc', this.clock.current())
-    })
+    await this.store.transaction((s) => this.writeChanges(s, bySpace))
     this.notify(touched, 'local')
-    this.afterLocalWrite([...bySpace.keys()])
+    await this.afterLocalWrite([...bySpace.keys()])
     void this.sync?.flush()
   }
 
+  // ---- writes from outside anoDB (Postgres) -------------------------------------------
+
+  async #watchExternalWrites(): Promise<void> {
+    const kick = () => void this.syncExternalWrites().catch(() => {})
+    this.#extUnlisten = await this.store.listen(EXTERNAL_CHANNEL, kick)
+    // Fallback for drivers without notifications, and for writes from other connections.
+    this.#extTimer = setInterval(kick, this.#extUnlisten ? 5000 : 500)
+    ;(this.#extTimer as { unref?: () => void }).unref?.()
+    await this.syncExternalWrites() // written while anoDB was closed
+  }
+
+  /**
+   * Commit writes that other tools made directly to the Postgres tables (Prisma, Drizzle, psql…):
+   * each changed row goes through the same checks as anoDB's own writes. Rows that fail them are
+   * restored from anoDB's state and reported via `onError` (`'rejected-write'`). Runs on its own
+   * after every such write; call it to wait until everything written so far is synced.
+   */
+  async syncExternalWrites(): Promise<void> {
+    if (!this.store.pg || this.#closed) return
+    if (this.#extRun) {
+      this.#extAgain = true
+      return this.#extRun
+    }
+    this.#extRun = (async () => {
+      try {
+        do {
+          this.#extAgain = false
+          while (!this.#closed && (await this.#externalBatch())) {}
+        } while (this.#extAgain && !this.#closed)
+      } finally {
+        this.#extRun = null
+      }
+    })()
+    return this.#extRun
+  }
+
+  /** One batch of outside writes. Returns whether anything was processed. */
+  async #externalBatch(): Promise<boolean> {
+    if ((await this.store.all('SELECT 1 AS x FROM anodb_ext LIMIT 1')).length === 0) return false
+    await this.gate.idle()
+    const errors: string[] = []
+    const touched = new Set<string>()
+    const spaces = new Set<string>()
+    const any = await this.store.transaction(async (s) => {
+      const cells = await takeExternal(s)
+      if (cells.length === 0) return false
+      const rows = new Map<string, CapturedCell[]>()
+      for (const c of cells) {
+        const k = `${c.space}\u0000${c.table}\u0000${c.rowId}`
+        const list = rows.get(k)
+        if (list) list.push(c)
+        else rows.set(k, [c])
+      }
+      const bySpace = new Map<string, Change[]>()
+      for (const group of rows.values()) {
+        const { space, table, rowId } = group[0]!
+        try {
+          const p = this.prepareCaptured(group)
+          for (const [sp, list] of p.bySpace) {
+            const all = bySpace.get(sp)
+            if (all) all.push(...list)
+            else bySpace.set(sp, [...list])
+          }
+          for (const t of p.touched) touched.add(t)
+        } catch (e) {
+          // Put the row back the way anoDB has it (removes rows that may not exist).
+          if (table in this.schema) await s.project(space, table, rowId)
+          touched.add(table)
+          errors.push(`write to ${table} ${rowId} was undone: ${(e as Error).message}`)
+        }
+      }
+      if (bySpace.size > 0) await this.writeChanges(s, bySpace)
+      for (const sp of bySpace.keys()) spaces.add(sp)
+      return true
+    })
+    if (!any) return false
+    this.notify(touched, 'local')
+    for (const m of errors) this.error('rejected-write', m)
+    if (spaces.size > 0) {
+      await this.afterLocalWrite([...spaces])
+      void this.sync?.flush()
+    }
+    return true
+  }
+
   /** Hook (v0.3: automatic snapshots / key rotation). */
-  protected afterLocalWrite(_spaces: string[]): void {}
+  protected async afterLocalWrite(_spaces: string[]): Promise<void> {}
 
   /** Throws unless this device may write to `space`. */
   protected assertCanWrite(space: string): void {
-    const s = this.store.spaces().find((x) => x.id === space)
+    const s = this.store.space(space)
     if (!s || s.status !== 'active') throw new Error(`anoDB: unknown or inactive space "${space}"`)
     if (!this.isAuthorizedWriter(space, this.pubkey, this.devicePubkey, Number.MAX_SAFE_INTEGER)) {
       throw new Error(`anoDB: no write permission in space ${space}`)
@@ -489,7 +632,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   }
 
   protected async loadKeys(): Promise<void> {
-    for (const k of this.store.keys()) {
+    for (const k of await this.store.keys()) {
       const key = await this.keyStore.open(k.sealed)
       this.addKey({ space: k.space, keyId: k.keyId, num: k.num, key, tag: spaceTag(key), createdAt: k.createdAt })
     }
@@ -510,7 +653,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
     if (this.keysByTag.has(k.tag)) return this.keysByTag.get(k.tag)!
     const sealed = await this.keyStore.seal(key)
     await this.gate.idle()
-    this.store.putKey(space, k.keyId, num, sealed)
+    await this.store.putKey(space, k.keyId, num, sealed)
     this.addKey(k)
     return k
   }
@@ -528,9 +671,9 @@ export class AnoDBCore<S extends SchemaDefinition> {
     const id = spaceIdFor(this.pubkey, nonce)
     await this.storeKey(id, randomBytes(32), 1)
     await this.gate.idle()
-    this.store.transaction(() => {
-      this.store.upsertSpace(id, name, personal)
-      this.sendToSpace(id, 'op', { op: { type: 'create', owner: this.pubkey, nonce, name, personal }, par: [] })
+    await this.store.transaction(async (s) => {
+      await s.upsertSpace(id, name, personal)
+      await this.sendToSpace(s, id, 'op', { op: { type: 'create', owner: this.pubkey, nonce, name, personal }, par: [] })
     })
     this.sync?.refresh()
     return id
@@ -538,22 +681,34 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   // ---- outgoing messages --------------------------------------------------------
 
-  /** Sign, store, wrap and enqueue a stream message. Must run inside `store.transaction`. */
-  protected sendToSpace(space: string, type: StreamPayload['t'], body: Record<string, unknown>, key = this.currentKey(space)): { seq: number; msgId: string } {
-    const seq = this.store.nextSeq(space)
-    // `rp: 1`: this device reads the space on its automatically picked relays (lets phase 2 know
-    // when every device can follow the switch; older versions ignore the field).
-    const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, ...(this.autoRelays ? { rp: 1 } : {}), dlg: this.delegation, ...body }
-    const content = JSON.stringify(payload)
-    const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
-    const innerJson = JSON.stringify(inner)
-    this.store.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id, innerJson)
-    const outer = this.wrap(innerJson, key.tag, key.key)
-    this.store.putRaw(outer, key.tag)
-    const hold = this.holdForPeers(space, outer)
-    this.sync?.enqueue(outer, true, hold > 0 ? Date.now() + hold : 0)
-    this.afterEnvelope(space, outer, hold > 0)
-    return { seq, msgId: inner.id }
+  /**
+   * Sign, store, wrap and enqueue a stream message, on the transaction view `s`. Membership is
+   * re-evaluated after an op.
+   */
+  protected async sendToSpace(
+    s: Store,
+    space: string,
+    type: StreamPayload['t'],
+    body: Record<string, unknown>,
+    key = this.currentKey(space),
+  ): Promise<{ seq: number; msgId: string }> {
+    return s.transaction(async (s) => {
+      const seq = await s.nextSeq(space)
+      // `rp: 1`: this device reads the space on its automatically picked relays (lets phase 2 know
+      // when every device can follow the switch; older versions ignore the field).
+      const payload = { v: 2, t: type, sp: space, ep: key.keyId, seq, ...(this.autoRelays ? { rp: 1 } : {}), dlg: this.delegation, ...body }
+      const content = JSON.stringify(payload)
+      const inner = signWith(this.deviceSk, { kind: MESSAGE_KIND, created_at: Math.floor(this.now() / 1000), tags: [], content })
+      const innerJson = JSON.stringify(inner)
+      await s.putMessage({ space, device: this.devicePubkey, seq, identity: this.pubkey, type, payload: content }, inner.id, innerJson)
+      const outer = await this.wrap(s, innerJson, key.tag, key.key)
+      await s.putRaw(outer, key.tag)
+      const hold = this.holdForPeers(space, outer)
+      if (this.sync) await s.enqueue(outer, true, hold > 0 ? Date.now() + hold : 0)
+      this.afterEnvelope(space, outer, hold > 0)
+      if (type === 'op') await this.reloadMembership(s, space)
+      return { seq, msgId: inner.id }
+    })
   }
 
   /** P2P hook: how long (ms) to keep a new envelope out of relays while peers acknowledge it. */
@@ -565,7 +720,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected afterEnvelope(_space: string, _outer: NostrEvent, _held: boolean): void {}
 
   /** Seal an inner message into an envelope with the given routing tag and conversation key. */
-  protected wrap(innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): NostrEvent {
+  protected async wrap(_s: Store, innerJson: string, tag: string, convKey: Uint8Array, signerSk?: Uint8Array): Promise<NostrEvent> {
     if (byteLength(innerJson) > 65_000) throw new Error('anoDB: message too large')
     const sk = signerSk ?? this.envelopeKey(tag)
     return signWith(sk, {
@@ -582,15 +737,15 @@ export class AnoDBCore<S extends SchemaDefinition> {
   }
 
   /** Envelope to another device's inbox (pairwise NIP-44 with a throwaway key). */
-  protected wrapToDevice(innerJson: string, devicePk: string): NostrEvent {
+  protected wrapToDevice(s: Store, innerJson: string, devicePk: string): Promise<NostrEvent> {
     const eph = this.opts.metadataProtection === 'none' ? this.deviceSk : generateSecretKey()
-    return this.wrap(innerJson, inboxTag(devicePk), conversationKey(eph, devicePk), eph)
+    return this.wrap(s, innerJson, inboxTag(devicePk), conversationKey(eph, devicePk), eph)
   }
 
-  protected enqueuePlain(event: NostrEvent): void {
+  protected async enqueuePlain(event: NostrEvent): Promise<void> {
     this.assertOpen()
     if (!this.sync) throw new Error('anoDB: no relays configured')
-    this.store.enqueue(event, false)
+    await this.store.enqueue(event, false)
     this.emitStatus()
     void this.sync.flush()
   }
@@ -635,7 +790,7 @@ export class AnoDBCore<S extends SchemaDefinition> {
   protected async afterCatchUp(_relay: string): Promise<void> {}
 
   /** Same content, fresh created_at, new envelope key. */
-  protected resignEnvelope(e: NostrEvent): NostrEvent {
+  protected async resignEnvelope(e: NostrEvent): Promise<NostrEvent> {
     const tag = e.tags.find((t) => t[0] === TAG)?.[1] ?? ''
     return signWith(this.envelopeKey(tag), { kind: e.kind, tags: e.tags, content: e.content, created_at: Math.floor(this.now() / 1000) })
   }
@@ -645,21 +800,21 @@ export class AnoDBCore<S extends SchemaDefinition> {
     return [...this.keysByTag.values()].filter((k) => active.has(k.space)).map((k) => k.tag)
   }
 
-  protected ingestGated(relay: string, e: NostrEvent): IngestResult {
+  protected async ingestGated(relay: string, e: NostrEvent): Promise<IngestResult> {
     if (this.gate.busy) {
-      this.#deferred.push(() => void this.ingest(relay, e))
+      this.#deferred.push(() => void this.ingest(relay, e).catch(() => {}))
       return 'seen'
     }
     return this.ingest(relay, e)
   }
 
   /** Verify and apply one envelope. */
-  protected ingest(source: string, outer: NostrEvent): IngestResult {
+  protected async ingest(source: string, outer: NostrEvent): Promise<IngestResult> {
     if (this.#closed || outer.kind !== WRAP_KIND) return 'invalid'
     const tag = outer.tags.find((t) => t[0] === TAG)?.[1]
     if (!tag) return 'invalid'
-    if (this.store.hasRaw(outer.id)) {
-      if (source !== 'p2p') this.store.putRaw(outer, tag, true) // now known to be on a relay
+    if (await this.store.hasRaw(outer.id)) {
+      if (source !== 'p2p') await this.store.putRaw(outer, tag, true) // now known to be on a relay
       return 'seen'
     }
     const ek = this.keysByTag.get(tag)
@@ -693,39 +848,39 @@ export class AnoDBCore<S extends SchemaDefinition> {
     let result = 'seen' as IngestResult
     const msgId = inner.id
     const device = inner.pubkey
-    const changed = this.store.transaction(() => {
-      this.store.putRaw(outer, tag, source !== 'p2p')
-      if (this.store.hasMessage(ek.space, device, payload.seq)) return new Set<string>()
-      this.store.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId, JSON.stringify(inner))
+    const changed = await this.store.transaction(async (s) => {
+      await s.putRaw(outer, tag, source !== 'p2p')
+      if (await s.hasMessage(ek.space, device, payload.seq)) return new Set<string>()
+      await s.putMessage({ space: ek.space, device, seq: payload.seq, identity, type: payload.t, payload: inner.content }, msgId, JSON.stringify(inner))
       result = 'new'
-      return this.onMessage(ek.space, identity, device, payload)
+      return this.onMessage(s, ek.space, identity, device, payload)
     })
     this.notify(changed, 'remote')
-    if (result === 'new') this.afterRemoteMessage(ek.space, identity, device, payload)
+    if (result === 'new') await this.afterRemoteMessage(ek.space, identity, device, payload)
     return result
   }
 
   /** Hook after a new remote message was stored (v0.3: membership handling). */
-  protected afterRemoteMessage(_space: string, _identity: string, _device: string, _p: StreamPayload): void {}
+  protected async afterRemoteMessage(_space: string, _identity: string, _device: string, _p: StreamPayload): Promise<void> {}
 
   /** Envelope for a tag that is not a space key (inbox, pairing secret). Implemented in v0.3. */
-  protected ingestOther(_tag: string, _outer: NostrEvent): IngestResult {
+  protected async ingestOther(_tag: string, _outer: NostrEvent): Promise<IngestResult> {
     return 'invalid'
   }
 
-  /** Apply a newly stored, signature-valid message. Returns changed tables. Runs inside a transaction. */
-  protected onMessage(space: string, identity: string, device: string, p: StreamPayload): Set<string> {
+  /** Apply a newly stored, signature-valid message (on the transaction view `s`). Returns changed tables. */
+  protected async onMessage(s: Store, space: string, identity: string, device: string, p: StreamPayload): Promise<Set<string>> {
     if (p.t === 'op') {
-      this.invalidateMembership(space)
-      return this.rebuildSpace(space)
+      await this.reloadMembership(s, space)
+      return this.rebuildSpace(s, space)
     }
     if (p.t !== 'ch') return new Set()
     if (!this.isAuthorizedWriter(space, identity, device, p.seq)) return new Set() // kept; re-evaluated on membership change
     let maxHlc = ''
     for (const c of p.c) if (c[4] > maxHlc) maxHlc = c[4]
     if (maxHlc) this.clock.receive(maxHlc)
-    this.store.setMeta('hlc', this.clock.current())
-    return this.store.applyChanges(space, this.allowedChanges(space, identity, p.c), identity)
+    await s.setMeta('hlc', this.clock.current())
+    return s.applyChanges(space, this.allowedChanges(space, identity, p.c), identity)
   }
 
   /** The changes of one signed message that pass the row-level rule (see policy.ts). */
@@ -741,30 +896,31 @@ export class AnoDBCore<S extends SchemaDefinition> {
 
   readonly #ownerCache = new Map<string, string | null>()
 
-  protected invalidateMembership(space: string): void {
-    this.#ownerCache.delete(space)
+  /**
+   * Re-evaluate who may do what in a space from its op log (read through `s`). Membership is kept
+   * in memory so permission checks stay synchronous; call this after the op log of a space changed.
+   */
+  protected async reloadMembership(s: Store, space: string): Promise<void> {
+    let owner: string | null = null
+    for (const m of await s.messages(space, 'op')) {
+      const p = JSON.parse(m.payload) as { op: { type?: string; owner?: string } }
+      if (p.op.type === 'create' && p.op.owner === m.identity) owner = m.identity
+    }
+    this.#ownerCache.set(space, owner)
   }
 
   /** v0.2: only the space creator (owner) may write. Generalised to roles in v0.3. */
   protected isAuthorizedWriter(space: string, identity: string, _device: string, _seq: number): boolean {
-    if (!this.#ownerCache.has(space)) {
-      let owner: string | null = null
-      for (const m of this.store.messages(space, 'op')) {
-        const p = JSON.parse(m.payload) as { op: { type?: string; owner?: string } }
-        if (p.op.type === 'create' && p.op.owner === m.identity) owner = m.identity
-      }
-      this.#ownerCache.set(space, owner)
-    }
-    return this.#ownerCache.get(space) === identity
+    return (this.#ownerCache.get(space) ?? null) === identity
   }
 
   /** Recompute a space's cells from the message log under the current authorization rules. */
-  protected rebuildSpace(space: string): Set<string> {
-    const touched = this.store.clearSpace(space)
-    for (const m of this.store.messages(space, 'ch')) {
+  protected async rebuildSpace(s: Store, space: string): Promise<Set<string>> {
+    const touched = await s.clearSpace(space)
+    for (const m of await s.messages(space, 'ch')) {
       if (!this.isAuthorizedWriter(space, m.identity, m.device, m.seq)) continue
       const p = JSON.parse(m.payload) as { c: Change[] }
-      for (const t of this.store.applyChanges(space, this.allowedChanges(space, m.identity, p.c), m.identity)) touched.add(t)
+      for (const t of await s.applyChanges(space, this.allowedChanges(space, m.identity, p.c), m.identity)) touched.add(t)
     }
     return touched
   }
@@ -803,13 +959,13 @@ export class AnoDBCore<S extends SchemaDefinition> {
   /** Retry relays that rejected pending events and flush the outbox now. */
   async flush(): Promise<void> {
     await this.gate.idle()
-    this.store.clearRejections()
+    await this.store.clearRejections()
     await this.sync?.flush()
   }
 
   /** Forget cursors and re-download everything from relays. */
-  resync(): void {
-    this.sync?.resync()
+  async resync(): Promise<void> {
+    await this.sync?.resync()
   }
 
   protected notify(tables: ReadonlySet<string>, origin: 'local' | 'remote'): void {
@@ -848,11 +1004,14 @@ export class AnoDBCore<S extends SchemaDefinition> {
   async close(): Promise<void> {
     if (this.#closed) return
     await this.gate.idle()
+    await this.#extRun?.catch(() => {})
     this.#closed = true
+    if (this.#extTimer) clearInterval(this.#extTimer)
+    await this.#extUnlisten?.().catch(() => {})
     this.sync?.close()
     this.#changeListeners.clear()
     this.#statusListeners.clear()
-    this.store.driver.close()
+    await this.store.close()
   }
 }
 

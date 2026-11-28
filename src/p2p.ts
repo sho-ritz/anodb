@@ -34,7 +34,7 @@ export interface P2PHost {
   /** Devices allowed in a space's room (active, not revoked; includes this device). */
   allowedDevices: (space: string) => Set<string>
   /** Deliver an envelope received from a peer; returns true if it was valid. */
-  ingest: (envelope: NostrEvent) => boolean
+  ingest: (envelope: NostrEvent) => Promise<boolean>
   /** All devices acknowledged a held envelope: drop it from the outbox, keep it local. */
   delivered: (entryId: string) => void
   /** Not everyone acknowledged in time: send it to relays. */
@@ -159,7 +159,11 @@ export class P2PSync {
     const device = st.devices.get(peer.id)
     if (!device) return // only verified devices may talk
     if (m.t === 'e' && isEvent(m.e)) {
-      if (this.#host.ingest(m.e)) void st.room.channel('anodb').send({ t: 'a', id: m.e.id }, peer).catch(() => {})
+      const e = m.e
+      void this.#host
+        .ingest(e)
+        .then((ok) => (ok ? st.room.channel('anodb').send({ t: 'a', id: e.id }, peer) : undefined))
+        .catch(() => {})
     } else if (m.t === 'a' && typeof m.id === 'string') {
       const p = this.#pending.get(m.id)
       if (!p || p.space !== st.space) return

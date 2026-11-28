@@ -39,7 +39,7 @@ describe('automatic relay selection, migration phase 1 (DECISIONS 29/30)', () =>
     expect(internals(db).sync.pool.relays).toEqual([f.url])
     await db.insertInto('todo').values({ title: 'x' }).execute()
     await until(() => wraps(f).length > 1, 3000, 'written')
-    const inner = (db as unknown as { store: { driver: { all<T>(q: string): T[] } } }).store.driver.all<{ payload: string }>(
+    const inner = await (db as unknown as { store: { all<T>(q: string): Promise<T[]> } }).store.all<{ payload: string }>(
       'SELECT payload FROM anodb_messages',
     )
     expect(inner.every((m) => !('rp' in JSON.parse(m.payload)))).toBe(true)
@@ -58,7 +58,7 @@ describe('automatic relay selection, migration phase 1 (DECISIONS 29/30)', () =>
     await until(() => [f, ...picked].every((r) => wraps(r).some((e) => e.tags[0]?.[1] === currentTag(db))), 3000, 'on every route relay')
     for (const r of cands.filter((r) => !route.includes(r.url))) expect(wraps(r).filter((e) => e.tags[0]?.[1] === currentTag(db))).toHaveLength(0)
 
-    const payloads = (db as unknown as { store: { driver: { all<T>(q: string): T[] } } }).store.driver.all<{ payload: string }>(
+    const payloads = await (db as unknown as { store: { all<T>(q: string): Promise<T[]> } }).store.all<{ payload: string }>(
       'SELECT payload FROM anodb_messages',
     )
     expect(payloads.length).toBeGreaterThan(0)

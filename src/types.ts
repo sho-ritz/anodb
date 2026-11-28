@@ -16,6 +16,35 @@ export interface SqliteDriver {
   close(): void
 }
 
+/** SQL flavour of a driver. */
+export type SqlDialectName = 'sqlite' | 'postgres'
+
+/**
+ * Asynchronous SQL driver (PGlite, Postgres). anoDB serializes all access itself, so the driver
+ * only needs one connection. Statements use the dialect's own placeholders (`$1` for Postgres).
+ */
+export interface AsyncSqlDriver {
+  readonly dialect: SqlDialectName
+  /** Execute one or more statements without parameters. */
+  exec(sql: string): Promise<void>
+  /** Execute one statement with parameters; resolves to the number of affected rows. */
+  run(sql: string, params?: readonly unknown[]): Promise<number>
+  /** Execute one statement and return all rows as objects. */
+  all<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): Promise<T[]>
+  /**
+   * Run `fn` inside BEGIN … COMMIT with exclusive use of the connection (a throw rolls back).
+   * Implement it when other code shares the connection (PGlite + Prisma) so their statements
+   * cannot land inside anoDB's transactions. Without it anoDB issues BEGIN / COMMIT itself.
+   */
+  transaction?<T>(fn: (tx: AsyncSqlDriver) => Promise<T>): Promise<T>
+  /** Change notifications (Postgres LISTEN). Optional: anoDB polls when it is missing. */
+  listen?(channel: string, fn: (payload: string) => void): Promise<() => Promise<void>>
+  close(): Promise<void>
+}
+
+/** Any driver `createAnoDB` accepts. */
+export type AnyDriver = SqliteDriver | AsyncSqlDriver
+
 export type ColumnType = 'text' | 'integer' | 'real' | 'boolean' | 'json'
 
 declare const JSON_TYPE: unique symbol

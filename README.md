@@ -43,11 +43,12 @@ npx @anodb/cli init
 One interactive command does the whole setup:
 
 1. Asks the language (English / 日本語) and detects your environment and framework
-2. Installs `@anodb/core` (plus `sql.js` for web apps)
-3. Generates `anodb/schema`, `anodb/db` and a React `<DBProvider>`
-4. Web apps: copies the SQLite WASM files to `public/anodb/` and adds `"postinstall": "anodb assets"` to keep them in sync
-5. Wraps your app in `<DBProvider>` (Next.js `app/layout` or Vite `src/main`)
-6. Optionally checks that the relays store and serve events
+2. Node / Electron: asks for the database — SQLite (`node:sqlite`) or [PGlite](#postgres-pglite-on-the-server) (Postgres)
+3. Installs `@anodb/core` (plus `sql.js` for web apps, `@electric-sql/pglite` for PGlite)
+4. Generates `anodb/schema`, `anodb/db` and a React `<DBProvider>`
+5. Web apps: copies the SQLite WASM files to `public/anodb/` and adds `"postinstall": "anodb assets"` to keep them in sync
+6. Wraps your app in `<DBProvider>` (Next.js `app/layout` or Vite `src/main`)
+7. Optionally checks that the relays store and serve events
 
 Then use it from any component:
 
@@ -84,7 +85,7 @@ import { browserDriver, createAnoDB } from '@anodb/core'
 const db = await createAnoDB({ appId, schema, driver: await browserDriver({ name: appId }) })
 ```
 
-Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 22.13+ (`node:sqlite`), and React Native / Expo (`expo-sqlite`).
+Runs in browsers / Tauri (sql.js persisted to IndexedDB), Electron and Node.js 22.13+ (`node:sqlite` or PGlite), and React Native / Expo (`expo-sqlite`).
 
 ## Usage
 
@@ -121,6 +122,39 @@ const stop = db.subscribe(db.selectFrom('todo').selectAll(), (rows) => render(ro
 
 - Every table gets `id`, `space`, `createdAt`, `updatedAt`, `createdBy` and `updatedBy` (`space` defaults to your personal space, see below).
 - `boolean` columns read as `true / false` and `json` columns as parsed values (also through JOINs, aliases and live queries). Raw SQL strings (`db.execute`) return plain SQLite values.
+
+### Postgres (PGlite) on the server
+
+```sh
+npx @anodb/cli init --env node --db pglite   # or pick "PGlite" in the wizard
+```
+
+```ts
+import { PGlite } from '@electric-sql/pglite'
+import { createAnoDB, pgliteDriver } from '@anodb/core'
+
+export const pg = await PGlite.create('./anodb-pgdata')
+export const db = await createAnoDB({ appId, schema, driver: pgliteDriver(pg) })
+```
+
+With [PGlite](https://pglite.dev) (Postgres compiled to WASM) the tables are **ordinary Postgres
+tables** with native types (`boolean`, `bigint`, `double precision`, `jsonb`). Kysely queries
+compile to Postgres, and raw SQL uses Postgres syntax (`$1` parameters, `done = true`).
+
+Other tools can share the same PGlite instance (Prisma via a PGlite driver adapter, Drizzle, plain
+`pg.query`). Their **writes to anoDB's tables are synced too**: Postgres triggers queue every changed
+row, and anoDB commits it like its own write (permission checks, signature, encryption, relays).
+anoDB picks the writes up through `LISTEN / NOTIFY` right away, and when it opens for writes made
+while it was closed. `await db.syncExternalWrites()` waits until everything written so far is
+committed. A row that fails the checks (for example an unknown `space`, or someone else's row in an
+`owned()` table) is put back the way anoDB has it, and `onError` receives `'rejected-write'`.
+
+- anoDB creates and owns its tables (`id`, `space`, `createdAt`, … plus your columns) and refuses to
+  start when a table of the same name already exists that it did not create. Point Prisma at them
+  with `prisma db pull` instead of migrating them yourself.
+- Changing `id` or `space` of a row is refused (an exception) for every writer. Writes to the
+  system columns (`createdAt`, `updatedBy`, …) are ignored.
+- Pass `pgliteDriver(pg, { close: false })` when other code keeps using `pg` after `db.close()`.
 
 ### Keys (most secure defaults)
 
@@ -165,6 +199,47 @@ await db.insertInto('profiles').values({ id: db.pubkey, name: 'Taro' }).execute(
 
 In every table, `createdBy` / `updatedBy` are taken from signatures (read-only), and nobody can
 create a row whose id names someone else.
+
+### Server-confirmed tables
+
+Some decisions must be made in one place: bookings, stock, the last seat. In a
+`confirmed(..., { by })` table only that identity (your server) may write. Every device enforces
+it, so clients can trust these rows as the server's decisions. Not even the owner of a space can
+write them, and neither a modified client nor a snapshot can forge them. Clients write a
+*request* to an ordinary table. On the server, `serveRequests` decides each request in a
+transaction and writes the result in the same commit.
+
+```ts
+import { confirmed, defineSchema, owned, serveRequests } from '@anodb/core'
+const SERVER = 'npub1…' // the server's identity
+export const schema = defineSchema({
+  slots: confirmed({ title: 'text', remaining: 'integer' }, { by: SERVER }),
+  bookingRequests: owned({ slot: 'text' }),                        // written by clients, even offline
+  bookings: confirmed({ slot: 'text', status: 'text' }, { by: SERVER }), // id = request id
+})
+
+// server (identity = SERVER): one request at a time, so constraints checked here hold
+serveRequests(db, {
+  requests: 'bookingRequests',
+  results: 'bookings',
+  handle: async (req, trx) => {
+    const s = await trx.selectFrom('slots').select('remaining').where('id', '=', req.slot!).executeTakeFirst()
+    if (!s || s.remaining! < 1) return { slot: req.slot, status: 'rejected' }
+    await trx.updateTable('slots').set({ remaining: s.remaining! - 1 }).where('id', '=', req.slot!).execute()
+    return { slot: req.slot, status: 'confirmed' }
+  },
+})
+```
+
+The result is written to the request's space. Give each user a private space shared with the
+server (the user adds the server as a `writer`), and keep public data such as `slots` in a space
+the server owns, with users as `reader`s. Then each user receives only their own bookings, while
+everyone sees the remaining seats.
+
+On the client, a request with no result yet is pending. While `db.status.pendingEvents > 0` it has
+not even left the device. Requests written while the server was down are decided when it starts.
+If `handle` throws, the request stays undecided: it is retried after the next change and reported
+once to `onError`.
 
 ## Sharing (spaces)
 
@@ -353,14 +428,14 @@ import { AddMember, DeviceList, Invitations, Members, PairDevice } from '@anodb/
 
 ## Column types
 
-| Type | Write (TS) | Read (TS) | SQLite |
-|---|---|---|---|
-| `text` | `string` | `string` | TEXT |
-| `integer` | `number` (safe integer) | `number` | INTEGER |
-| `real` | `number` | `number` | REAL |
-| `boolean` | `boolean` | `boolean` | INTEGER (0 / 1) |
-| `json` | any JSON value | `unknown` | TEXT |
-| `json<T>()` | `T` | `T` | TEXT |
+| Type | Write (TS) | Read (TS) | SQLite | Postgres (PGlite) |
+|---|---|---|---|---|
+| `text` | `string` | `string` | TEXT | TEXT |
+| `integer` | `number` (safe integer) | `number` | INTEGER | BIGINT |
+| `real` | `number` | `number` | REAL | DOUBLE PRECISION |
+| `boolean` | `boolean` | `boolean` | INTEGER (0 / 1) | BOOLEAN |
+| `json` | any JSON value | `unknown` | TEXT | JSONB |
+| `json<T>()` | `T` | `T` | TEXT | JSONB |
 
 ```ts
 import { defineSchema, json } from '@anodb/core'
@@ -378,7 +453,7 @@ All columns are nullable.
 - **Losing every device loses your personal space** (by design, for security).
 - With only non-NIP-77 relays, more events in a single second than a relay's result limit can be missed; `syncHealth()` reports the gap.
 - Files depend on Blossom servers' retention policies (none are guaranteed).
-- The local SQLite file itself is not encrypted; rely on disk encryption.
+- The local database file (SQLite or PGlite) itself is not encrypted; rely on disk encryption.
 
 See [docs/DESIGN.md](docs/DESIGN.md) for the threat model and open issues.
 
@@ -386,6 +461,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) for the threat model and open issues.
 
 ```sh
 npm test              # unit + integration tests against a mock relay (NIP-77, fault injection)
+npm run test:pglite   # the same suite with PGlite (Postgres) as the default driver
 npm run typecheck
 npm run smoke:public  # checks against real public relays (network required)
 ```
