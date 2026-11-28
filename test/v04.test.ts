@@ -20,8 +20,11 @@ describe('NIP-77 sync (v0.4)', () => {
   it('recovers messages that time-based paging cannot reach (one second over the relay limit)', async () => {
     for (const neg of [false, true]) {
       const r = await relay({ maxLimit: 3, negentropy: neg })
-      // Freeze the writer's clock while it writes, so every envelope has the same created_at
-      // (otherwise the writes can straddle a second boundary and paging reaches them all).
+      // Ten envelopes in one second (the writer's clock is frozen), then one in a later second.
+      // The relay returns 3 per request and NIP-01 cannot page inside a second, so the reader gets
+      // the newest envelope plus 2 of the 10: some are lost, and the newest one's sequence number
+      // reveals that they exist. (Without the later one, the 3 delivered could be the 3 oldest,
+      // and a loss at the end of a device's stream is invisible.)
       let frozen: number | null = null
       const a = await open(schema, [r], { now: () => frozen ?? Date.now() })
       const dev = await pairedDevice(a, schema, [r])
@@ -29,17 +32,19 @@ describe('NIP-77 sync (v0.4)', () => {
       await dev.db.close()
       frozen = Date.now()
       for (let i = 0; i < 10; i++) await a.insertInto('todo').values({ title: `s${i}` }).execute()
+      frozen += 2000
+      await a.insertInto('todo').values({ title: 's10' }).execute()
       frozen = null
       await until(() => a.status.pendingEvents === 0, 4000)
       const b = await dev.reopen()
       await until(() => b.status.state === 'synced', 4000)
       const count = async () => (await titles(b)).filter((t) => t?.startsWith('s')).length
-      if (neg) await until(async () => (await count()) === 10, 4000, 'NIP-77 recovers all')
+      if (neg) await until(async () => (await count()) === 11, 4000, 'NIP-77 recovers all')
       else {
         // NIP-01 cannot page inside one second, so this relay alone cannot deliver everything —
         // but the loss is no longer silent: sequence numbers expose it (layer 3).
         await until(() => b.syncHealth().gaps.length > 0, 4000, 'gap detected')
-        expect(await count()).toBeLessThan(10)
+        expect(await count()).toBeLessThan(11)
       }
     }
   })
