@@ -306,6 +306,7 @@
     {
       "grant": {
         "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
         "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
         "ops": [
           "x",
@@ -317,22 +318,15 @@
     {
       "grant": {
         "sp": "f6f50f5a31c5533b6bba52030f800888",
-        "key": "BB7B8BA52D7E62322F80F9C46BB7A6C1878D6DAA27F357CB31A8B0613F829FAA",
+        "num": 2,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
         "ops": []
       },
-      "valid": false
+      "valid": true
     },
     {
       "grant": {
         "sp": "f6f50f5a31c5533b6bba52030f800888",
-        "key": "ab",
-        "ops": []
-      },
-      "valid": false
-    },
-    {
-      "grant": {
-        "sp": 1,
         "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
         "ops": []
       },
@@ -341,6 +335,81 @@
     {
       "grant": {
         "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": "2",
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": -1,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1.5,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
+        "name": 5,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
+        "name": null,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
+        "key": "BB7B8BA52D7E62322F80F9C46BB7A6C1878D6DAA27F357CB31A8B0613F829FAA",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
+        "key": "ab",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": 1,
+        "num": 1,
+        "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
+        "ops": []
+      },
+      "valid": false
+    },
+    {
+      "grant": {
+        "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
         "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa"
       },
       "valid": false
@@ -348,6 +417,7 @@
     {
       "grant": {
         "sp": "f6f50f5a31c5533b6bba52030f800888",
+        "num": 1,
         "key": "bb7b8ba52d7e62322f80f9c46bb7a6c1878d6daa27f357cb31a8b0613f829faa",
         "ops": {}
       },

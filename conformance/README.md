@@ -36,22 +36,13 @@ is byte-for-byte stable; CI regenerates it and fails if the checked-in files dif
 
 ## Where the implementation and PROTOCOL.md disagree
 
-The vectors follow the TypeScript implementation (that is what deployed apps do). To be settled
-before the protocol leaves draft:
+The vectors follow the TypeScript implementation (that is what deployed apps do). Disagreements
+with the text of PROTOCOL.md are listed here until they are settled.
 
-1. **Tables the schema does not know.** PROTOCOL.md §4.1: "Tables unknown to an implementation
-   follow the owned rule". The implementation treats them as **plain** (`changeAllowed` →
-   `isOwned(undefined)` is false). See `policy.json`, table `unknown`.
+None at the moment. Settled so far:
 
-## Where Rust is stricter (not covered by the vectors)
-
-The vectors only contain inputs on which both implementations agree. On these, Rust refuses what
-TypeScript lets through:
-
-1. **Snapshot cells.** TypeScript keeps any 5-element array (`[1, 2, 3, 4, 5]` reaches the cell
-   table); Rust requires a valid change (`Change::parse_cell`), as in `ch` messages.
-2. **Key grants.** TypeScript does not check `num` or `name`; Rust exposes them as `None` unless they
-   are a safe integer / a string, and leaves the decision to the caller.
-
-Fixing the TypeScript side (1) is a small change to `assembleSnapshots` and would let the vectors
-cover it.
+1. **Tables the schema does not know** are plain, as implemented; PROTOCOL.md §4.1 was changed to
+   match (docs/DECISIONS.md row 35). See `policy.json`, table `unknown`.
+2. **Snapshot cells and key grants** are validated the same way on both sides (a snapshot cell is a
+   valid change plus an optional hex signer; a grant needs a safe-integer `num` ≥ 0 and a string or
+   absent `name`).

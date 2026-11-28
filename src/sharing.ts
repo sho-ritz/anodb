@@ -29,7 +29,7 @@ import {
   mayWrite,
   parseOp,
 } from './membership.js'
-import { type Change, type InboxPayload, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, parseInboxPayload, parseStreamPayload } from './protocol.js'
+import { type Change, type InboxPayload, MAX_BODY_BYTES, MESSAGE_KIND, byteLength, isChange, parseInboxPayload, parseStreamPayload } from './protocol.js'
 import { changeAllowed } from './policy.js'
 import { SYS_DELETED } from './schema.js'
 import type { IngestResult } from './sync.js'
@@ -81,7 +81,15 @@ export interface KeyGrant {
 export function parseKeyGrant(g: unknown): KeyGrant | null {
   if (typeof g !== 'object' || g === null) return null
   const x = g as Record<string, unknown>
-  return typeof x.sp === 'string' && typeof x.key === 'string' && /^[0-9a-f]{64}$/.test(x.key) && Array.isArray(x.ops) ? (g as KeyGrant) : null
+  return typeof x.sp === 'string' &&
+    typeof x.key === 'string' &&
+    /^[0-9a-f]{64}$/.test(x.key) &&
+    Array.isArray(x.ops) &&
+    Number.isSafeInteger(x.num) &&
+    (x.num as number) >= 0 &&
+    (x.name === undefined || typeof x.name === 'string')
+    ? (g as KeyGrant)
+    : null
 }
 
 /** The receiver's role if a `key` / `invite` grant from `sender` is acceptable under `m` (§5.3). */
@@ -152,7 +160,9 @@ export function assembleSnapshots(messages: Iterable<SnapshotMessage>): Assemble
     if (h?.heads && typeof h.heads === 'object') {
       for (const [d, v] of Object.entries(h.heads as Record<string, unknown>)) if (typeof v === 'number' && Number.isSafeInteger(v)) heads[d] = v
     }
-    const valid = (c: unknown) => Array.isArray(c) && (c.length === 5 || (c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5])))
+    // A change (as in `ch` messages), optionally followed by the identity that signed it.
+    const valid = (c: unknown) =>
+      Array.isArray(c) && (c.length === 5 ? isChange(c) : c.length === 6 && typeof c[5] === 'string' && /^[0-9a-f]{64}$/.test(c[5]) && isChange(c.slice(0, 5)))
     out.push({ device: parts[0]!.device, author: parts[0]!.identity, last: Math.max(...parts.map((p) => p.seq)), cells: cells.filter(valid), heads })
   }
   return out

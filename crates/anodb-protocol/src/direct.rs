@@ -120,11 +120,11 @@ pub fn seal_to_secret(inner: &Event, secret: &str, created_at: u64) -> Result<Ev
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeyGrant {
     pub space: String,
-    /// `None` unless a string.
+    /// `None` when absent.
     pub name: Option<String>,
     pub personal: bool,
-    /// Epoch number; `None` unless a safe integer (the TypeScript implementation does not check it).
-    pub num: Option<i64>,
+    /// Epoch number (§5.2).
+    pub num: u64,
     pub key: [u8; 32],
     /// The string entries of `ops` (signed inner op events, see [`portable_op`]).
     pub ops: Vec<String>,
@@ -136,9 +136,12 @@ pub fn parse_key_grant(v: &Value) -> Option<KeyGrant> {
     let key = x.get("key")?.as_str().filter(|k| is_lower_hex(k, 64))?;
     Some(KeyGrant {
         space: x.get("sp")?.as_str()?.to_owned(),
-        name: x.get("name").and_then(Value::as_str).map(str::to_owned),
+        name: match x.get("name") {
+            None => None,
+            Some(n) => Some(n.as_str()?.to_owned()),
+        },
         personal: x.get("personal").and_then(Value::as_bool).unwrap_or(false),
-        num: x.get("num").and_then(safe_integer),
+        num: x.get("num").and_then(safe_integer).filter(|n| *n >= 0)? as u64,
         key: hex::decode(key).ok()?.try_into().ok()?,
         ops: x
             .get("ops")?

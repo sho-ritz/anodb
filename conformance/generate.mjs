@@ -563,12 +563,19 @@ const portable = [
 
 const grantShapes = [
   [{ sp: mSpace, name: 'Family', personal: false, num: 2, key: bytesToHex(epochKey), ops: [] }, true],
-  [{ sp: mSpace, key: bytesToHex(epochKey), ops: ['x', 1] }, true],
-  [{ sp: mSpace, key: bytesToHex(epochKey).toUpperCase(), ops: [] }, false],
-  [{ sp: mSpace, key: 'ab', ops: [] }, false],
-  [{ sp: 1, key: bytesToHex(epochKey), ops: [] }, false],
-  [{ sp: mSpace, key: bytesToHex(epochKey) }, false],
-  [{ sp: mSpace, key: bytesToHex(epochKey), ops: {} }, false],
+  [{ sp: mSpace, num: 1, key: bytesToHex(epochKey), ops: ['x', 1] }, true],
+  [{ sp: mSpace, num: 2.0, key: bytesToHex(epochKey), ops: [] }, true],
+  [{ sp: mSpace, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: '2', key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: -1, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: 1.5, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: 1, name: 5, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: 1, name: null, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: 1, key: bytesToHex(epochKey).toUpperCase(), ops: [] }, false],
+  [{ sp: mSpace, num: 1, key: 'ab', ops: [] }, false],
+  [{ sp: 1, num: 1, key: bytesToHex(epochKey), ops: [] }, false],
+  [{ sp: mSpace, num: 1, key: bytesToHex(epochKey) }, false],
+  [{ sp: mSpace, num: 1, key: bytesToHex(epochKey), ops: {} }, false],
   [null, false],
   ['grant', false],
 ].map(([grant, valid]) => {
@@ -663,6 +670,9 @@ const snapCells = [
   cell('mine', oRow, 'note', 'owner row, signed by owner', who.owner),
   ['mine', oRow, 'title', 'x', h(5, 0, A), 'not-hex'],
   ['short', 'r', 'c', 1],
+  [1, 2, 3, 4, 5],
+  ['$sys', 'r', 'c', 1, h(5, 0, A)],
+  ['plain', 'r', 'title', 1, 'not an hlc', who.owner],
 ]
 const snapshotSets = [
   ['complete, two parts, from an admin', [

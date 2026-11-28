@@ -20,11 +20,16 @@ describe('NIP-77 sync (v0.4)', () => {
   it('recovers messages that time-based paging cannot reach (one second over the relay limit)', async () => {
     for (const neg of [false, true]) {
       const r = await relay({ maxLimit: 3, negentropy: neg })
-      const a = await open(schema, [r])
+      // Freeze the writer's clock while it writes, so every envelope has the same created_at
+      // (otherwise the writes can straddle a second boundary and paging reaches them all).
+      let frozen: number | null = null
+      const a = await open(schema, [r], { now: () => frozen ?? Date.now() })
       const dev = await pairedDevice(a, schema, [r])
       await until(() => dev.db.status.state === 'synced', 4000)
       await dev.db.close()
-      for (let i = 0; i < 10; i++) await a.insertInto('todo').values({ title: `s${i}` }).execute() // all within ~1 second
+      frozen = Date.now()
+      for (let i = 0; i < 10; i++) await a.insertInto('todo').values({ title: `s${i}` }).execute()
+      frozen = null
       await until(() => a.status.pendingEvents === 0, 4000)
       const b = await dev.reopen()
       await until(() => b.status.state === 'synced', 4000)

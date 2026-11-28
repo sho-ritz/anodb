@@ -65,8 +65,6 @@ impl Change {
     }
 
     /// A snapshot cell: a change, optionally followed by the identity that signed it (§5.4).
-    ///
-    /// Stricter than the TypeScript implementation, which keeps any 5-element array here.
     pub fn parse_cell(v: &Value) -> Option<Self> {
         let a = v.as_array()?;
         match a.len() {

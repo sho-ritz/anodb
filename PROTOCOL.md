@@ -86,7 +86,9 @@ the app marks tables `owned`. A row whose id names a creator is visible only onc
 cell exists, so nobody can make a row appear in someone else's name. Refused changes are ignored,
 not stored as state. Implementations create ids as `<own identity>-<16 hex random>` by default,
 expose the creator as `createdBy` and the signer of the newest cell as `updatedBy`. Tables unknown to
-an implementation follow the owned rule.
+an implementation are treated as plain: an older app version keeps what a newer one writes to a table
+it does not know yet, and snapshot cells name their signer (§5.4), so a version that knows the table
+re-checks them under its rule.
 
 ## 5. Spaces and membership
 

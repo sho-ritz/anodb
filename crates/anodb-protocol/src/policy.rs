@@ -75,8 +75,7 @@ pub fn owner_of_row(row_id: &str) -> Option<&str> {
 
 /// `rule` is the table's rule, or `None` for a table this implementation does not know.
 ///
-/// Tables the schema does not know are treated as plain, like the TypeScript implementation.
-/// (PROTOCOL.md §4.1 says "owned"; see conformance/README.md.)
+/// Tables the schema does not know are treated as plain (PROTOCOL.md §4.1).
 pub fn change_allowed(
     rule: Option<&TableRule>,
     c: &Change,
