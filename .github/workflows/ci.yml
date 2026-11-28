@@ -37,3 +37,9 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
       - run: cargo run -q -p anodb-protocol --example interop | node conformance/check-rust.mjs
+      - run: cargo clippy -p anodb-engine --features tls -- -D warnings
+      # A TypeScript device and a Rust device share spaces through a relay.
+      - name: Interop with the TypeScript implementation
+        run: |
+          cargo build -q -p anodb-engine --example peer
+          ANODB_RUST_PEER="$PWD/target/debug/examples/peer" npx vitest run test/rust-interop.test.ts
